@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, inArray, isNotNull, ne, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { Money } from '@accounting/money';
 import {
   LEDGER_STATUSES,
@@ -15,12 +16,14 @@ import {
   journalLines,
   inventoryBalances,
   inventorySettings,
+  taxCodes,
   vendorBills,
   vendorPayments,
   warehouses,
 } from '@/database/schema';
 import { AccountsService } from '@/modules/accounting/accounts/accounts.service';
 import { SubledgerBalancesService } from '@/modules/reconciliation/subledger-balances.service';
+import { SuspenseService } from '@/modules/reconciliation/suspense.service';
 
 export type IntegritySeverity = 'INFO' | 'WARNING' | 'CRITICAL';
 
@@ -70,6 +73,7 @@ export class IntegrityService {
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly accounts: AccountsService,
     private readonly balances: SubledgerBalancesService,
+    private readonly suspense: SuspenseService,
   ) {}
 
   async run(companyId: string, asOf: string): Promise<IntegrityReport> {
@@ -89,6 +93,8 @@ export class IntegrityService {
       this.duplicateVendorInvoices(companyId),
       this.duplicatePayments(companyId),
       this.negativeStock(companyId),
+      this.suspenseBalances(companyId, asOf),
+      this.taxAccounts(companyId),
     ]);
     const worst = findings.some((f) => f.count > 0 && f.severity === 'CRITICAL')
       ? 'CRITICAL'
@@ -370,6 +376,60 @@ export class IntegrityService {
       'NEGATIVE_STOCK',
       'WARNING',
       'No negative stock where the company forbids it',
+      rows,
+    );
+  }
+
+  /** Suspense / clearing accounts must clear within policy (see SuspenseService). */
+  private async suspenseBalances(companyId: string, asOf: string): Promise<IntegrityFinding> {
+    const monitor = await this.suspense.monitor(companyId, asOf);
+    const rows = monitor.accounts
+      .filter((a) => a.status === 'REQUIRES_INVESTIGATION')
+      .map((a) => ({
+        accountId: a.accountId,
+        code: a.code,
+        name: a.name,
+        balance: a.balance,
+        ageDays: a.ageDays,
+        reasons: a.reasons,
+      }));
+    return finding(
+      'SUSPENSE_BALANCE',
+      'WARNING',
+      'No suspense balance requires investigation',
+      rows,
+      `Materiality ${monitor.materiality}, max age ${monitor.maxAgeDays} days`,
+    );
+  }
+
+  /** Active tax codes must map to active, postable accounts on both sides. */
+  private async taxAccounts(companyId: string): Promise<IntegrityFinding> {
+    const sa = alias(accounts, 'sa');
+    const pa = alias(accounts, 'pa');
+    const badSales = sql`(${taxCodes.salesAccountId} is not null and (${sa.id} is null or ${sa.status} <> 'ACTIVE' or ${sa.isHeader}))`;
+    const badPurchase = sql`(${taxCodes.purchaseAccountId} is not null and (${pa.id} is null or ${pa.status} <> 'ACTIVE' or ${pa.isHeader}))`;
+    const unmapped = sql`(${taxCodes.salesAccountId} is null and ${taxCodes.purchaseAccountId} is null)`;
+    const rows = await this.db
+      .select({
+        taxCodeId: taxCodes.id,
+        code: taxCodes.code,
+        problem: sql<string>`case when ${badSales} then 'sales account' when ${badPurchase} then 'purchase account' else 'no account' end`,
+      })
+      .from(taxCodes)
+      .leftJoin(sa, eq(sa.id, taxCodes.salesAccountId))
+      .leftJoin(pa, eq(pa.id, taxCodes.purchaseAccountId))
+      .where(
+        and(
+          eq(taxCodes.companyId, companyId),
+          eq(taxCodes.status, 'ACTIVE'),
+          sql`(${badSales} or ${badPurchase} or ${unmapped})`,
+        ),
+      )
+      .limit(20);
+    return finding(
+      'TAX_ACCOUNT_INVALID',
+      'CRITICAL',
+      'Active tax codes map to active, postable accounts',
       rows,
     );
   }

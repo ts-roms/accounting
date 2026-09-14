@@ -190,6 +190,7 @@ export interface Account {
   parentId: string | null;
   isHeader: boolean;
   isSystem: boolean;
+  isSuspense: boolean;
   currency: string | null;
   description: string | null;
   status: EntityStatus;
@@ -1675,6 +1676,9 @@ export interface ApprovalWorkflow {
   maxAmount: string | null;
   priority: number;
   allowSelfApproval: boolean;
+  branchId: string | null;
+  deadlineHours: number | null;
+  escalationPermission: string | null;
   steps: WorkflowStep[];
   status: EntityStatus;
   openRequests: number;
@@ -1697,6 +1701,11 @@ export interface ApprovalRequest {
   requestedByName: string | null;
   pendingApprovals: number;
   canDecide: boolean;
+  overdue: boolean;
+  escalationPermission: string | null;
+  branchId: string | null;
+  dueAt: string | null;
+  escalatedAt: string | null;
   completedAt: string | null;
   createdAt: string;
 }
@@ -1922,6 +1931,9 @@ export interface AccountingPolicy {
   closeBlockOnOpenExceptions: boolean;
   closeRequireIntegrityOk: boolean;
   closeLockOnComplete: boolean;
+  closeBlockOnSuspense: boolean;
+  suspenseMateriality: string;
+  suspenseMaxAgeDays: number;
 }
 
 export interface ReconciliationLine {
@@ -2072,4 +2084,79 @@ export interface CloseView {
 export interface CloseDetail extends CloseView {
   tasks: CloseTaskView[];
   blockers: CloseBlocker[];
+}
+
+// ---------------------------------------------------------------- Hardening H5: enterprise controls
+
+export type ControlSeverity = 'OK' | 'INFO' | 'WARNING' | 'CRITICAL';
+
+export interface ControlTile {
+  key: string;
+  title: string;
+  value: string;
+  kind: 'count' | 'amount' | 'percent' | 'text';
+  severity: ControlSeverity;
+  detail: string | null;
+  href: string;
+}
+
+export interface ControlDashboard {
+  asOf: string;
+  currency: string;
+  generatedAt: string;
+  status: ControlSeverity;
+  tiles: ControlTile[];
+}
+
+export type SuspenseStatus = 'CLEAR' | 'WITHIN_POLICY' | 'REQUIRES_INVESTIGATION';
+
+export interface SuspenseAccountView {
+  accountId: string;
+  code: string;
+  name: string;
+  balance: string;
+  transactions: number;
+  openTransactions: number;
+  openSince: string | null;
+  ageDays: number;
+  status: SuspenseStatus;
+  reasons: string[];
+}
+
+export interface SuspenseMonitor {
+  asOf: string;
+  currency: string;
+  materiality: string;
+  maxAgeDays: number;
+  totalBalance: string;
+  requiresInvestigation: number;
+  accounts: SuspenseAccountView[];
+}
+
+export interface FieldChange {
+  id: number;
+  auditLogId: number;
+  entityType: string;
+  entityId: string;
+  field: string;
+  previousValue: unknown;
+  newValue: unknown;
+  changedBy: string | null;
+  changedByEmail: string | null;
+  reason: string | null;
+  correlationId: string | null;
+  changedAt: string;
+}
+
+export interface SodUserConflict {
+  policyId: string;
+  policyName: string;
+  permissionA: string;
+  permissionB: string;
+  enforcement: 'BLOCK' | 'WARN';
+  userId: string;
+  userName: string;
+  userEmail: string;
+  companyId: string | null;
+  companyName: string | null;
 }

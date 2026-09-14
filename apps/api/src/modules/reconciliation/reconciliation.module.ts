@@ -11,6 +11,7 @@ import {
 } from './reconciliation.controller';
 import { ReconciliationsService } from './reconciliations.service';
 import { SubledgerBalancesService } from './subledger-balances.service';
+import { SuspenseService } from './suspense.service';
 
 /**
  * Generalised subledger-to-control reconciliation: one service derives every
@@ -26,7 +27,7 @@ import { SubledgerBalancesService } from './subledger-balances.service';
     BankingModule,
   ],
   controllers: [ReconciliationController, AccountingPoliciesController],
-  providers: [SubledgerBalancesService, ReconciliationsService],
-  exports: [SubledgerBalancesService, ReconciliationsService],
+  providers: [SubledgerBalancesService, ReconciliationsService, SuspenseService],
+  exports: [SubledgerBalancesService, ReconciliationsService, SuspenseService],
 })
 export class ReconciliationModule {}

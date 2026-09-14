@@ -44,6 +44,7 @@ import { FiscalPeriodsService } from '@/modules/accounting/fiscal/fiscal-periods
 import { IntegrityService } from '@/modules/accounting/integrity/integrity.service';
 import { AuditService } from '@/modules/audit/audit.service';
 import { ReconciliationsService } from '@/modules/reconciliation/reconciliations.service';
+import { SuspenseService } from '@/modules/reconciliation/suspense.service';
 import { ReportingService } from '@/modules/reporting/reporting.service';
 
 const MODULE = 'FINANCIAL_CLOSE';
@@ -123,6 +124,12 @@ const TEMPLATE: Array<{
     kind: 'MANUAL',
     required: false,
   },
+  {
+    key: 'SUSPENSE_BALANCES',
+    title: 'Suspense balances within policy',
+    kind: 'AUTO',
+    required: true,
+  },
   { key: 'MANUAL_SUSPENSE', title: 'Suspense account review', kind: 'MANUAL', required: true },
   {
     key: 'UNAPPROVED_JOURNALS',
@@ -175,6 +182,7 @@ export class FinancialCloseService {
     private readonly periods: FiscalPeriodsService,
     private readonly recon: ReconciliationsService,
     private readonly integrity: IntegrityService,
+    private readonly suspense: SuspenseService,
     private readonly reports: ReportingService,
   ) {}
 
@@ -250,19 +258,17 @@ export class FinancialCloseService {
         })
         .returning({ id: financialCloses.id });
       const template = TEMPLATE.filter((t) => !t.types || t.types.includes(input.closeType));
-      await tx
-        .insert(closeTasks)
-        .values(
-          template.map((t, i) => ({
-            closeId: created!.id,
-            companyId,
-            sequence: i + 1,
-            key: t.key,
-            title: t.title,
-            kind: t.kind,
-            required: t.required,
-          })),
-        );
+      await tx.insert(closeTasks).values(
+        template.map((t, i) => ({
+          closeId: created!.id,
+          companyId,
+          sequence: i + 1,
+          key: t.key,
+          title: t.title,
+          kind: t.kind,
+          required: t.required,
+        })),
+      );
       await this.audit.record(
         {
           action: 'CREATE',
@@ -438,18 +444,16 @@ export class FinancialCloseService {
         .toUpperCase()
         .replace(/[^A-Z0-9]+/g, '_')
         .slice(0, 40)}_${next}`;
-      await tx
-        .insert(closeTasks)
-        .values({
-          closeId: id,
-          companyId,
-          sequence: next,
-          key,
-          title: input.title,
-          kind: 'MANUAL',
-          required: input.required,
-          ownerId: input.ownerId ?? null,
-        });
+      await tx.insert(closeTasks).values({
+        closeId: id,
+        companyId,
+        sequence: next,
+        key,
+        title: input.title,
+        kind: 'MANUAL',
+        required: input.required,
+        ownerId: input.ownerId ?? null,
+      });
     });
     return this.refresh(companyId, actor, id);
   }
@@ -663,11 +667,17 @@ export class FinancialCloseService {
       { missing },
     );
 
-    // Depreciation: a POSTED run for the period, unless no asset is depreciating.
+    // Depreciation: a POSTED run for the period, unless no asset was in service by its end.
     const [activeAssets] = await this.db
       .select({ n: sql<number>`count(*)::int` })
       .from(fixedAssets)
-      .where(and(eq(fixedAssets.companyId, companyId), eq(fixedAssets.status, 'ACTIVE')));
+      .where(
+        and(
+          eq(fixedAssets.companyId, companyId),
+          eq(fixedAssets.status, 'ACTIVE'),
+          lte(fixedAssets.inServiceDate, end),
+        ),
+      );
     const [run] = await this.db
       .select({ id: depreciationRuns.id })
       .from(depreciationRuns)
@@ -741,6 +751,20 @@ export class FinancialCloseService {
         ? `${openExc.n} open reconciliation exception(s)`
         : 'No open reconciliation exceptions',
       { open: openExc?.n ?? 0 },
+    );
+
+    const suspense = await this.suspense.monitor(companyId, end);
+    const flagged = suspense.accounts.filter((a) => a.status === 'REQUIRES_INVESTIGATION');
+    push(
+      'SUSPENSE_BALANCES',
+      flagged.length === 0,
+      flagged.length
+        ? `Suspense balances requiring investigation: ${flagged.map((a) => `${a.code} (${a.balance}, ${a.ageDays}d)`).join(', ')}`
+        : 'Suspense balances within policy',
+      {
+        totalBalance: suspense.totalBalance,
+        accounts: flagged.map((a) => ({ code: a.code, balance: a.balance, ageDays: a.ageDays })),
+      },
     );
 
     const tb = await this.reports.trialBalance(companyId, {
@@ -853,6 +877,7 @@ function blockersFrom(checks: CheckResult[], policy: AccountingPolicy): CloseBlo
     OPEN_RECONCILIATION_EXCEPTIONS: policy.closeBlockOnOpenExceptions,
     TRIAL_BALANCE: true,
     INTEGRITY: policy.closeRequireIntegrityOk,
+    SUSPENSE_BALANCES: policy.closeBlockOnSuspense,
   };
   for (const c of checks) {
     c.required = must[c.key];

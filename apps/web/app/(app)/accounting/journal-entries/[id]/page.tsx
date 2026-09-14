@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { AttachmentsPanel } from '@/components/enterprise/attachments-panel';
+import { HistoryPanel } from '@/components/enterprise/history-panel';
 import { P, type JournalStatus } from '@accounting/types';
 import {
   Alert,
@@ -357,6 +358,7 @@ export default function JournalEntryDetailPage() {
           </CardContent>
         </Card>
         <AttachmentsPanel entityType="JOURNAL_ENTRY" entityId={e.id} />
+        <HistoryPanel entityType="JournalEntry" entityId={e.id} />
       </div>
 
       <ConfirmDialog

@@ -14,6 +14,7 @@ const account = (overrides: Partial<Account>): Account => ({
   parentId: null,
   isHeader: false,
   isIntercompany: false,
+  isSuspense: false,
   isSystem: false,
   currency: null,
   description: null,

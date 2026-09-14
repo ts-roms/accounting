@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import {
+  AlertTriangle,
   BadgePercent,
   Banknote,
   BarChart3,
@@ -117,6 +118,12 @@ export const NAVIGATION: NavSection[] = [
         permissions: [P['intercompany.view']],
       },
       {
+        title: 'Control Center',
+        href: '/accounting/control-center',
+        icon: LayoutDashboard,
+        permissions: [P['controls.view']],
+      },
+      {
         title: 'Financial Close',
         href: '/accounting/financial-close',
         icon: ClipboardCheck,
@@ -133,6 +140,12 @@ export const NAVIGATION: NavSection[] = [
         href: '/accounting/integrity',
         icon: ShieldCheck,
         permissions: [P['integrity.check']],
+      },
+      {
+        title: 'Suspense Accounts',
+        href: '/accounting/suspense',
+        icon: AlertTriangle,
+        permissions: [P['controls.view']],
       },
     ],
   },

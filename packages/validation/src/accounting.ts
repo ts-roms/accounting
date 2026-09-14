@@ -55,6 +55,8 @@ export const createAccountSchema = z.object({
   parentId: uuidSchema.nullable().optional(),
   currency: currencyCodeSchema.nullable().optional(),
   isHeader: z.boolean().default(false),
+  /** Suspense / clearing account watched by the suspense monitor. */
+  isSuspense: z.boolean().default(false),
   description: optionalText(500),
 });
 export type CreateAccountInput = z.infer<typeof createAccountSchema>;
@@ -64,6 +66,7 @@ export const updateAccountSchema = z.object({
   subtype: z.enum(ACCOUNT_SUBTYPES).nullable().optional(),
   parentId: uuidSchema.nullable().optional(),
   description: optionalText(500),
+  isSuspense: z.boolean().optional(),
   status: z.enum(ENTITY_STATUSES).optional(),
 });
 export type UpdateAccountInput = z.infer<typeof updateAccountSchema>;

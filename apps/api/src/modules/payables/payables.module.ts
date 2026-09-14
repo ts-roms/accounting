@@ -3,6 +3,7 @@ import { FxModule } from '@/modules/fx/fx.module';
 import { WorkflowsModule } from '@/modules/workflows/workflows.module';
 import { TaxModule } from '@/modules/tax/tax.module';
 import { AccountingModule } from '@/modules/accounting/accounting.module';
+import { RbacModule } from '@/modules/rbac/rbac.module';
 import { InventoryCoreModule } from '@/modules/inventory/inventory-core.module';
 import { OrdersCoreModule } from '@/modules/orders/orders-core.module';
 import { ApReportsService } from './ap-reports.service';
@@ -25,6 +26,7 @@ import {
     TaxModule,
     FxModule,
     WorkflowsModule,
+    RbacModule,
   ],
   controllers: [VendorsController, BillsController, VendorPaymentsController, ApReportsController],
   providers: [VendorsService, BillsService, VendorPaymentsService, ApReportsService],

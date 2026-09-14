@@ -25,6 +25,7 @@ import { AccountsService } from '@/modules/accounting/accounts/accounts.service'
 import { AccountingPostingService } from '@/modules/accounting/journals/posting.service';
 import { DocumentNumberingService } from '@/modules/accounting/numbering/document-numbering.service';
 import { AuditService } from '@/modules/audit/audit.service';
+import { SodService } from '@/modules/rbac/sod.service';
 import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { BusinessRuleError, NotFoundError } from '@/common/errors/app-error';
 import { ErrorCodes } from '@/common/errors/error-codes';
@@ -80,6 +81,7 @@ export class VendorPaymentsService {
     private readonly rates: ExchangeRatesService,
     private readonly fx: FxService,
     private readonly approvals: ApprovalsService,
+    private readonly sod: SodService,
   ) {}
 
   async list(
@@ -409,7 +411,21 @@ export class VendorPaymentsService {
         amount: existing.amount,
         currency: existing.currency,
         requestedBy: existing.createdBy ?? actor.id,
+        branchId: existing.branchId,
       });
+      await this.sod.checkActorSeparation(
+        actor.organizationId,
+        [P['vendor-payment.create'], P['vendor-payment.post']],
+        existing.createdBy,
+        actor.id,
+        tx,
+        {
+          companyId,
+          entityType: 'VendorPayment',
+          entityId: id,
+          documentNumber: existing.documentNumber,
+        },
+      );
       const currency = existing.currency;
       const amount = Money.of(existing.amount, currency);
       const draftAllocations = await tx

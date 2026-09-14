@@ -26,6 +26,8 @@ export const AUDIT_ACTIONS = [
   'RECONCILIATION_APPROVE',
   'YEAR_CLOSE',
   'LOCK',
+  'ESCALATE',
+  'SOD_WARNING',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

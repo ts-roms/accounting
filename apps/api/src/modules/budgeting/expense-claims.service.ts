@@ -302,6 +302,7 @@ export class ExpenseClaimsService {
         amount: claim.total,
         currency: claim.currency,
         requestedBy: actor.id,
+        branchId: claim.branchId,
       }),
     );
     return claim;
@@ -337,6 +338,7 @@ export class ExpenseClaimsService {
         amount: existing.total,
         currency: existing.currency,
         requestedBy: existing.claimantUserId,
+        branchId: existing.branchId,
       });
       await tx
         .update(expenseClaims)

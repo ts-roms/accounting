@@ -411,10 +411,14 @@ function PolicyDialog({
   const update = useUpdateAccountingPolicy();
   const [materiality, setMateriality] = React.useState('');
   const [staleDays, setStaleDays] = React.useState('');
+  const [suspenseMateriality, setSuspenseMateriality] = React.useState('');
+  const [suspenseMaxAge, setSuspenseMaxAge] = React.useState('');
   React.useEffect(() => {
     if (policy.data) {
       setMateriality(policy.data.reconciliationMateriality);
       setStaleDays(String(policy.data.reconciliationStaleDays));
+      setSuspenseMateriality(policy.data.suspenseMateriality);
+      setSuspenseMaxAge(String(policy.data.suspenseMaxAgeDays));
     }
   }, [policy.data, open]);
   return (
@@ -448,6 +452,28 @@ function PolicyDialog({
               onChange={(e) => setStaleDays(e.target.value)}
             />
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="policy-suspense-materiality">Suspense materiality</Label>
+              <Input
+                id="policy-suspense-materiality"
+                inputMode="decimal"
+                value={suspenseMateriality}
+                onChange={(e) => setSuspenseMateriality(e.target.value)}
+                data-testid="policy-suspense-materiality"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="policy-suspense-age">Suspense max age (days)</Label>
+              <Input
+                id="policy-suspense-age"
+                inputMode="numeric"
+                value={suspenseMaxAge}
+                onChange={(e) => setSuspenseMaxAge(e.target.value)}
+                data-testid="policy-suspense-age"
+              />
+            </div>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -460,6 +486,8 @@ function PolicyDialog({
                 await update.mutateAsync({
                   reconciliationMateriality: materiality,
                   reconciliationStaleDays: Number(staleDays),
+                  suspenseMateriality,
+                  suspenseMaxAgeDays: Number(suspenseMaxAge),
                 });
                 toast.success('Policy updated.');
                 onOpenChange(false);

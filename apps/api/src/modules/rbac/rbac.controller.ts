@@ -82,6 +82,13 @@ export class RbacController {
     return this.sodService.list(user.organizationId);
   }
 
+  @Get('sod-policies/conflicts')
+  @RequirePermissions(P['role.view'])
+  @ApiOperation({ summary: 'Users who currently hold both sides of an active SoD policy' })
+  sodConflicts(@CurrentUser() user: AuthenticatedUser) {
+    return this.sodService.userConflicts(user.organizationId);
+  }
+
   @Post('sod-policies')
   @RequirePermissions(P['sod.manage'])
   createSodPolicy(@CurrentUser() user: AuthenticatedUser, @Body() body: UpsertSodPolicyDto) {

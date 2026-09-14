@@ -25,6 +25,7 @@ import { AccountsService } from '@/modules/accounting/accounts/accounts.service'
 import { AccountingPostingService } from '@/modules/accounting/journals/posting.service';
 import { DocumentNumberingService } from '@/modules/accounting/numbering/document-numbering.service';
 import { AuditService } from '@/modules/audit/audit.service';
+import { SodService } from '@/modules/rbac/sod.service';
 import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { BusinessRuleError, NotFoundError } from '@/common/errors/app-error';
 import { ErrorCodes } from '@/common/errors/error-codes';
@@ -78,6 +79,7 @@ export class CustomerPaymentsService {
     private readonly invoicesService: InvoicesService,
     private readonly rates: ExchangeRatesService,
     private readonly fx: FxService,
+    private readonly sod: SodService,
   ) {}
 
   async list(
@@ -399,6 +401,19 @@ export class CustomerPaymentsService {
           ErrorCodes.DOCUMENT_INVALID_STATE,
           `${existing.documentNumber} is ${existing.status}.`,
         );
+      await this.sod.checkActorSeparation(
+        actor.organizationId,
+        [P['customer-payment.create'], P['customer-payment.post']],
+        existing.createdBy,
+        actor.id,
+        tx,
+        {
+          companyId,
+          entityType: 'CustomerPayment',
+          entityId: id,
+          documentNumber: existing.documentNumber,
+        },
+      );
       const currency = existing.currency;
       const amount = Money.of(existing.amount, currency);
       const draftAllocations = await tx

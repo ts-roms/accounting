@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import {
   NORMAL_BALANCE_BY_TYPE,
   type AccountMappingKey,
@@ -28,6 +28,8 @@ interface CoaRow {
   system?: boolean;
   /** Eliminated in consolidated reports (Phase 8). */
   intercompany?: boolean;
+  /** Watched by the suspense monitor: expected to clear to zero. */
+  suspense?: boolean;
 }
 
 /** A compact Philippine SME chart of accounts. Codes are stable identifiers. */
@@ -83,6 +85,15 @@ const CHART: CoaRow[] = [
     type: 'ASSET',
     parent: '1500',
     subtype: 'OTHER_ASSET',
+    suspense: true,
+  },
+  {
+    code: '1990',
+    name: 'Suspense',
+    type: 'ASSET',
+    parent: '1000',
+    subtype: 'OTHER_ASSET',
+    suspense: true,
   },
   {
     code: '1520',
@@ -144,6 +155,7 @@ const CHART: CoaRow[] = [
     type: 'LIABILITY',
     parent: '2100',
     subtype: 'ACCRUED_LIABILITY',
+    suspense: true,
   },
   {
     code: '2200',
@@ -458,7 +470,7 @@ export async function seedAccounting(
     await seedSubledgers(tx, company, codeToId, adminUserId, log);
     await seedOrders(tx, company, codeToId, adminUserId, log);
     await seedInventory(tx, company, adminUserId, log);
-    await seedAssetsBanking(tx, company, codeToId, log);
+    await seedAssetsBanking(tx, company, codeToId, adminUserId, log);
     await seedBudgetingTax(tx, company, codeToId, adminUserId, log);
   }
   await seedExchangeRates(tx, organizationId, adminUserId, log);
@@ -510,12 +522,23 @@ async function ensureChart(tx: Tx, companyId: string, log: Log): Promise<Map<str
         isHeader: row.header ?? false,
         isSystem: row.system ?? false,
         isIntercompany: row.intercompany ?? false,
+        isSuspense: row.suspense ?? false,
       })
       .returning({ id: schema.accounts.id });
     codeToId.set(row.code, inserted!.id);
     created += 1;
   }
   if (created > 0) log(`chart of accounts: ${created} accounts created`);
+  // Flags introduced later (suspense watch) are applied to pre-existing rows too.
+  const suspenseIds = CHART.filter((r) => r.suspense)
+    .map((r) => codeToId.get(r.code)!)
+    .filter(Boolean);
+  if (suspenseIds.length > 0) {
+    await tx
+      .update(schema.accounts)
+      .set({ isSuspense: true })
+      .where(and(inArray(schema.accounts.id, suspenseIds), eq(schema.accounts.isSuspense, false)));
+  }
   return codeToId;
 }
 

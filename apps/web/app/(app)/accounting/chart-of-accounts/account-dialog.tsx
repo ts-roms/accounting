@@ -69,6 +69,7 @@ export function AccountDialog({
       parentId: account?.parentId ?? parent?.id ?? null,
       currency: account?.currency ?? null,
       isHeader: account?.isHeader ?? false,
+      isSuspense: account?.isSuspense ?? false,
       description: account?.description ?? undefined,
     }),
     [account, parent],
@@ -93,6 +94,7 @@ export function AccountDialog({
           subtype: values.subtype ?? null,
           parentId: values.parentId ?? null,
           description: values.description,
+          isSuspense: values.isSuspense,
         });
         toast.success(`Account ${account.code} updated.`);
       } else {
@@ -260,6 +262,24 @@ export function AccountDialog({
                     Used by dashboards and future control-account checks.
                   </FormDescription>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="isSuspense"
+              render={({ field }) => (
+                <FormItem className="flex items-center gap-2 space-y-0 md:col-span-2">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value ?? false}
+                      onCheckedChange={(v) => field.onChange(v === true)}
+                      data-testid="account-suspense"
+                    />
+                  </FormControl>
+                  <FormLabel className="font-normal">
+                    Suspense / clearing account (watched by the suspense monitor, expected to clear)
+                  </FormLabel>
                 </FormItem>
               )}
             />

@@ -35,9 +35,15 @@ import { users } from './users';
 export const depreciationMethodEnum = pgEnum('depreciation_method', DEPRECIATION_METHODS);
 export const assetStatusEnum = pgEnum('asset_status', ASSET_STATUSES);
 export const assetEventTypeEnum = pgEnum('asset_event_type', ASSET_EVENT_TYPES);
-export const depreciationRunStatusEnum = pgEnum('depreciation_run_status', DEPRECIATION_RUN_STATUSES);
+export const depreciationRunStatusEnum = pgEnum(
+  'depreciation_run_status',
+  DEPRECIATION_RUN_STATUSES,
+);
 export const bankTransactionTypeEnum = pgEnum('bank_transaction_type', BANK_TRANSACTION_TYPES);
-export const bankTransactionStatusEnum = pgEnum('bank_transaction_status', BANK_TRANSACTION_STATUSES);
+export const bankTransactionStatusEnum = pgEnum(
+  'bank_transaction_status',
+  BANK_TRANSACTION_STATUSES,
+);
 export const statementStatusEnum = pgEnum('statement_status', STATEMENT_STATUSES);
 export const statementLineStatusEnum = pgEnum('statement_line_status', STATEMENT_LINE_STATUSES);
 export const matchKindEnum = pgEnum('match_kind', MATCH_KINDS);
@@ -57,10 +63,14 @@ export const assetCategories = pgTable(
     name: text('name').notNull(),
     description: text('description'),
     usefulLifeMonths: integer('useful_life_months').notNull().default(60),
-    depreciationMethod: depreciationMethodEnum('depreciation_method').notNull().default('STRAIGHT_LINE'),
+    depreciationMethod: depreciationMethodEnum('depreciation_method')
+      .notNull()
+      .default('STRAIGHT_LINE'),
     decliningRatePercent: money('declining_rate_percent'),
     /** Optional GL overrides; company mappings otherwise. */
-    assetAccountId: uuid('asset_account_id').references(() => accounts.id, { onDelete: 'restrict' }),
+    assetAccountId: uuid('asset_account_id').references(() => accounts.id, {
+      onDelete: 'restrict',
+    }),
     accumulatedDepreciationAccountId: uuid('accumulated_depreciation_account_id').references(
       () => accounts.id,
       { onDelete: 'restrict' },
@@ -406,7 +416,9 @@ export const bankingSettings = pgTable('banking_settings', {
     .primaryKey()
     .references(() => companies.id, { onDelete: 'cascade' }),
   matchDateToleranceDays: integer('match_date_tolerance_days').notNull().default(3),
-  autoMatchMinConfidence: matchConfidenceEnum('auto_match_min_confidence').notNull().default('MEDIUM'),
+  autoMatchMinConfidence: matchConfidenceEnum('auto_match_min_confidence')
+    .notNull()
+    .default('MEDIUM'),
   ...timestamps,
 });
 

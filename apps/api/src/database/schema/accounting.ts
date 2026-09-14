@@ -67,6 +67,8 @@ export const accounts = pgTable(
     isIntercompany: boolean('is_intercompany').notNull().default(false),
     /** System accounts are required by the engine (e.g. retained earnings) and cannot be deactivated. */
     isSystem: boolean('is_system').notNull().default(false),
+    /** Suspense / clearing accounts are expected to return to zero; the suspense monitor watches them. */
+    isSuspense: boolean('is_suspense').notNull().default(false),
     /** NULL = the company's functional currency. */
     currency: char('currency', { length: 3 }),
     description: text('description'),

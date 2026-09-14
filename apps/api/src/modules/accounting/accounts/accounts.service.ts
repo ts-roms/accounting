@@ -97,6 +97,7 @@ export class AccountsService {
             parentId: parent?.id ?? null,
             currency: input.currency ?? null,
             isHeader: input.isHeader,
+            isSuspense: input.isSuspense,
             description: input.description ?? null,
           })
           .returning();
@@ -173,6 +174,7 @@ export class AccountsService {
           subtype: input.subtype === undefined ? existing.subtype : input.subtype,
           parentId: input.parentId === undefined ? existing.parentId : input.parentId,
           description: input.description === undefined ? existing.description : input.description,
+          isSuspense: input.isSuspense ?? existing.isSuspense,
           status: input.status ?? existing.status,
         })
         .where(eq(accounts.id, id))

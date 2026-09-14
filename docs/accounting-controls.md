@@ -102,4 +102,4 @@ corrected so the sample company reconciles from day one.
 ## Known limitations (next phases)
 
 - Close checklists have no due dates or reminders, and the template is fixed in code (see `docs/financial-close.md`).
-- Suspense monitoring, field-level history and the control dashboard (phase 5).
+- Department-specific approval rules, a responsible owner per suspense account and failed-job tracking are still open (see `docs/enterprise-controls.md`).

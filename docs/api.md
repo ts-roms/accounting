@@ -75,6 +75,7 @@ Base path: `/api/v1` (URI versioning). OpenAPI UI: `http://localhost:3001/api/do
 | PUT      | `/roles/:id/permissions`                                                      | `role.manage`     |
 | GET      | `/sod-policies`                                                               | `role.view`       |
 | POST/PUT | `/sod-policies`, `/sod-policies/:id`                                          | `sod.manage`      |
+| GET      | `/sod-policies/conflicts` - users holding both sides of an active policy      | `role.view`       |
 
 ### Accounting (all require `X-Company-Id`)
 
@@ -252,7 +253,7 @@ accept the three dimension filters.
 | GET                 | `/consolidation/trial-balance?from&to&currency?&companyIds?` (`companyIds` array or comma list; defaults to every company of the organization)                                                                                                           | `consolidation.view`                                |
 | GET / POST / PATCH  | `/approval-workflows`, `/approval-workflows/:id` `{ documentType, name, description?, minAmount, maxAmount?, priority, allowSelfApproval, steps[{ name, requiredPermission, minApprovers }] }` (PATCH also `status`)                                     | `approval.view` / `workflow.manage`                 |
 | GET                 | `/approvals?mine&status&documentType` (paginated; `mine=true` lists only steps the caller can decide now), `/approvals/:id` (steps + decisions + `canDecide`)                                                                                            | `approval.view`                                     |
-| POST                | `/approvals/:id/decide { decision: APPROVE \| REJECT, comment? }`                                                                                                                                                                                        | `approval.decide` + the step's `requiredPermission` |
+| POST                | `/approvals/:id/decide { decision: APPROVE \| REJECT, comment? }` - while a request is overdue, holders of the workflow's `escalationPermission` may decide                                                                                              | `approval.decide` + the step's `requiredPermission` |
 | GET / POST          | `/attachments/:entityType/:entityId` (list; `POST` multipart `file` + optional `description`, 15 MB, PDF / images / office / csv / txt)                                                                                                                  | `attachment.view` / `attachment.manage`             |
 | GET / DELETE        | `/attachments/file/:id` (download with original name), `DELETE` removes the file and the row                                                                                                                                                             | `attachment.view` / `attachment.manage`             |
 
@@ -323,6 +324,22 @@ New error codes: `ACCOUNTING_PERIOD_SOFT_CLOSED`, `ACCOUNTING_PERIOD_LOCKED`, `S
 | POST       | `/financial-closes/:id/tasks { title, required?, ownerId? }`, `/:id/cancel { reason }`                                                                     | `close.manage`                |
 | POST       | `/financial-closes/:id/approve { notes? }` - refuses with `CLOSE_BLOCKED` (422; `details.blockers`, `details.pendingTasks`)                                | `close.approve`               |
 | POST       | `/financial-closes/:id/complete { notes? }` - closes (and per policy locks) the period in the same transaction                                             | `period.close`                |
+
+Workflows also accept `branchId?`, `deadlineHours?` and `escalationPermission?` (H5); `VENDOR_BILL`
+is a workflow document type; `GET /approvals?overdue=true` lists pending requests past their deadline
+and every request carries `overdue`, `dueAt`, `escalatedAt`.
+
+### Enterprise controls (all require `X-Company-Id`; see `docs/enterprise-controls.md`)
+
+| Method | Path                                                                                       | Permission      |
+| ------ | ------------------------------------------------------------------------------------------ | --------------- |
+| GET    | `/controls/dashboard?asOf` - ten control tiles with severity and drill-down links          | `controls.view` |
+| GET    | `/controls/suspense?asOf` - suspense / clearing accounts: balance, age, open items, status | `controls.view` |
+| GET    | `/history?entityType&entityId[&field]` - field-level change history of one record          | `history.view`  |
+
+`PATCH /accounting-policies` also accepts `suspenseMateriality`, `suspenseMaxAgeDays` and
+`closeBlockOnSuspense`; `PATCH /invoices/:id` and `/bills/:id` accept `changeReason`.
+New audit actions: `SOD_WARNING`, `ESCALATE`.
 
 ### Audit & health
 

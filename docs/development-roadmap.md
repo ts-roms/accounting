@@ -293,11 +293,27 @@ A second programme strengthens the delivered system along the lines of
   transaction; Accounting → Financial Close list + detail screens
 - Tests: API integration 119 (+4 close scenarios), Playwright (+1)
 
-### H5-H9 (planned)
+### H5 - Enterprise controls (COMPLETE)
 
-Enterprise controls (SoD/approvals/suspense/history), data infrastructure
-(imports, opening balances, numbering), reporting engine, reliability,
-consolidation readiness.
+- Segregation of duties on invoices, bills, vendor payments and receipts
+  (BLOCK refuses, WARN is audited as `SOD_WARNING`); standing-conflict
+  report and five more default policies
+- Approval engine: branch-scoped workflows, deadlines, overdue flag,
+  escalation approvers, `VENDOR_BILL` gating; requests survive the
+  APPROVAL_REQUIRED rollback
+- Field-level change history (`field_changes`, immutable) derived from
+  audit events with a change reason; history panels on journals, invoices,
+  bills
+- Suspense monitor (balance, age, open items, policy status), integrity
+  check, close blocker; seed capitalises the sample equipment
+- Accounting → Control Center (ten severity tiles + control areas),
+  Suspense Accounts screen, SoD conflicts tab, workflow deadline fields
+- Tests: API integration 124 (+5), Playwright +3
+
+### H6-H9 (planned)
+
+Data infrastructure (imports, opening balances, numbering), reporting
+engine, reliability, consolidation readiness.
 
 ## Beyond the roadmap
 
