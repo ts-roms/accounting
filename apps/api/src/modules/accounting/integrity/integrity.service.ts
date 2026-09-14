@@ -1,14 +1,16 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, inArray, isNotNull, ne, sql } from 'drizzle-orm';
 import { Money } from '@accounting/money';
-import { LEDGER_STATUSES, type AccountMappingKey } from '@accounting/types';
+import {
+  LEDGER_STATUSES,
+  type AccountMappingKey,
+  type ReconciliationArea,
+} from '@accounting/types';
 import { DRIZZLE, type Database } from '@/database/database.types';
 import {
   accountMappings,
   accounts,
-  assetCategories,
   fiscalPeriods,
-  fixedAssets,
   journalEntries,
   journalLines,
   inventoryBalances,
@@ -18,10 +20,7 @@ import {
   warehouses,
 } from '@/database/schema';
 import { AccountsService } from '@/modules/accounting/accounts/accounts.service';
-import { GeneralLedgerService } from '@/modules/accounting/ledger/general-ledger.service';
-import { ApReportsService } from '@/modules/payables/ap-reports.service';
-import { ArReportsService } from '@/modules/receivables/ar-reports.service';
-import { InventoryReportsService } from '@/modules/inventory/inventory-reports.service';
+import { SubledgerBalancesService } from '@/modules/reconciliation/subledger-balances.service';
 
 export type IntegritySeverity = 'INFO' | 'WARNING' | 'CRITICAL';
 
@@ -70,10 +69,7 @@ export class IntegrityService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly accounts: AccountsService,
-    private readonly ledger: GeneralLedgerService,
-    private readonly ar: ArReportsService,
-    private readonly ap: ApReportsService,
-    private readonly inventory: InventoryReportsService,
+    private readonly balances: SubledgerBalancesService,
   ) {}
 
   async run(companyId: string, asOf: string): Promise<IntegrityReport> {
@@ -87,8 +83,9 @@ export class IntegrityService {
       this.missingMappings(companyId),
       this.subledger('AR', companyId, asOf, currency),
       this.subledger('AP', companyId, asOf, currency),
-      this.inventoryVariance(companyId, asOf, currency),
-      this.fixedAssetVariance(companyId, asOf, currency),
+      this.subledger('INVENTORY', companyId, asOf, currency),
+      this.subledger('FIXED_ASSETS', companyId, asOf, currency),
+      this.subledger('TAX', companyId, asOf, currency),
       this.duplicateVendorInvoices(companyId),
       this.duplicatePayments(companyId),
       this.negativeStock(companyId),
@@ -255,147 +252,36 @@ export class IntegrityService {
 
   // ----------------------------------------------------------- subledgers
 
+  /** Every subledger derives its expected balance in SubledgerBalancesService; the variance is the finding. */
   private async subledger(
-    side: 'AR' | 'AP',
+    area: ReconciliationArea,
     companyId: string,
     asOf: string,
     currency: string,
   ): Promise<IntegrityFinding> {
-    const report = await (side === 'AR' ? this.ar : this.ap).reconciliation(companyId, { asOf });
-    const diff = Money.of(report.difference, currency);
-    return finding(
-      `${side}_CONTROL_VARIANCE`,
-      'CRITICAL',
-      `${side === 'AR' ? 'Receivables' : 'Payables'} subledger equals its control account`,
-      diff.isZero()
-        ? []
-        : [
-            {
-              subledger: report.subledgerBalance,
-              ledger: report.ledgerBalance,
-              difference: report.difference,
-              control: report.controlAccount.code,
-            },
-          ],
-    );
-  }
-
-  private async inventoryVariance(
-    companyId: string,
-    asOf: string,
-    currency: string,
-  ): Promise<IntegrityFinding> {
-    const report = await this.inventory.valuation(companyId, { asOf });
-    const samples = report.reconciled
-      ? []
-      : report.accounts
-          .filter((r) => !r.reconciled)
-          .map((r) => ({
-            account: r.code,
-            subledger: r.subledgerValue,
-            ledger: r.ledgerBalance,
-            difference: r.difference,
-          }));
-    if (!report.reconciled && !samples.length)
-      samples.push({
-        account: 'TOTAL',
-        subledger: report.totalSubledger,
-        ledger: report.totalLedger,
-        difference: currency,
-      });
-    return finding(
-      'INVENTORY_VARIANCE',
-      'CRITICAL',
-      'Inventory valuation equals the inventory accounts',
-      samples,
-    );
-  }
-
-  /**
-   * Register cost / accumulated depreciation per resolved account versus the
-   * ledger. The mapped cost and accumulated accounts are always compared, so
-   * balances that reached them without a registered asset are flagged too.
-   */
-  private async fixedAssetVariance(
-    companyId: string,
-    asOf: string,
-    currency: string,
-  ): Promise<IntegrityFinding> {
-    const registered = await this.db
-      .select({
-        cost: sql<string>`coalesce(sum(${fixedAssets.cost}), 0)`,
-        accumulated: sql<string>`coalesce(sum(${fixedAssets.accumulatedDepreciation}), 0)`,
-        assetAccountId: assetCategories.assetAccountId,
-        accumulatedAccountId: assetCategories.accumulatedDepreciationAccountId,
-      })
-      .from(fixedAssets)
-      .innerJoin(assetCategories, eq(assetCategories.id, fixedAssets.categoryId))
-      .where(
-        and(
-          eq(fixedAssets.companyId, companyId),
-          inArray(fixedAssets.status, ['ACTIVE', 'FULLY_DEPRECIATED']),
-          sql`${fixedAssets.capitalizedAt} IS NOT NULL AND ${fixedAssets.capitalizedAt}::date <= ${asOf}`,
-        ),
-      )
-      .groupBy(assetCategories.assetAccountId, assetCategories.accumulatedDepreciationAccountId);
-    const [costMap, accMap] = await Promise.all([
-      this.accounts.resolveMapped(companyId, 'FIXED_ASSET_COST').catch(() => null),
-      this.accounts.resolveMapped(companyId, 'ACCUMULATED_DEPRECIATION').catch(() => null),
-    ]);
-    const cost = new Map<string, Money>();
-    const accumulated = new Map<string, Money>();
-    if (costMap) cost.set(costMap.id, Money.zero(currency));
-    if (accMap) accumulated.set(accMap.id, Money.zero(currency));
-    for (const r of registered) {
-      const costId = r.assetAccountId ?? costMap?.id;
-      const accId = r.accumulatedAccountId ?? accMap?.id;
-      if (costId)
-        cost.set(
-          costId,
-          (cost.get(costId) ?? Money.zero(currency)).add(Money.of(r.cost, currency)),
-        );
-      if (accId)
-        accumulated.set(
-          accId,
-          (accumulated.get(accId) ?? Money.zero(currency)).add(Money.of(r.accumulated, currency)),
-        );
-    }
-    const activity = await this.ledger.activity({ companyId, to: asOf });
-    const ledgerOf = (accountId: string) => {
-      const a = activity.find((x) => x.accountId === accountId);
-      return Money.of(a?.debit ?? '0', currency).subtract(Money.of(a?.credit ?? '0', currency));
+    const titles: Record<ReconciliationArea, string> = {
+      AR: 'Receivables subledger equals its control account',
+      AP: 'Payables subledger equals its control account',
+      INVENTORY: 'Inventory valuation equals the inventory accounts',
+      FIXED_ASSETS: 'Fixed asset register equals the asset accounts',
+      TAX: 'Tax register equals the document-driven movements on tax accounts',
     };
-    const samples: Record<string, unknown>[] = [];
-    // Cost accounts carry a debit balance; accumulated depreciation a credit balance.
-    for (const [accountId, sum] of cost) {
-      const ledger = ledgerOf(accountId);
-      if (!ledger.equals(sum))
-        samples.push({
-          side: 'cost',
-          accountId,
-          register: sum.toString(),
-          ledger: ledger.toString(),
-          difference: ledger.subtract(sum).toString(),
-        });
+    const check = area === 'AR' || area === 'AP' ? `${area}_CONTROL_VARIANCE` : `${area}_VARIANCE`;
+    try {
+      const b = await this.balances.compute(companyId, area, asOf);
+      const samples = b.lines
+        .filter((l) => !Money.of(l.difference, currency).isZero())
+        .map((l) => ({
+          account: l.code,
+          subledger: l.expected,
+          ledger: l.actual,
+          difference: l.difference,
+          note: l.note,
+        }));
+      return finding(check, 'CRITICAL', titles[area], samples);
+    } catch (err) {
+      return finding(check, 'CRITICAL', titles[area], [{ error: (err as Error).message }]);
     }
-    for (const [accountId, sum] of accumulated) {
-      const ledger = ledgerOf(accountId);
-      const expected = sum.negate();
-      if (!ledger.equals(expected))
-        samples.push({
-          side: 'accumulated',
-          accountId,
-          register: expected.toString(),
-          ledger: ledger.toString(),
-          difference: ledger.subtract(expected).toString(),
-        });
-    }
-    return finding(
-      'FIXED_ASSET_VARIANCE',
-      'CRITICAL',
-      'Fixed asset register equals the asset accounts',
-      samples,
-    );
   }
 
   // -------------------------------------------------------------- controls

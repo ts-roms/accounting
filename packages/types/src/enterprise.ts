@@ -50,6 +50,7 @@ export const ATTACHMENT_ENTITY_TYPES = [
   'CUSTOMER',
   'VENDOR',
   'AI_DOCUMENT',
+  'RECONCILIATION',
 ] as const;
 export type AttachmentEntityType = (typeof ATTACHMENT_ENTITY_TYPES)[number];
 
@@ -64,3 +65,27 @@ export const ATTACHMENT_ALLOWED_MIME = [
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ] as const;
+
+// ------------------------------------------------ hardening: reconciliation
+
+/** Subledgers that reconcile to a control account (bank reconciliation lives in banking). */
+export const RECONCILIATION_AREAS = ['AR', 'AP', 'INVENTORY', 'FIXED_ASSETS', 'TAX'] as const;
+export type ReconciliationArea = (typeof RECONCILIATION_AREAS)[number];
+
+/**
+ * NOT_STARTED -> IN_PROGRESS (computed) -> RECONCILED | HAS_VARIANCE ->
+ * UNDER_REVIEW (reviewer assigned) -> APPROVED. A material variance can only
+ * be approved once every exception explaining it is resolved.
+ */
+export const SUBLEDGER_RECONCILIATION_STATUSES = [
+  'NOT_STARTED',
+  'IN_PROGRESS',
+  'RECONCILED',
+  'HAS_VARIANCE',
+  'UNDER_REVIEW',
+  'APPROVED',
+] as const;
+export type SubledgerReconciliationStatus = (typeof SUBLEDGER_RECONCILIATION_STATUSES)[number];
+
+export const RECONCILIATION_EXCEPTION_STATUSES = ['OPEN', 'RESOLVED'] as const;
+export type ReconciliationExceptionStatus = (typeof RECONCILIATION_EXCEPTION_STATUSES)[number];

@@ -254,9 +254,26 @@ A second programme strengthens the delivered system along the lines of
   Integrity dashboard; it found and fixed two seed violations
 - Tests: API unit 62 (+4), API integration 110 (+6 controls), Playwright 26 (+3)
 
-### H2-H9 (planned)
+### H2 - Subledgers (COMPLETE)
 
-Subledger reconciliation records, reconciliation center, financial close,
+- `SubledgerBalancesService`: one implementation of every subledger's expected
+  balance (AR, AP, inventory, fixed assets, tax); the integrity checker and the
+  recorded reconciliations share it
+- Tax reconciliation: signed tax register per tax account against
+  document-driven ledger movements; fixed-asset reconciliation always compares
+  the mapped accounts
+- Recorded reconciliations with lifecycle (IN_PROGRESS → RECONCILED /
+  HAS_VARIANCE → UNDER_REVIEW → APPROVED), exceptions with resolution, notes,
+  attachments, four-eyes approval and the rule that an unexplained variance
+  above materiality is never approved
+- Company accounting policies (materiality, stale days)
+- Seeded documents registered in the tax subledger so the sample company
+  reconciles in every area from day one
+- Tests: API integration 115 (+5 reconciliation scenarios)
+
+### H3-H9 (planned)
+
+Reconciliation center, financial close,
 enterprise controls (SoD/approvals/suspense/history), data infrastructure
 (imports, opening balances, numbering), reporting engine, reliability,
 consolidation readiness.

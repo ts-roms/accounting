@@ -7,6 +7,8 @@ import {
   EXCHANGE_RATE_SOURCES,
   INTERCOMPANY_STATUSES,
   WORKFLOW_DOCUMENT_TYPES,
+  RECONCILIATION_AREAS,
+  SUBLEDGER_RECONCILIATION_STATUSES,
 } from '@accounting/types';
 import { amountSchema, isoDateSchema } from './accounting';
 import {
@@ -185,3 +187,53 @@ export const attachmentMetaSchema = z.object({
   description: optionalText(300),
 });
 export type AttachmentMetaInput = z.infer<typeof attachmentMetaSchema>;
+
+// ------------------------------------------------ hardening: reconciliation
+
+export const runReconciliationSchema = z.object({
+  area: z.enum(RECONCILIATION_AREAS),
+  asOf: isoDateSchema,
+});
+export type RunReconciliationInput = z.infer<typeof runReconciliationSchema>;
+
+export const listReconciliationsQuerySchema = paginationQuerySchema.extend({
+  area: z.enum(RECONCILIATION_AREAS).optional(),
+  status: z.enum(SUBLEDGER_RECONCILIATION_STATUSES).optional(),
+  from: isoDateSchema.optional(),
+  to: isoDateSchema.optional(),
+});
+export type ListReconciliationsQuery = z.infer<typeof listReconciliationsQuerySchema>;
+
+export const assignReconciliationSchema = z.object({
+  reviewerId: uuidSchema,
+  notes: optionalText(1000),
+});
+export type AssignReconciliationInput = z.infer<typeof assignReconciliationSchema>;
+
+export const reconciliationNotesSchema = z.object({
+  notes: z.string().trim().min(1, 'Notes are required').max(2000),
+});
+export type ReconciliationNotesInput = z.infer<typeof reconciliationNotesSchema>;
+
+/** An explained part of the variance (timing difference, posting error to be corrected, ...). */
+export const createReconciliationExceptionSchema = z.object({
+  description: z.string().trim().min(3, 'Describe the exception').max(500),
+  /** Signed contribution to the variance (ledger minus subledger). */
+  amount: amountSchema,
+  reference: optionalText(100),
+});
+export type CreateReconciliationExceptionInput = z.infer<typeof createReconciliationExceptionSchema>;
+
+export const resolveReconciliationExceptionSchema = z.object({
+  resolution: z.string().trim().min(3, 'Explain how it was resolved').max(1000),
+});
+export type ResolveReconciliationExceptionInput = z.infer<typeof resolveReconciliationExceptionSchema>;
+
+/** Company accounting policies: what counts as material, and later what blocks a close. */
+export const updateAccountingPolicySchema = z.object({
+  /** Absolute variance (base currency) up to which a reconciliation counts as reconciled. */
+  reconciliationMateriality: amountSchema.optional(),
+  /** A reconciliation older than this many days is considered stale. */
+  reconciliationStaleDays: z.coerce.number().int().min(1).max(365).optional(),
+});
+export type UpdateAccountingPolicyInput = z.infer<typeof updateAccountingPolicySchema>;

@@ -144,14 +144,12 @@ export async function seedBudgetingTax(
         isDefaultPurchases: t.isDefaultPurchases,
       })
       .returning();
-    await tx
-      .insert(schema.taxRates)
-      .values({
-        taxCodeId: code!.id,
-        ratePercent: t.rate,
-        effectiveFrom: '2000-01-01',
-        effectiveTo: null,
-      });
+    await tx.insert(schema.taxRates).values({
+      taxCodeId: code!.id,
+      ratePercent: t.rate,
+      effectiveFrom: '2000-01-01',
+      effectiveTo: null,
+    });
   }
 
   // Sample budget on the earliest fiscal year, approved so variance works out of the box.
@@ -210,5 +208,164 @@ export async function seedBudgetingTax(
       if (lines.length) await tx.insert(schema.budgetLines).values(lines);
     }
   }
+  await registerSeededDocumentTax(tx, company, codeToId, log);
   log(`dimensions, tax codes and sample budget ensured for ${company.code}`);
+}
+
+/**
+ * The sample invoices and bills predate the tax engine: their VAT is an explicit
+ * line on the output / input VAT account. Register those lines in the tax
+ * subledger so it reconciles to the document-driven ledger movements, exactly
+ * as documents posted through the engine do. Idempotent per document.
+ */
+async function registerSeededDocumentTax(
+  tx: Tx,
+  company: schema.Company,
+  codeToId: Map<string, string>,
+  log: Log,
+): Promise<void> {
+  const [vat] = await tx
+    .select()
+    .from(schema.taxCodes)
+    .where(and(eq(schema.taxCodes.companyId, company.id), eq(schema.taxCodes.code, 'VAT12')));
+  const outputVat = codeToId.get('2130');
+  const inputVat = codeToId.get('1450');
+  if (!vat || !outputVat || !inputVat) return;
+  const [rate] = await tx
+    .select({ rate: schema.taxRates.ratePercent })
+    .from(schema.taxRates)
+    .where(eq(schema.taxRates.taxCodeId, vat.id))
+    .orderBy(asc(schema.taxRates.effectiveFrom))
+    .limit(1);
+  let registered = 0;
+  const invoices = await tx
+    .select({
+      id: schema.invoices.id,
+      documentNumber: schema.invoices.documentNumber,
+      journalEntryId: schema.invoices.journalEntryId,
+      documentType: schema.invoices.documentType,
+      documentDate: schema.invoices.documentDate,
+      partyId: schema.invoices.customerId,
+      partyName: schema.customers.name,
+      partyTaxNumber: schema.customers.taxIdentificationNumber,
+    })
+    .from(schema.invoices)
+    .innerJoin(schema.customers, eq(schema.customers.id, schema.invoices.customerId))
+    .where(
+      and(
+        eq(schema.invoices.companyId, company.id),
+        eq(schema.invoices.accountingStatus, 'POSTED'),
+      ),
+    );
+  for (const doc of invoices) {
+    registered += await registerLines(
+      tx,
+      company.id,
+      vat.id,
+      rate?.rate ?? '12',
+      'SALES',
+      'AR_DOCUMENT',
+      doc,
+      outputVat,
+      schema.invoiceLines,
+      schema.invoiceLines.invoiceId,
+    );
+  }
+  const bills = await tx
+    .select({
+      id: schema.vendorBills.id,
+      documentNumber: schema.vendorBills.documentNumber,
+      journalEntryId: schema.vendorBills.journalEntryId,
+      documentType: schema.vendorBills.documentType,
+      documentDate: schema.vendorBills.documentDate,
+      partyId: schema.vendorBills.vendorId,
+      partyName: schema.vendors.name,
+      partyTaxNumber: schema.vendors.taxIdentificationNumber,
+    })
+    .from(schema.vendorBills)
+    .innerJoin(schema.vendors, eq(schema.vendors.id, schema.vendorBills.vendorId))
+    .where(
+      and(
+        eq(schema.vendorBills.companyId, company.id),
+        eq(schema.vendorBills.accountingStatus, 'POSTED'),
+      ),
+    );
+  for (const doc of bills) {
+    registered += await registerLines(
+      tx,
+      company.id,
+      vat.id,
+      rate?.rate ?? '12',
+      'PURCHASES',
+      'AP_DOCUMENT',
+      doc,
+      inputVat,
+      schema.billLines,
+      schema.billLines.billId,
+    );
+  }
+  if (registered) log(`tax register backfilled for ${registered} seeded document(s)`);
+}
+
+async function registerLines(
+  tx: Tx,
+  companyId: string,
+  taxCodeId: string,
+  ratePercent: string,
+  side: 'SALES' | 'PURCHASES',
+  sourceType: 'AR_DOCUMENT' | 'AP_DOCUMENT',
+  doc: {
+    id: string;
+    documentNumber: string;
+    journalEntryId: string | null;
+    documentType: string;
+    documentDate: string;
+    partyId: string;
+    partyName: string;
+    partyTaxNumber: string | null;
+  },
+  taxAccountId: string,
+  linesTable: typeof schema.invoiceLines | typeof schema.billLines,
+  docColumn: typeof schema.invoiceLines.invoiceId | typeof schema.billLines.billId,
+): Promise<number> {
+  if (!doc.journalEntryId) return 0;
+  const [already] = await tx
+    .select({ id: schema.taxTransactions.id })
+    .from(schema.taxTransactions)
+    .where(
+      and(
+        eq(schema.taxTransactions.sourceType, sourceType),
+        eq(schema.taxTransactions.sourceId, doc.id),
+      ),
+    )
+    .limit(1);
+  if (already) return 0;
+  const lines = await tx.select().from(linesTable).where(eq(docColumn, doc.id));
+  const taxLines = lines.filter((l) => l.accountId === taxAccountId);
+  if (!taxLines.length) return 0;
+  // Credit notes reduce the tax; the register keeps signed amounts.
+  const sign = doc.documentType === 'CREDIT_NOTE' ? -1 : 1;
+  const base = lines
+    .filter((l) => l.accountId !== taxAccountId)
+    .reduce((sum, l) => sum + Number(l.amount), 0);
+  await tx.insert(schema.taxTransactions).values(
+    taxLines.map((l) => ({
+      companyId,
+      taxCodeId,
+      side,
+      sourceType,
+      sourceId: doc.id,
+      sourceLineId: l.id,
+      documentNumber: doc.documentNumber,
+      journalEntryId: doc.journalEntryId!,
+      partyId: doc.partyId,
+      partyName: doc.partyName,
+      partyTaxNumber: doc.partyTaxNumber,
+      transactionDate: doc.documentDate,
+      ratePercent,
+      baseAmount: (sign * base).toFixed(4),
+      taxAmount: (sign * Number(l.amount)).toFixed(4),
+    })),
+  );
+  return 1;
 }

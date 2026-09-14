@@ -69,6 +69,7 @@ docs                Architecture, accounting engine, database, API, security, pe
 - [Architecture](docs/architecture.md)
 - [Accounting engine rules](docs/accounting-engine.md)
 - [Accounting controls](docs/accounting-controls.md)
+- [Subledger reconciliation](docs/reconciliation.md)
 - [Database](docs/database.md)
 - [API](docs/api.md)
 - [Security](docs/security.md)

@@ -16,6 +16,7 @@ import { AppConfigService } from '@/config/app-config.service';
 import { DRIZZLE, type Database, type DbExecutor } from '@/database/database.types';
 import {
   aiDocuments,
+  reconciliations,
   attachments,
   bankStatements,
   customerPayments,
@@ -240,6 +241,7 @@ export class AttachmentsService {
       CUSTOMER: customers,
       VENDOR: vendors,
       AI_DOCUMENT: aiDocuments,
+      RECONCILIATION: reconciliations,
     }[entityType];
     const [row] = await executor
       .select({ id: table.id })

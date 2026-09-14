@@ -174,6 +174,16 @@ entry to the original it replaces. Migration `0011_accounting_controls.sql` also
 installs `journal_entries_guard_locked_period()`: no row may enter a ledger
 status while its period is `LOCKED`, whatever client writes it.
 
+## Hardening phase 2 (reconciliation)
+
+| Table                       | Purpose                                                            | Notable constraints                                                                    |
+| --------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| `accounting_policies`       | Per-company controls (materiality, stale days)                     | one row per company, created on first read                                             |
+| `reconciliations`           | Recorded subledger-to-control reconciliation snapshots + lifecycle | `(company, area, control_account, as_of)` unique; `variance = actual - expected` CHECK |
+| `reconciliation_exceptions` | Explained parts of a variance with resolution                      | cascade with their reconciliation                                                      |
+
+Migration: `0012_reconciliation.sql` (also adds `RECONCILIATION` to `attachment_entity_type`).
+
 ## Posted-journal immutability
 
 Migration `0003_posted_journal_immutability.sql` installs triggers that reject

@@ -88,6 +88,7 @@ test suites after every scenario:
 - No orphan lines [CRITICAL]
 - Required account mappings resolve to postable accounts [CRITICAL]
 - AR subledger = AR control; AP subledger = AP control [CRITICAL]
+- Tax register = document-driven movements on tax accounts [CRITICAL]
 - Inventory valuation = inventory accounts [CRITICAL]
 - Fixed asset register (cost, accumulated) = asset accounts, including the
   mapped accounts when no asset is registered [CRITICAL]
@@ -100,7 +101,6 @@ corrected so the sample company reconciles from day one.
 
 ## Known limitations (next phases)
 
-- Reconciliations are computed, not recorded: no status / reviewer / sign-off
-  yet (hardening phase 2-3).
+- Reconciliation Center UI and bank-reconciliation confidence rules (phase 3).
 - No close checklist or close blockers (phase 4).
 - Suspense monitoring, field-level history and the control dashboard (phase 5).

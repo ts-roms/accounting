@@ -68,6 +68,10 @@ export const PERMISSION_DEFINITIONS = [
   define('period.post-soft-closed', 'ACCOUNTING', 'Post into soft-closed fiscal periods'),
   define('journal.correct', 'ACCOUNTING', 'Reverse and re-draft a posted journal as a correction'),
   define('integrity.check', 'ACCOUNTING', 'Run and view financial integrity checks'),
+  define('reconciliation.view', 'ACCOUNTING', 'View subledger reconciliations'),
+  define('reconciliation.prepare', 'ACCOUNTING', 'Run subledger reconciliations, log and resolve exceptions'),
+  define('reconciliation.approve', 'ACCOUNTING', 'Review and approve subledger reconciliations'),
+  define('policy.manage', 'ACCOUNTING', 'Manage accounting policies (materiality, close blockers)'),
 
   // Sales / AR
   define('customer.view', 'SALES', 'View customers'),

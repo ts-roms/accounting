@@ -97,7 +97,7 @@ describe('Accounting controls (e2e)', () => {
         'AR_CONTROL_VARIANCE',
         'AP_CONTROL_VARIANCE',
         'INVENTORY_VARIANCE',
-        'FIXED_ASSET_VARIANCE',
+        'FIXED_ASSETS_VARIANCE',
         'ACCOUNT_MAPPING',
       ]),
     );

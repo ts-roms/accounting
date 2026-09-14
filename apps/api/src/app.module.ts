@@ -13,6 +13,7 @@ import { DatabaseModule } from './database/database.module';
 import { AccountingModule } from './modules/accounting/accounting.module';
 import { AiModule } from './modules/ai/ai.module';
 import { IntegrityModule } from './modules/accounting/integrity/integrity.module';
+import { ReconciliationModule } from './modules/reconciliation/reconciliation.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AttachmentsModule } from './modules/attachments/attachments.module';
@@ -96,6 +97,7 @@ import { UsersModule } from './modules/users/users.module';
     FxModule,
     ConsolidationModule,
     AiModule,
+    ReconciliationModule,
     IntegrityModule,
     WorkflowsModule,
     AttachmentsModule,

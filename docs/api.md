@@ -295,6 +295,17 @@ and is what the tests run; `ANTHROPIC` adds image reading and phrasing.
 
 New error codes: `ACCOUNTING_PERIOD_SOFT_CLOSED`, `ACCOUNTING_PERIOD_LOCKED`, `SOURCE_DOCUMENT_INVALID` (all 422).
 
+### Subledger reconciliation (all require `X-Company-Id`)
+
+| Method      | Path                                                                                                                                                                           | Permission                                       |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------ |
+| GET         | `/reconciliations/summary?asOf` - per area: latest record, live figures, stale flag                                                                                            | `reconciliation.view`                            |
+| GET / POST  | `/reconciliations` (paginated; `area`, `status`, `from`, `to`), `POST { area, asOf }` computes / recomputes                                                                    | `reconciliation.view` / `reconciliation.prepare` |
+| GET         | `/reconciliations/:id` (lines, exceptions, `unexplained`)                                                                                                                      | `reconciliation.view`                            |
+| POST        | `/reconciliations/:id/assign { reviewerId, notes? }`, `/notes { notes }`, `/exceptions { description, amount, reference? }`, `/exceptions/:exceptionId/resolve { resolution }` | `reconciliation.prepare`                         |
+| POST        | `/reconciliations/:id/approve { notes? }` - four-eyes; open exceptions or an unexplained variance above materiality refuse (`RECONCILIATION_UNRESOLVED`)                       | `reconciliation.approve`                         |
+| GET / PATCH | `/accounting-policies` `{ reconciliationMateriality?, reconciliationStaleDays? }`                                                                                              | `reconciliation.view` / `policy.manage`          |
+
 ### Audit & health
 
 | Method | Path                                                                                                                 | Notes                         |
