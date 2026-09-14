@@ -53,6 +53,8 @@ export interface IntegrationView extends Integration {
 @Injectable()
 export class IntegrationsService {
   readonly throttle = new ProviderThrottle();
+  /** Overridable for tests that stub a provider API (see test/stripe.e2e-spec.ts). */
+  fetchImpl: typeof fetch = (...args) => fetch(...args);
 
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
@@ -486,6 +488,7 @@ export class IntegrationsService {
         rateLimitPerSecond: connector.descriptor.rateLimitPerSecond,
         throttle: this.throttle,
         defaultTimeoutMs: this.config.env.WEBHOOK_TIMEOUT_MS,
+        fetchImpl: this.fetchImpl,
         onResponse: (info) =>
           void logs.record({
             organizationId: row.organizationId,

@@ -3,6 +3,7 @@ import { DemoEcommerceConnector } from './demo-ecommerce.connector';
 import { DemoOAuthCrmConnector } from './demo-oauth-crm.connector';
 import { DemoPaymentGatewayConnector } from './demo-payment-gateway.connector';
 import { DemoTaxAuthorityConnector } from './demo-tax-authority.connector';
+import { StripeConnector } from './stripe/stripe.connector';
 
 /**
  * Connector catalogue. To add a provider: implement `IntegrationConnector`
@@ -15,6 +16,7 @@ export const CONNECTOR_CLASSES = [
   DemoEcommerceConnector,
   DemoTaxAuthorityConnector,
   DemoOAuthCrmConnector,
+  StripeConnector,
 ] as const;
 
 export const CONNECTORS = Symbol('CONNECTORS');

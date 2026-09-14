@@ -80,6 +80,14 @@ export class AcmeBankConnector extends BaseConnector {
   register it in `SyncService` and `InboundWebhooksService`. Do not add tables
   or posting code.
 
+## Real connectors
+
+- **Stripe** (`connectors/stripe/`, see `connectors/stripe.md`): API-key auth,
+  paginated pulls of customers and settled charges, Stripe-signed webhooks. Use
+  it as the template for other REST providers: a pure `*.logic.ts` for amounts,
+  cursors and normalisation, a thin connector class, and an in-memory API stub
+  in the e2e test (`IntegrationsService.fetchImpl`).
+
 ## Demo connectors
 
 `DEMO_BANK`, `DEMO_PAYMENT_GATEWAY`, `DEMO_ECOMMERCE`, `DEMO_TAX_AUTHORITY` and
@@ -97,4 +105,4 @@ CRM (Salesforce / HubSpot via OAuth), storage (S3-compatible, Google Drive,
 OneDrive), communication (SMTP, SMS, messaging) and identity (OAuth 2.0 /
 OIDC, Google, Microsoft Entra ID) and analytics (Power BI, warehouses). The
 `IntegrationCategory` enum and `authType` list cover them; only the demo
-representatives are implemented.
+representatives and Stripe are implemented.
