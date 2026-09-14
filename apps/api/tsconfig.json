@@ -1,0 +1,12 @@
+{
+  "extends": "@accounting/tsconfig/nestjs.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": ["src", "test", "drizzle.config.ts"],
+  "exclude": ["node_modules", "dist"]
+}

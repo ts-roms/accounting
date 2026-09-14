@@ -1,0 +1,5 @@
+{
+  "extends": "@accounting/tsconfig/library.json",
+  "compilerOptions": { "noEmit": true },
+  "include": ["src"]
+}

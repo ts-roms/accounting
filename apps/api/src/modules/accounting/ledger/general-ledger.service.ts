@@ -1,0 +1,239 @@
+import { Inject, Injectable } from '@nestjs/common';
+import { and, asc, eq, gte, inArray, lt, lte, sql, type SQL } from 'drizzle-orm';
+import { Money } from '@accounting/money';
+import { LEDGER_STATUSES, type AccountType } from '@accounting/types';
+import type { GeneralLedgerQuery } from '@accounting/validation';
+import { NotFoundError } from '@/common/errors/app-error';
+import { DRIZZLE, type Database, type DbExecutor } from '@/database/database.types';
+import { accounts, companies, journalEntries, journalLines, type Account } from '@/database/schema';
+
+export interface LedgerLine {
+  journalEntryId: string;
+  documentNumber: string;
+  entryDate: string;
+  journalType: string;
+  status: string;
+  entryDescription: string;
+  reference: string | null;
+  lineDescription: string | null;
+  debit: string;
+  credit: string;
+  /** Running balance signed by the account's normal balance side. */
+  balance: string;
+  branchId: string | null;
+}
+
+export interface LedgerResult {
+  account: Pick<Account, 'id' | 'code' | 'name' | 'type' | 'normalBalance'>;
+  currency: string;
+  from: string;
+  to: string;
+  openingBalance: string;
+  periodDebit: string;
+  periodCredit: string;
+  closingBalance: string;
+  lines: LedgerLine[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
+export interface AccountActivity {
+  accountId: string;
+  debit: string;
+  credit: string;
+}
+
+export interface BalanceFilter {
+  companyId: string;
+  /** Inclusive lower bound (omit for all history). */
+  from?: string;
+  /** Inclusive upper bound. */
+  to: string;
+  branchId?: string;
+  departmentId?: string | null;
+  costCenterId?: string | null;
+  projectId?: string | null;
+  accountTypes?: readonly AccountType[];
+}
+
+/** Sign a (debit - credit) net amount according to the account's normal side. */
+export function signedBalance(net: Money, normalBalance: Account['normalBalance']): Money {
+  return normalBalance === 'DEBIT' ? net : net.negate();
+}
+
+/** Optional dimension filters shared by every ledger read. */
+export function dimensionConditions(filter: {
+  departmentId?: string | null;
+  costCenterId?: string | null;
+  projectId?: string | null;
+}): SQL[] {
+  const out: SQL[] = [];
+  if (filter.departmentId) out.push(eq(journalLines.departmentId, filter.departmentId));
+  if (filter.costCenterId) out.push(eq(journalLines.costCenterId, filter.costCenterId));
+  if (filter.projectId) out.push(eq(journalLines.projectId, filter.projectId));
+  return out;
+}
+
+/**
+ * Read model over posted journal lines. Every figure in every report starts
+ * from `activity()`; nothing here is cached or maintained separately.
+ */
+@Injectable()
+export class GeneralLedgerService {
+  constructor(@Inject(DRIZZLE) private readonly db: Database) {}
+
+  /** Debit/credit totals per account for the filter window, from posted lines only. */
+  async activity(
+    filter: BalanceFilter,
+    executor: DbExecutor = this.db,
+  ): Promise<AccountActivity[]> {
+    const conditions: SQL[] = [
+      eq(journalEntries.companyId, filter.companyId),
+      inArray(journalEntries.status, [...LEDGER_STATUSES]),
+      lte(journalEntries.entryDate, filter.to),
+    ];
+    if (filter.from) conditions.push(gte(journalEntries.entryDate, filter.from));
+    if (filter.branchId) conditions.push(eq(journalLines.branchId, filter.branchId));
+    conditions.push(...dimensionConditions(filter));
+    if (filter.accountTypes) conditions.push(inArray(accounts.type, [...filter.accountTypes]));
+
+    const rows = await executor
+      .select({
+        accountId: journalLines.accountId,
+        debit: sql<string>`coalesce(sum(${journalLines.debit}), 0)`,
+        credit: sql<string>`coalesce(sum(${journalLines.credit}), 0)`,
+      })
+      .from(journalLines)
+      .innerJoin(journalEntries, eq(journalEntries.id, journalLines.journalEntryId))
+      .innerJoin(accounts, eq(accounts.id, journalLines.accountId))
+      .where(and(...conditions))
+      .groupBy(journalLines.accountId);
+    return rows;
+  }
+
+  async ledger(companyId: string, query: GeneralLedgerQuery): Promise<LedgerResult> {
+    const [account] = await this.db
+      .select({
+        id: accounts.id,
+        code: accounts.code,
+        name: accounts.name,
+        type: accounts.type,
+        normalBalance: accounts.normalBalance,
+        companyId: accounts.companyId,
+      })
+      .from(accounts)
+      .where(and(eq(accounts.id, query.accountId), eq(accounts.companyId, companyId)));
+    if (!account) throw new NotFoundError('Account', query.accountId);
+    const currency = await this.currency(companyId);
+
+    const base: SQL[] = [
+      eq(journalEntries.companyId, companyId),
+      eq(journalLines.accountId, account.id),
+      inArray(journalEntries.status, [...LEDGER_STATUSES]),
+    ];
+    if (query.branchId) base.push(eq(journalLines.branchId, query.branchId));
+    base.push(...dimensionConditions(query));
+
+    const [opening] = await this.db
+      .select({
+        net: sql<string>`coalesce(sum(${journalLines.debit} - ${journalLines.credit}), 0)`,
+      })
+      .from(journalLines)
+      .innerJoin(journalEntries, eq(journalEntries.id, journalLines.journalEntryId))
+      .where(and(...base, lt(journalEntries.entryDate, query.from)));
+    const openingNet = Money.of(opening?.net ?? '0', currency);
+
+    const inRange = and(
+      ...base,
+      gte(journalEntries.entryDate, query.from),
+      lte(journalEntries.entryDate, query.to),
+    );
+    const [totals] = await this.db
+      .select({
+        debit: sql<string>`coalesce(sum(${journalLines.debit}), 0)`,
+        credit: sql<string>`coalesce(sum(${journalLines.credit}), 0)`,
+        count: sql<number>`count(*)`,
+      })
+      .from(journalLines)
+      .innerJoin(journalEntries, eq(journalEntries.id, journalLines.journalEntryId))
+      .where(inRange);
+
+    const rows = await this.db
+      .select({
+        journalEntryId: journalEntries.id,
+        documentNumber: journalEntries.documentNumber,
+        entryDate: journalEntries.entryDate,
+        journalType: journalEntries.journalType,
+        status: journalEntries.status,
+        entryDescription: journalEntries.description,
+        reference: journalEntries.reference,
+        lineDescription: journalLines.description,
+        debit: journalLines.debit,
+        credit: journalLines.credit,
+        branchId: journalLines.branchId,
+        // Cumulative net over the whole range (ordering is deterministic), independent of the page.
+        running: sql<string>`sum(${journalLines.debit} - ${journalLines.credit}) over (order by ${journalEntries.entryDate}, ${journalEntries.documentNumber}, ${journalLines.lineNumber} rows between unbounded preceding and current row)`,
+      })
+      .from(journalLines)
+      .innerJoin(journalEntries, eq(journalEntries.id, journalLines.journalEntryId))
+      .where(inRange)
+      .orderBy(
+        asc(journalEntries.entryDate),
+        asc(journalEntries.documentNumber),
+        asc(journalLines.lineNumber),
+      )
+      .limit(query.pageSize)
+      .offset((query.page - 1) * query.pageSize);
+
+    const periodDebit = Money.of(totals?.debit ?? '0', currency);
+    const periodCredit = Money.of(totals?.credit ?? '0', currency);
+    const closingNet = openingNet.add(periodDebit).subtract(periodCredit);
+
+    return {
+      account: {
+        id: account.id,
+        code: account.code,
+        name: account.name,
+        type: account.type,
+        normalBalance: account.normalBalance,
+      },
+      currency,
+      from: query.from,
+      to: query.to,
+      openingBalance: signedBalance(openingNet, account.normalBalance).toString(),
+      periodDebit: periodDebit.toString(),
+      periodCredit: periodCredit.toString(),
+      closingBalance: signedBalance(closingNet, account.normalBalance).toString(),
+      lines: rows.map((r) => ({
+        journalEntryId: r.journalEntryId,
+        documentNumber: r.documentNumber,
+        entryDate: r.entryDate,
+        journalType: r.journalType,
+        status: r.status,
+        entryDescription: r.entryDescription,
+        reference: r.reference,
+        lineDescription: r.lineDescription,
+        debit: Money.of(r.debit, currency).toString(),
+        credit: Money.of(r.credit, currency).toString(),
+        balance: signedBalance(
+          openingNet.add(Money.of(r.running, currency)),
+          account.normalBalance,
+        ).toString(),
+        branchId: r.branchId,
+      })),
+      page: query.page,
+      pageSize: query.pageSize,
+      total: Number(totals?.count ?? 0),
+    };
+  }
+
+  async currency(companyId: string, executor: DbExecutor = this.db): Promise<string> {
+    const [row] = await executor
+      .select({ baseCurrency: companies.baseCurrency })
+      .from(companies)
+      .where(eq(companies.id, companyId));
+    if (!row) throw new NotFoundError('Company', companyId);
+    return row.baseCurrency;
+  }
+}

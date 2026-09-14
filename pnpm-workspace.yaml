@@ -1,0 +1,13 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# Native modules that are allowed to run install scripts (pnpm >= 10).
+allowBuilds:
+  argon2: true
+  esbuild: true
+  msgpackr-extract: true
+  "@tailwindcss/oxide": true
+  sharp: true
+  unrs-resolver: true
+  "@scarf/scarf": false
