@@ -22,6 +22,7 @@ import { findNavItem } from '@/lib/navigation';
 import { initials } from '@/lib/format';
 import { Sidebar } from './sidebar';
 import { CommandMenu } from './command-menu';
+import { NotificationsMenu } from './notifications-menu';
 import { ChangePasswordDialog } from './change-password-dialog';
 
 export function Header() {
@@ -87,6 +88,7 @@ export function Header() {
           </kbd>
         </Button>
         <CompanySwitcher />
+        <NotificationsMenu />
         <UserMenu />
       </div>
       <CommandMenu open={commandOpen} onOpenChange={setCommandOpen} />

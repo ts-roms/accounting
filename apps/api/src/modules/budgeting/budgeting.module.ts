@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { DelegationsModule } from '@/modules/delegations/delegations.module';
 import { AccountingModule } from '@/modules/accounting/accounting.module';
 import { BankingModule } from '@/modules/banking/banking.module';
 import { RbacModule } from '@/modules/rbac/rbac.module';
@@ -10,7 +11,14 @@ import { ExpenseClaimsService } from './expense-claims.service';
 
 /** Budgets with versions and variance analysis; employee expense claims through approval, posting and payment. */
 @Module({
-  imports: [AccountingModule, RbacModule, TaxModule, BankingModule, WorkflowsModule],
+  imports: [
+    AccountingModule,
+    RbacModule,
+    TaxModule,
+    BankingModule,
+    WorkflowsModule,
+    DelegationsModule,
+  ],
   controllers: [BudgetsController, ExpenseClaimsController],
   providers: [BudgetsService, ExpenseClaimsService],
   exports: [ExpenseClaimsService],

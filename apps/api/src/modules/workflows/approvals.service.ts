@@ -4,6 +4,7 @@ import { Money } from '@accounting/money';
 import type {
   ApprovalRequestStatus,
   PaginatedResult,
+  PermissionKey,
   WorkflowDocumentType,
 } from '@accounting/types';
 import type {
@@ -28,6 +29,7 @@ import {
 } from '@/database/schema';
 import { AuditService } from '@/modules/audit/audit.service';
 import { PermissionResolverService } from '@/modules/rbac/permission-resolver.service';
+import { AuthorityService } from '@/modules/delegations/authority.service';
 
 const MODULE = 'WORKFLOWS';
 
@@ -75,6 +77,7 @@ export class ApprovalsService {
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly audit: AuditService,
     private readonly resolver: PermissionResolverService,
+    private readonly authority: AuthorityService,
   ) {}
 
   // --------------------------------------------------------------- workflows
@@ -358,6 +361,7 @@ export class ApprovalsService {
         decided.filter((d) => d.requestId === r.id),
         actor.id,
         access.permissions,
+        actor.delegations,
       ),
     );
     if (query.mine) {
@@ -399,7 +403,10 @@ export class ApprovalsService {
       .where(eq(approvalDecisions.requestId, id))
       .orderBy(asc(approvalDecisions.decidedAt));
     const access = await this.resolver.resolve(actor.id, companyId);
-    return { ...this.enrich(row, decisions, actor.id, access.permissions), decisions };
+    return {
+      ...this.enrich(row, decisions, actor.id, access.permissions, actor.delegations),
+      decisions,
+    };
   }
 
   /** One decision per approver per step; the step completes at `minApprovers`; a rejection ends the request. */
@@ -432,11 +439,32 @@ export class ApprovalsService {
           'The request has no open step.',
         );
       const access = await this.resolver.resolve(actor.id, companyId, tx);
+      // The step's permission may be held natively or lent by an active delegation
+      // (scope, amount ceiling and SoD are enforced and the use is recorded).
+      let delegatedAudit: Record<string, unknown> | undefined;
       if (!access.permissions.has(step.requiredPermission)) {
-        throw new BusinessRuleError(
-          ErrorCodes.APPROVAL_NOT_ELIGIBLE,
-          `Step "${step.name}" needs the ${step.requiredPermission} permission.`,
+        const grants = actor.delegations ?? [];
+        if (!grants.some((g) => g.permission === step.requiredPermission))
+          throw new BusinessRuleError(
+            ErrorCodes.APPROVAL_NOT_ELIGIBLE,
+            `Step "${step.name}" needs the ${step.requiredPermission} permission.`,
+          );
+        const authority = await this.authority.assert(
+          tx,
+          { ...actor, permissions: access.permissions },
+          step.requiredPermission as PermissionKey,
+          {
+            companyId,
+            amount: request.amount,
+            currency: request.currency,
+            documentType: 'APPROVAL_REQUEST',
+            documentId: id,
+            documentNumber: request.documentNumber,
+            createdBy: request.requestedBy,
+            action: `${input.decision === 'APPROVE' ? 'Approved' : 'Rejected'} workflow step "${step.name}" for ${request.documentType}`,
+          },
         );
+        delegatedAudit = authority.audit;
       }
       if (!workflow?.allowSelfApproval && request.requestedBy === actor.id) {
         throw new BusinessRuleError(
@@ -485,7 +513,11 @@ export class ApprovalsService {
             status,
             comment: input.comment ?? null,
           },
-          metadata: { actor: actor.email, documentNumber: request.documentNumber },
+          metadata: {
+            actor: actor.email,
+            documentNumber: request.documentNumber,
+            ...delegatedAudit,
+          },
           companyId,
         },
         tx,
@@ -505,6 +537,7 @@ export class ApprovalsService {
     decisions: ReadonlyArray<{ step: number; decidedBy: string }>,
     actorId: string,
     permissions: ReadonlySet<string>,
+    delegations: readonly { permission: string }[] = [],
   ): ApprovalRequestView {
     const step: WorkflowStep | undefined = row.steps[row.currentStep];
     const approvalsSoFar = decisions.filter((d) => d.step === row.currentStep).length;
@@ -512,7 +545,8 @@ export class ApprovalsService {
     const canDecide =
       row.status === 'PENDING' &&
       Boolean(step) &&
-      permissions.has(step!.requiredPermission) &&
+      (permissions.has(step!.requiredPermission) ||
+        delegations.some((d) => d.permission === step!.requiredPermission)) &&
       (row.allowSelfApproval || row.requestedBy !== actorId) &&
       !decisions.some((d) => d.decidedBy === actorId);
     const { allowSelfApproval: _a, ...rest } = row;

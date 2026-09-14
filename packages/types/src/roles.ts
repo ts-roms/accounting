@@ -29,9 +29,17 @@ export interface SystemRoleDefinition {
 }
 
 /** Every read permission except the audit trail, which is reserved for auditors and administrators. */
+const RESTRICTED_VIEWS: readonly PermissionKey[] = [
+  'audit.view',
+  'integration.view',
+  'api-key.view',
+  'webhook.view',
+];
 const VIEW_ALL: PermissionKey[] = PERMISSION_KEYS.filter(
-  (k) => k.endsWith('.view') && k !== 'audit.view',
+  (k) => k.endsWith('.view') && !RESTRICTED_VIEWS.includes(k),
 );
+/** Integration platform views (admins, finance managers, auditors). */
+const INTEGRATION_VIEWS: PermissionKey[] = ['integration.view', 'api-key.view', 'webhook.view'];
 
 export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
   {
@@ -78,6 +86,13 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
       P['workflow.manage'],
       P['approval.decide'],
       P['exchange-rate.manage'],
+      ...INTEGRATION_VIEWS,
+      P['integration.manage'],
+      P['api-key.manage'],
+      P['webhook.manage'],
+      P['delegation.create'],
+      P['delegation.approve'],
+      P['delegation.manage'],
       P['attachment.manage'],
       P['ai.use'],
       P['ai.review'],
@@ -133,6 +148,10 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
       P['bill.match-review'],
       P['vendor-payment.approve'],
       P['vendor-payment.post'],
+      ...INTEGRATION_VIEWS,
+      P['integration.manage'],
+      P['delegation.create'],
+      P['delegation.approve'],
       P['customer-payment.post'],
       P['sales-order.approve'],
       P['sales-return.approve'],
@@ -176,7 +195,13 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
     key: 'AUDITOR',
     name: 'Auditor',
     description: 'Read-only access to all records including the audit trail.',
-    permissions: [...VIEW_ALL, P['audit.view'], P['reports.export'], P['integrity.check']],
+    permissions: [
+      ...VIEW_ALL,
+      ...INTEGRATION_VIEWS,
+      P['audit.view'],
+      P['reports.export'],
+      P['integrity.check'],
+    ],
   },
   {
     key: 'CASHIER',
@@ -262,6 +287,7 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
       P['purchase-return.approve'],
       P['reports.export'],
       P['ai.use'],
+      P['delegation.create'],
     ],
   },
   {

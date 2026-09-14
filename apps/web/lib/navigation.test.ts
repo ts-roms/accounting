@@ -69,6 +69,14 @@ describe('navigation', () => {
       '/reports/consolidation',
       '/admin/workflows',
       '/admin/approvals',
+      ...[
+        'delegations',
+        'integrations',
+        'api-keys',
+        'webhooks',
+        'integration-logs',
+        'notifications',
+      ].map((p) => `/admin/${p}`),
       ...['assistant', 'intake', 'anomalies', 'forecast'].map((p) => `/ai/${p}`),
     ]);
     for (const section of NAVIGATION) {

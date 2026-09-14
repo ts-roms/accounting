@@ -20,6 +20,7 @@ import {
   type OrderStatus,
   type OrderType,
   type PaginatedResult,
+  type PermissionKey,
 } from '@accounting/types';
 import type {
   CancelOrderInput,
@@ -52,6 +53,7 @@ import { AuditService } from '@/modules/audit/audit.service';
 import { BillsService } from '@/modules/payables/bills.service';
 import { VendorsService } from '@/modules/payables/vendors.service';
 import { SodService, type SodConflict } from '@/modules/rbac/sod.service';
+import { AuthorityService } from '@/modules/delegations/authority.service';
 import { CustomersService } from '@/modules/receivables/customers.service';
 import { InvoicesService } from '@/modules/receivables/invoices.service';
 import { DocumentStockService } from '@/modules/inventory/document-stock.service';
@@ -132,6 +134,7 @@ export class OrdersService {
     private readonly accounts: AccountsService,
     private readonly numbering: DocumentNumberingService,
     private readonly sod: SodService,
+    private readonly authority: AuthorityService,
     private readonly customersService: CustomersService,
     private readonly vendorsService: VendorsService,
     private readonly invoicesService: InvoicesService,
@@ -406,7 +409,29 @@ export class OrdersService {
         if (action === 'submit') await this.approvals.open(tx, { ...ref, requestedBy: actor.id });
         else await this.approvals.assertApproved(tx, ref);
       }
+      let delegatedAudit: Record<string, unknown> | undefined;
       if (action === 'approve' && SOD_PAIR[type]) {
+        // Delegated authority (if any): scope, amount ceiling and SoD are checked and the use recorded.
+        const authority = await this.authority.assert(
+          tx,
+          actor,
+          SOD_PAIR[type]![1] as PermissionKey,
+          {
+            companyId,
+            branchId: existing.branchId,
+            amount: existing.total,
+            currency: existing.currency,
+            documentType:
+              type === 'SALES_ORDER' || type === 'PURCHASE_ORDER' || type === 'PURCHASE_REQUEST'
+                ? type
+                : 'ORDER',
+            documentId: id,
+            documentNumber: existing.documentNumber,
+            createdBy: existing.createdBy,
+            action: 'Approved ' + type.toLowerCase().replace(/_/g, ' '),
+          },
+        );
+        delegatedAudit = authority.audit;
         const conflict = await this.sod.checkActorSeparation(
           actor.organizationId,
           SOD_PAIR[type]!,
@@ -464,7 +489,7 @@ export class OrdersService {
           entityId: id,
           previousValue: { status: existing.status },
           newValue: { status: to, reason, sodWarnings: warnings.length ? warnings : undefined },
-          metadata: { documentNumber: existing.documentNumber },
+          metadata: { documentNumber: existing.documentNumber, ...delegatedAudit },
           companyId,
         },
         tx,

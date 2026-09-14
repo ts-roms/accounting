@@ -31,6 +31,7 @@ import type {
   PaginatedResult,
   SodEnforcement,
   UserStatus,
+  DelegatedGrant,
 } from '@accounting/types';
 
 export type { PaginatedResult };
@@ -60,6 +61,8 @@ export interface MeResponse {
   permissions: string[];
   roleKeys: string[];
   activeCompanyId: string | null;
+  /** Active delegations lending approval authority in the active company (Prompt #4). */
+  delegations: DelegatedGrant[];
   companies: CompanySummary[];
 }
 

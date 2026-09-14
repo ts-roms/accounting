@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AccountingModule } from '@/modules/accounting/accounting.module';
+import { DelegationsModule } from '@/modules/delegations/delegations.module';
 import { WorkflowsModule } from '@/modules/workflows/workflows.module';
 import { InventoryCoreModule } from '@/modules/inventory/inventory-core.module';
 import { PayablesModule } from '@/modules/payables/payables.module';
@@ -24,6 +25,7 @@ import { ReturnsService } from './returns.service';
     OrdersCoreModule,
     InventoryCoreModule,
     WorkflowsModule,
+    DelegationsModule,
   ],
   providers: [OrdersService, GoodsReceiptsService, ReturnsService],
   exports: [OrdersService, GoodsReceiptsService, ReturnsService, OrdersCoreModule],

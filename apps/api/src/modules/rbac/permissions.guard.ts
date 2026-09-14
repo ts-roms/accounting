@@ -1,7 +1,7 @@
 import { type CanActivate, type ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
-import type { PermissionKey } from '@accounting/types';
+import type { DelegatedGrant, PermissionKey } from '@accounting/types';
 import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { IS_PUBLIC_KEY } from '@/common/decorators/public.decorator';
 import { PERMISSIONS_KEY } from '@/common/decorators/require-permissions.decorator';
@@ -38,11 +38,23 @@ export class PermissionsGuard implements CanActivate {
 
     const required =
       this.reflector.getAllAndOverride<PermissionKey[]>(PERMISSIONS_KEY, targets) ?? [];
-    return PermissionsGuard.hasAll(user.permissions, required);
+    return PermissionsGuard.hasAll(user.permissions, required, user.delegations);
   }
 
-  static hasAll(granted: ReadonlySet<string>, required: readonly string[]): boolean {
-    const missing = required.filter((p) => !granted.has(p));
+  /**
+   * A permission is satisfied by the principal's own grant or by an active
+   * delegation for the active company (grants are resolved per company by the
+   * auth guard). Delegated permissions still go through
+   * `AuthorityService.assert` in the service for scope / amount / SoD.
+   */
+  static hasAll(
+    granted: ReadonlySet<string>,
+    required: readonly string[],
+    delegations: readonly DelegatedGrant[] = [],
+  ): boolean {
+    const missing = required.filter(
+      (p) => !granted.has(p) && !delegations.some((d) => d.permission === p),
+    );
     if (missing.length > 0) throw new PermissionDeniedError(missing);
     return true;
   }

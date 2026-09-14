@@ -13,6 +13,7 @@ import {
   PERMISSION_DEFINITIONS,
   WORKFLOW_DOCUMENT_TYPES,
   type ApprovalRequestStatus,
+  type PermissionKey,
   type WorkflowDocumentType,
 } from '@accounting/types';
 import { createWorkflowSchema, type CreateWorkflowInput } from '@accounting/validation';
@@ -55,6 +56,7 @@ import {
   Textarea,
 } from '@accounting/ui';
 import { describeError } from '@/lib/api/client';
+import { DelegatedAuthorityNotice } from '@/components/delegations/delegated-authority-notice';
 import {
   useApproval,
   useApprovals,
@@ -742,6 +744,13 @@ function ApprovalDialog({
                 );
               })}
             </ol>
+            {r.canDecide && r.steps[r.currentStep] ? (
+              <DelegatedAuthorityNotice
+                permission={r.steps[r.currentStep]!.requiredPermission as PermissionKey}
+                amount={r.amount}
+                currency={r.currency}
+              />
+            ) : null}
             {r.canDecide ? (
               <div className="space-y-1">
                 <Label>Comment</Label>

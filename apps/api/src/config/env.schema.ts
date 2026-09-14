@@ -51,6 +51,23 @@ export const envSchema = z.object({
   /** Nightly anomaly scan window in days (0 disables the job). */
   AI_ANOMALY_SCAN_DAYS: z.coerce.number().int().min(0).max(365).default(7),
 
+  /**
+   * Integration platform (Prompt #4). The encryption key protects provider
+   * credentials, OAuth tokens and webhook secrets at rest; production must set
+   * it explicitly (32 bytes hex/base64 or a long passphrase).
+   */
+  INTEGRATION_ENCRYPTION_KEY: z.string().trim().min(16).optional(),
+  /** Run sync / webhook / delivery jobs inline instead of through BullMQ (tests, Redis-less dev). */
+  INTEGRATION_INLINE_JOBS: z
+    .string()
+    .default('false')
+    .transform((v) => v === 'true'),
+  WEBHOOK_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60000).default(10000),
+  /** Public base URL of the API for OAuth redirect URIs (e.g. https://api.example.com). */
+  OAUTH_REDIRECT_BASE_URL: z.string().trim().url().optional(),
+  /** Where OAuth callbacks send the browser back to (the web app). */
+  WEB_BASE_URL: z.string().trim().url().default('http://localhost:3000'),
+
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });
 

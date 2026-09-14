@@ -11,6 +11,7 @@ import {
 } from '@accounting/types';
 import * as schema from '../schema';
 import { seedAccounting } from './accounting.seed';
+import { seedIntegrations, seedSampleDelegation } from './integrations.seed';
 
 /** Identity that owns scheduled postings (depreciation job). Never logs in. */
 export const SYSTEM_USER_EMAIL = 'scheduler@system.local';
@@ -24,6 +25,8 @@ export interface SeedOptions {
   demoPassword?: string;
   /** Skip the demo (non-admin) users - used by tests. */
   demoUsers?: boolean;
+  /** Skip the demo integrations and the sample delegation (Prompt #4). */
+  demoIntegrations?: boolean;
   log?: (msg: string) => void;
 }
 
@@ -47,6 +50,10 @@ export async function runSeed(connectionString: string, options: SeedOptions = {
       await ensureSodPolicies(tx, org.id, log);
       const adminId = await ensureUsers(tx, org.id, options, log);
       await seedAccounting(tx, org.id, adminId, log);
+      if (options.demoIntegrations !== false) {
+        await seedIntegrations(tx, org.id, adminId, log);
+        if (options.demoUsers !== false) await seedSampleDelegation(tx, org.id, adminId, log);
+      }
     });
   } finally {
     await pool.end();

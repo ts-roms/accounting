@@ -9,6 +9,7 @@ import type {
 } from '@accounting/validation';
 import { AuditService } from '@/modules/audit/audit.service';
 import { AccountsService } from '@/modules/accounting/accounts/accounts.service';
+import { OutboxService } from '@/modules/integrations/events/outbox.service';
 import { DuplicateError, NotFoundError } from '@/common/errors/app-error';
 import { countWhere, offsetFor, toPaginatedResult } from '@/common/pagination/pagination';
 import { shallowDiff } from '@/common/utils/diff';
@@ -39,6 +40,7 @@ export class CustomersService {
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly audit: AuditService,
     private readonly accounts: AccountsService,
+    private readonly outbox: OutboxService,
   ) {}
 
   async list(companyId: string, query: ListPartiesQuery): Promise<PaginatedResult<CustomerView>> {
@@ -129,6 +131,18 @@ export class CustomersService {
         },
         tx,
       );
+      await this.outbox.enqueue(tx, {
+        eventType: 'customer.created',
+        companyId,
+        dedupeKey: 'customer.created:' + created.id,
+        payload: {
+          customerId: created.id,
+          code: created.code,
+          name: created.name,
+          currency: created.currency,
+          status: created.status,
+        },
+      });
       return created.id;
     });
     return this.getView(companyId, id);
@@ -170,6 +184,17 @@ export class CustomersService {
         },
         tx,
       );
+      await this.outbox.enqueue(tx, {
+        eventType: 'customer.updated',
+        companyId,
+        payload: {
+          customerId: id,
+          code: updated.code,
+          name: updated.name,
+          status: updated.status,
+          changed: Object.keys(next ?? {}),
+        },
+      });
     });
     return this.getView(companyId, id);
   }

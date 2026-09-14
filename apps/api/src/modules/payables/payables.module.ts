@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { DelegationsModule } from '@/modules/delegations/delegations.module';
 import { FxModule } from '@/modules/fx/fx.module';
 import { WorkflowsModule } from '@/modules/workflows/workflows.module';
 import { TaxModule } from '@/modules/tax/tax.module';
@@ -25,6 +26,7 @@ import {
     TaxModule,
     FxModule,
     WorkflowsModule,
+    DelegationsModule,
   ],
   controllers: [VendorsController, BillsController, VendorPaymentsController, ApReportsController],
   providers: [VendorsService, BillsService, VendorPaymentsService, ApReportsService],

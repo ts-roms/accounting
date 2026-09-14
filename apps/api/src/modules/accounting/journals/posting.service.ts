@@ -6,6 +6,7 @@ import { PinoLogger } from 'nestjs-pino';
 import { Money } from '@accounting/money';
 import { P, type JournalType, type PermissionKey } from '@accounting/types';
 import { AuditService } from '@/modules/audit/audit.service';
+import { OutboxService } from '@/modules/integrations/events/outbox.service';
 import { BusinessRuleError, PermissionDeniedError } from '@/common/errors/app-error';
 import { ErrorCodes } from '@/common/errors/error-codes';
 import { DRIZZLE, type Database, type DbExecutor } from '@/database/database.types';
@@ -172,6 +173,7 @@ export class AccountingPostingService {
     private readonly numbering: DocumentNumberingService,
     private readonly dimensions: DimensionsService,
     private readonly events: EventEmitter2,
+    private readonly outbox: OutboxService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(AccountingPostingService.name);
@@ -579,6 +581,17 @@ export class AccountingPostingService {
       totalDebit: posted.totalDebit,
       totalCredit: posted.totalCredit,
     };
+    // Transactional outbox: the outbound webhook event commits with the ledger write.
+    await this.outbox.enqueue(tx, {
+      eventType: posted.journalType === 'REVERSAL' ? 'journal.reversed' : 'journal.posted',
+      companyId: posted.companyId,
+      dedupeKey: `journal.posted:${posted.id}`,
+      payload: {
+        ...payload,
+        reversalOfId: posted.reversalOfId ?? null,
+        description: posted.description,
+      },
+    });
     this.events.emit(JOURNAL_POSTED_EVENT, payload);
     return posted;
   }

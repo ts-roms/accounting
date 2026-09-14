@@ -66,6 +66,7 @@ import { DimensionsService } from '@/modules/accounting/dimensions/dimensions.se
 import { TaxEngineService } from '@/modules/tax/tax-engine.service';
 import { ExchangeRatesService } from '@/modules/fx/exchange-rates.service';
 import { FxService } from '@/modules/fx/fx.service';
+import { AuthorityService } from '@/modules/delegations/authority.service';
 
 const MODULE = 'PAYABLES';
 const NUMBER_TYPE: Record<SubledgerDocumentType, DocumentType> = {
@@ -130,6 +131,7 @@ export class BillsService {
     private readonly dimensions: DimensionsService,
     private readonly rates: ExchangeRatesService,
     private readonly fx: FxService,
+    private readonly authority: AuthorityService,
   ) {}
 
   // ----------------------------------------------------------------- queries
@@ -550,6 +552,18 @@ export class BillsService {
     const warnings = await this.db.transaction(async (tx) => {
       const existing = await this.lock(tx, companyId, id);
       this.assertStatus(existing, ['DRAFT'], 'approved');
+      // Delegated authority (if any) is validated and recorded in this transaction.
+      const authority = await this.authority.assert(tx, actor, P['bill.approve'], {
+        companyId,
+        branchId: existing.branchId,
+        amount: existing.total,
+        currency: existing.currency,
+        documentType: 'VENDOR_BILL',
+        documentId: id,
+        documentNumber: existing.documentNumber,
+        createdBy: existing.createdBy,
+        action: 'Approved vendor bill',
+      });
       await tx
         .update(vendorBills)
         .set({ status: 'APPROVED', approvedBy: actor.id, approvedAt: new Date() })
@@ -562,7 +576,7 @@ export class BillsService {
           entityId: id,
           previousValue: { status: 'DRAFT' },
           newValue: { status: 'APPROVED' },
-          metadata: { documentNumber: existing.documentNumber },
+          metadata: { documentNumber: existing.documentNumber, ...authority.audit },
           companyId,
         },
         tx,

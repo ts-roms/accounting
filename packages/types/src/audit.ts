@@ -26,6 +26,16 @@ export const AUDIT_ACTIONS = [
   'RECONCILIATION_APPROVE',
   'YEAR_CLOSE',
   'LOCK',
+  'CONNECT',
+  'DISCONNECT',
+  'ROTATE',
+  'REVOKE',
+  'SYNC_START',
+  'SYNC_COMPLETE',
+  'SYNC_FAIL',
+  'DELEGATION_USE',
+  'EXPIRE',
+  'CANCEL',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

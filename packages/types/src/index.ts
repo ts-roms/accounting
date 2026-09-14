@@ -11,3 +11,5 @@ export * from './assets-banking';
 export * from './budgeting-tax';
 export * from './enterprise';
 export * from './ai';
+export * from './integrations';
+export * from './delegations';

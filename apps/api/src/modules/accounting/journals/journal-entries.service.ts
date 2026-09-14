@@ -41,6 +41,7 @@ import {
 import { DocumentNumberingService } from '../numbering/document-numbering.service';
 import { DimensionsService } from '../dimensions/dimensions.service';
 import { ApprovalsService } from '@/modules/workflows/approvals.service';
+import { AuthorityService } from '@/modules/delegations/authority.service';
 import { AccountingPostingService } from './posting.service';
 
 const MODULE = 'ACCOUNTING';
@@ -107,6 +108,7 @@ export class JournalEntriesService {
     private readonly sod: SodService,
     private readonly dimensions: DimensionsService,
     private readonly approvals: ApprovalsService,
+    private readonly authority: AuthorityService,
   ) {}
 
   // ----------------------------------------------------------------- queries
@@ -463,6 +465,17 @@ export class JournalEntriesService {
         tx,
       );
       if (conflict) warnings.push(conflict);
+      const authority = await this.authority.assert(tx, actor, P['journal.approve'], {
+        companyId,
+        branchId: entry.branchId,
+        amount: entry.totalDebit,
+        currency: entry.currency,
+        documentType: 'JOURNAL_ENTRY',
+        documentId: id,
+        documentNumber: entry.documentNumber,
+        createdBy: entry.createdBy,
+        action: 'Approved journal entry',
+      });
       await this.posting.resolvePeriod(tx, companyId, entry.entryDate, { draft: true });
       await tx
         .update(journalEntries)
@@ -474,7 +487,9 @@ export class JournalEntriesService {
         'APPROVE',
         'APPROVED',
         companyId,
-        warnings.length ? { sodWarnings: warnings } : undefined,
+        warnings.length || authority.audit
+          ? { ...(warnings.length ? { sodWarnings: warnings } : {}), ...authority.audit }
+          : undefined,
       );
     });
     return { ...(await this.get(companyId, id)), sodWarnings: warnings };

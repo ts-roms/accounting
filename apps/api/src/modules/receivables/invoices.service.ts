@@ -65,6 +65,8 @@ import { DimensionsService } from '@/modules/accounting/dimensions/dimensions.se
 import { TaxEngineService } from '@/modules/tax/tax-engine.service';
 import { ExchangeRatesService } from '@/modules/fx/exchange-rates.service';
 import { FxService } from '@/modules/fx/fx.service';
+import { AuthorityService } from '@/modules/delegations/authority.service';
+import { OutboxService } from '@/modules/integrations/events/outbox.service';
 
 const MODULE = 'RECEIVABLES';
 const NUMBER_TYPE: Record<SubledgerDocumentType, DocumentType> = {
@@ -128,6 +130,8 @@ export class InvoicesService {
     private readonly dimensions: DimensionsService,
     private readonly rates: ExchangeRatesService,
     private readonly fx: FxService,
+    private readonly authority: AuthorityService,
+    private readonly outbox: OutboxService,
   ) {}
 
   // ----------------------------------------------------------------- queries
@@ -347,6 +351,12 @@ export class InvoicesService {
         },
         tx,
       );
+      await this.outbox.enqueue(tx, {
+        eventType: 'invoice.created',
+        companyId,
+        dedupeKey: 'invoice.created:' + created.id,
+        payload: this.eventPayload(created),
+      });
       const warnings = await this.creditLimitWarnings(companyId, customer.id, created, tx);
       return { id: created.id, warnings };
     }
@@ -514,6 +524,18 @@ export class InvoicesService {
     const warnings = await this.db.transaction(async (tx) => {
       const existing = await this.lock(tx, companyId, id);
       this.assertStatus(existing, ['DRAFT'], 'approved');
+      // Delegated authority (if any) is validated and recorded in this transaction.
+      const authority = await this.authority.assert(tx, actor, P['invoice.approve'], {
+        companyId,
+        branchId: existing.branchId,
+        amount: existing.total,
+        currency: existing.currency,
+        documentType: 'INVOICE',
+        documentId: id,
+        documentNumber: existing.documentNumber,
+        createdBy: existing.createdBy,
+        action: 'Approved customer invoice',
+      });
       await tx
         .update(invoices)
         .set({ status: 'APPROVED', approvedBy: actor.id, approvedAt: new Date() })
@@ -526,11 +548,17 @@ export class InvoicesService {
           entityId: id,
           previousValue: { status: 'DRAFT' },
           newValue: { status: 'APPROVED' },
-          metadata: { documentNumber: existing.documentNumber },
+          metadata: { documentNumber: existing.documentNumber, ...authority.audit },
           companyId,
         },
         tx,
       );
+      await this.outbox.enqueue(tx, {
+        eventType: 'invoice.approved',
+        companyId,
+        dedupeKey: `invoice.approved:${id}`,
+        payload: this.eventPayload(existing),
+      });
       return this.creditLimitWarnings(companyId, existing.customerId, existing, tx);
     });
     return { ...(await this.get(companyId, id)), warnings };
@@ -672,6 +700,17 @@ export class InvoicesService {
         },
         tx,
       );
+      await this.outbox.enqueue(tx, {
+        eventType: 'invoice.posted',
+        companyId,
+        dedupeKey: 'invoice.posted:' + id,
+        payload: {
+          ...this.eventPayload(existing),
+          accountingStatus: 'POSTED',
+          journalEntryId: entry.id,
+          journalNumber: entry.documentNumber,
+        },
+      });
     });
     return this.get(companyId, id);
   }
@@ -794,6 +833,12 @@ export class InvoicesService {
         },
         tx,
       );
+      await this.outbox.enqueue(tx, {
+        eventType: 'invoice.cancelled',
+        companyId,
+        dedupeKey: 'invoice.cancelled:' + id,
+        payload: { ...this.eventPayload(existing), status: 'VOID', reason: input.reason },
+      });
     });
     return this.get(companyId, id);
   }
@@ -1118,6 +1163,23 @@ export class InvoicesService {
       .for('update');
     if (!row) throw new NotFoundError('Invoice', id);
     return row;
+  }
+
+  /** Outbound webhook payload: identifiers and amounts only, never line-level PII. */
+  private eventPayload(doc: Invoice): Record<string, unknown> {
+    return {
+      invoiceId: doc.id,
+      documentNumber: doc.documentNumber,
+      documentType: doc.documentType,
+      customerId: doc.customerId,
+      documentDate: doc.documentDate,
+      dueDate: doc.dueDate,
+      currency: doc.currency,
+      total: doc.total,
+      status: doc.status,
+      accountingStatus: doc.accountingStatus,
+      reference: doc.reference,
+    };
   }
 
   private assertStatus(doc: Invoice, allowed: Invoice['status'][], verb: string): void {

@@ -20,6 +20,7 @@ import {
 } from '@/database/schema';
 import { AccountsService } from '../accounts/accounts.service';
 import { AccountingPostingService } from '../journals/posting.service';
+import { OutboxService } from '@/modules/integrations/events/outbox.service';
 
 const MODULE = 'ACCOUNTING';
 const UNPOSTED = ['DRAFT', 'SUBMITTED', 'APPROVED'] as const;
@@ -64,6 +65,7 @@ export class FiscalPeriodsService {
     private readonly audit: AuditService,
     private readonly accountsService: AccountsService,
     private readonly posting: AccountingPostingService,
+    private readonly outbox: OutboxService,
   ) {}
 
   async listYears(companyId: string): Promise<FiscalYearWithPeriods[]> {
@@ -299,6 +301,19 @@ export class FiscalPeriodsService {
         },
         tx,
       );
+      await this.outbox.enqueue(tx, {
+        eventType: 'period.closed',
+        companyId,
+        dedupeKey: 'period.closed:' + period.id + ':' + Date.now(),
+        payload: {
+          fiscalPeriodId: period.id,
+          name: period.name,
+          startDate: period.startDate,
+          endDate: period.endDate,
+          status: 'CLOSED',
+          lockedEntries: locked.length,
+        },
+      });
       return closed;
     });
   }

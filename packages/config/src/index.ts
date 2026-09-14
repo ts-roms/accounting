@@ -15,6 +15,15 @@ export const HEADERS = {
   REQUESTED_WITH: 'x-requested-with',
   /** Optional idempotency key for financial operations (used from Phase 2). */
   IDEMPOTENCY_KEY: 'idempotency-key',
+  /** Set on replayed idempotent responses. */
+  IDEMPOTENT_REPLAYED: 'idempotent-replayed',
+  /** Outbound webhook signature: t=<unix seconds>,v1=<hex hmac-sha256>. */
+  WEBHOOK_SIGNATURE: 'x-webhook-signature',
+  WEBHOOK_EVENT_ID: 'x-webhook-event-id',
+  WEBHOOK_EVENT_TYPE: 'x-webhook-event',
+  WEBHOOK_DELIVERY_ID: 'x-webhook-delivery-id',
+  /** Remaining API-key quota in the current window. */
+  RATE_LIMIT_REMAINING: 'x-ratelimit-remaining',
 } as const;
 
 export const REQUESTED_WITH_VALUE = 'XMLHttpRequest';

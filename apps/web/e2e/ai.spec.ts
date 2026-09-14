@@ -21,7 +21,9 @@ Total Amount Due   PHP 18,500.00
 test.describe('ai assistance (advisory only)', () => {
   test.slow();
 
-  test('intake reads a text invoice, matches the vendor and drafts a bill that stays a draft', async ({ page }) => {
+  test('intake reads a text invoice, matches the vendor and drafts a bill that stays a draft', async ({
+    page,
+  }) => {
     await login(page);
     await page.goto('/ai/intake');
     await expect(page.getByTestId('ai-advisory')).toContainText('Advisory only');
@@ -47,7 +49,9 @@ test.describe('ai assistance (advisory only)', () => {
     await expect(page).toHaveURL(/\/purchasing\/bills\/[0-9a-f-]+$/);
     await expect(page.getByText('DRAFT', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('18,500.00').first()).toBeVisible();
-    await expect(page.getByTestId('attachment-row').filter({ hasText: `ppu-${stamp}.txt` })).toBeVisible();
+    await expect(
+      page.getByTestId('attachment-row').filter({ hasText: `ppu-${stamp}.txt` }),
+    ).toBeVisible();
   });
 
   test('the assistant answers from posted reports with sources', async ({ page }) => {
@@ -69,7 +73,10 @@ test.describe('ai assistance (advisory only)', () => {
     await page.goto('/ai/anomalies');
     await page.getByTestId('anomaly-scan').click();
     await expect(page.getByText(/Scanned \d+ documents/)).toBeVisible();
-    const row = page.getByRole('row').filter({ hasText: /duplicate|round|person|backdated|control/i }).first();
+    const row = page
+      .getByRole('row')
+      .filter({ hasText: /duplicate|round|person|backdated|control/i })
+      .first();
     await expect(row).toBeVisible();
     await row.click();
     await expect(page.getByTestId('flag-detail')).toBeVisible();

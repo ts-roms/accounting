@@ -10,7 +10,11 @@ import { AppModule } from './app.module';
 import { configureApp } from './app.setup';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
+  // rawBody: inbound webhook signatures are verified over the exact bytes received.
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bufferLogs: true,
+    rawBody: true,
+  });
   const logger = app.get(Logger);
   app.useLogger(logger);
 

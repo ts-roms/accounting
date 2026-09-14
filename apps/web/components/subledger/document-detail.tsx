@@ -49,6 +49,7 @@ import { useSession } from '@/lib/auth/session';
 import type { SubledgerConfig } from '@/lib/subledger/config';
 import { formatDateTime, titleCase } from '@/lib/format';
 import { ConfirmDialog, PageHeader } from '@/components/ui-ext/page';
+import { DelegatedAuthorityNotice } from '@/components/delegations/delegated-authority-notice';
 import { AttachmentsPanel } from '@/components/enterprise/attachments-panel';
 import { Amount, today } from '@/components/accounting/primitives';
 import { MatchCard } from '@/components/orders/match-card';
@@ -57,7 +58,7 @@ import { partyOf } from './documents';
 
 export function DocumentDetailPage({ cfg, id }: { cfg: SubledgerConfig; id: string }) {
   const router = useRouter();
-  const { hasPermission } = useSession();
+  const { hasPermission, hasAuthority } = useSession();
   const document = useDocument(cfg, id);
   const action = useDocumentAction(cfg);
   const voidDoc = useVoidDocument(cfg);
@@ -73,7 +74,8 @@ export function DocumentDetailPage({ cfg, id }: { cfg: SubledgerConfig; id: stri
   const party = partyOf(cfg, d);
   const isDraft = d.status === 'DRAFT';
   const canEdit = isDraft && hasPermission(cfg.permissions.docCreate);
-  const canApprove = isDraft && hasPermission(cfg.permissions.docApprove);
+  // Approval may be held natively or through an active delegation (the API enforces scope and limits).
+  const canApprove = isDraft && hasAuthority(cfg.permissions.docApprove);
   const canPost =
     d.status === 'APPROVED' &&
     d.accountingStatus === 'UNPOSTED' &&
@@ -167,6 +169,13 @@ export function DocumentDetailPage({ cfg, id }: { cfg: SubledgerConfig; id: stri
           <AlertTitle>Voided {d.voidedAt ? formatDateTime(d.voidedAt) : ''}</AlertTitle>
           <AlertDescription>{d.voidReason}</AlertDescription>
         </Alert>
+      ) : null}
+      {isDraft ? (
+        <DelegatedAuthorityNotice
+          permission={cfg.permissions.docApprove}
+          amount={d.total}
+          currency={d.currency}
+        />
       ) : null}
       <WarningsAlert warnings={warnings.length ? warnings : (d.warnings ?? [])} />
 

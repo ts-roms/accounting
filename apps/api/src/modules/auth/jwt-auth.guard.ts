@@ -1,14 +1,20 @@
-import { type CanActivate, type ExecutionContext, Injectable } from '@nestjs/common';
+import { type CanActivate, type ExecutionContext, HttpStatus, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { COOKIES, HEADERS } from '@accounting/config';
+import { DelegationsService } from '@/modules/delegations/delegations.service';
+import { ApiKeysService } from '@/modules/integrations/api-keys/api-keys.service';
+import {
+  effectiveApiKeyPermissions,
+  isApiKeySecret,
+} from '@/modules/integrations/api-keys/api-key.logic';
 import { OrganizationsService } from '@/modules/organizations/organizations.service';
 import { PermissionResolverService } from '@/modules/rbac/permission-resolver.service';
 import { UsersService } from '@/modules/users/users.service';
 import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { RequestContext } from '@/common/context/request-context';
 import { IS_PUBLIC_KEY } from '@/common/decorators/public.decorator';
-import { ForbiddenError, UnauthenticatedError } from '@/common/errors/app-error';
+import { AppError, ForbiddenError, UnauthenticatedError } from '@/common/errors/app-error';
 import { ErrorCodes } from '@/common/errors/error-codes';
 import { AuthService } from './auth.service';
 import { TokenService } from './token.service';
@@ -17,10 +23,13 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 /**
  * Global authentication guard.
- *  1. Extracts the access token (httpOnly cookie or Bearer header).
- *  2. Verifies the signature/expiry and that the session is not revoked.
+ *  1. Extracts the credential: httpOnly session cookie, Bearer JWT, or Bearer API key (`ak_...`).
+ *  2. Sessions: verifies signature / expiry and that the session is not revoked.
+ *     API keys: verifies the hash, status, expiry and per-key rate limit.
  *  3. Loads the user (must be ACTIVE) and validates the optional company context.
- *  4. Resolves effective permissions and attaches the principal to the request.
+ *  4. Resolves effective permissions (API keys: scopes intersected with the
+ *     owner's permissions) plus active delegations for the company, and
+ *     attaches the principal to the request.
  */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -31,6 +40,8 @@ export class JwtAuthGuard implements CanActivate {
     private readonly users: UsersService,
     private readonly resolver: PermissionResolverService,
     private readonly organizations: OrganizationsService,
+    private readonly apiKeys: ApiKeysService,
+    private readonly delegations: DelegationsService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -40,14 +51,30 @@ export class JwtAuthGuard implements CanActivate {
     ]);
     const req = context.switchToHttp().getRequest<Request & { user?: AuthenticatedUser }>();
 
-    // Public routes (login, refresh, health) never depend on a principal. A stale
-    // or revoked cookie must not block them - refresh in particular has to reach
-    // the service so token-reuse detection can run.
+    // Public routes (login, refresh, health, webhook receivers) never depend on
+    // a principal. A stale or revoked cookie must not block them - refresh in
+    // particular has to reach the service so token-reuse detection can run.
     if (isPublic) return true;
 
     const token = this.extractToken(req);
     if (!token) throw new UnauthenticatedError();
 
+    const principal = isApiKeySecret(token)
+      ? await this.authenticateApiKey(req, token, context.switchToHttp().getResponse<Response>())
+      : await this.authenticateSession(req, token);
+
+    req.user = principal;
+    RequestContext.patch({
+      userId: principal.id,
+      userEmail: principal.email,
+      organizationId: principal.organizationId,
+      companyId: principal.companyId,
+      sessionId: principal.sessionId,
+    });
+    return true;
+  }
+
+  private async authenticateSession(req: Request, token: string): Promise<AuthenticatedUser> {
     const payload = await this.tokens.verifyAccessToken(token);
     if (!payload)
       throw new UnauthenticatedError(
@@ -66,9 +93,12 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthenticatedError('This account is not active.', ErrorCodes.ACCOUNT_INACTIVE);
 
     const companyId = await this.resolveCompany(req, user.id, user.organizationId);
-    const access = await this.resolver.resolve(user.id, companyId);
+    const [access, delegations] = await Promise.all([
+      this.resolver.resolve(user.id, companyId),
+      companyId ? this.delegations.grantsFor(user.id, companyId) : Promise.resolve([]),
+    ]);
 
-    const principal: AuthenticatedUser = {
+    return {
       id: user.id,
       email: user.email,
       firstName: user.firstName,
@@ -78,16 +108,59 @@ export class JwtAuthGuard implements CanActivate {
       companyId,
       permissions: access.permissions,
       roleKeys: access.roleKeys,
+      delegations,
     };
-    req.user = principal;
-    RequestContext.patch({
-      userId: user.id,
-      userEmail: user.email,
-      organizationId: user.organizationId,
+  }
+
+  /**
+   * API keys act as their owner, limited to the key's scopes, its company
+   * list and its rate limit. They never receive delegated authority.
+   */
+  private async authenticateApiKey(
+    req: Request,
+    secret: string,
+    res: Response,
+  ): Promise<AuthenticatedUser> {
+    const { key, scopes } = await this.apiKeys.authenticate(secret);
+    const remaining = this.apiKeys.consumeQuota(key);
+    res.setHeader(HEADERS.RATE_LIMIT_REMAINING, String(Math.max(remaining, 0)));
+    if (remaining < 0)
+      throw new AppError(
+        ErrorCodes.RATE_LIMITED,
+        'API key rate limit exceeded.',
+        HttpStatus.TOO_MANY_REQUESTS,
+        { limitPerMinute: key.rateLimitPerMinute },
+      );
+    const owner = await this.users.findById(key.ownerUserId);
+    if (!owner || owner.organizationId !== key.organizationId || owner.status !== 'ACTIVE')
+      throw new UnauthenticatedError(
+        'The API key owner is not active.',
+        ErrorCodes.API_KEY_INVALID,
+      );
+
+    const companyId = await this.resolveCompany(req, owner.id, owner.organizationId);
+    if (companyId && key.companyIds.length > 0 && !key.companyIds.includes(companyId))
+      throw new ForbiddenError(
+        'This API key is not allowed to act in the selected company.',
+        ErrorCodes.COMPANY_NOT_ACCESSIBLE,
+        { companyId },
+      );
+    const ownerAccess = await this.resolver.resolve(owner.id, companyId);
+    this.apiKeys.touch(key.id);
+    return {
+      id: owner.id,
+      email: owner.email,
+      firstName: owner.firstName,
+      lastName: owner.lastName,
+      organizationId: owner.organizationId,
+      sessionId: `apikey:${key.id}`,
       companyId,
-      sessionId: payload.sid,
-    });
-    return true;
+      permissions: effectiveApiKeyPermissions(scopes, ownerAccess.permissions),
+      roleKeys: [],
+      apiKeyId: key.id,
+      scopes,
+      delegations: [],
+    };
   }
 
   private extractToken(req: Request): string | undefined {

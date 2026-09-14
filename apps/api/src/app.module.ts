@@ -16,6 +16,11 @@ import { IntegrityModule } from './modules/accounting/integrity/integrity.module
 import { ReconciliationModule } from './modules/reconciliation/reconciliation.module';
 import { FinancialCloseModule } from './modules/financial-close/financial-close.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { DelegationsModule } from './modules/delegations/delegations.module';
+import { ApiKeysModule } from './modules/integrations/api-keys/api-keys.module';
+import { IntegrationsModule } from './modules/integrations/integrations.module';
+import { OutboxModule } from './modules/integrations/events/outbox.module';
+import { NotificationsModule } from './modules/integrations/notifications/notifications.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AttachmentsModule } from './modules/attachments/attachments.module';
 import { BankingModule } from './modules/banking/banking.module';
@@ -79,6 +84,8 @@ import { UsersModule } from './modules/users/users.module';
     EventEmitterModule.forRoot({ wildcard: true }),
     DatabaseModule,
     AuditModule,
+    OutboxModule,
+    NotificationsModule,
     HealthModule,
     JobsModule,
     OrganizationsModule,
@@ -104,6 +111,9 @@ import { UsersModule } from './modules/users/users.module';
     WorkflowsModule,
     AttachmentsModule,
     BudgetingModule,
+    DelegationsModule,
+    ApiKeysModule,
+    IntegrationsModule,
   ],
   providers: [
     { provide: APP_PIPE, useClass: ZodValidationPipe },

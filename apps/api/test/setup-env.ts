@@ -8,6 +8,9 @@ process.env.DATABASE_URL =
 process.env.LOG_LEVEL = process.env.TEST_LOG_LEVEL ?? 'silent';
 process.env.STORAGE_DIR = process.env.TEST_STORAGE_DIR ?? './storage-test';
 process.env.AI_PROVIDER = 'HEURISTIC';
+process.env.INTEGRATION_INLINE_JOBS = 'true';
+process.env.INTEGRATION_ENCRYPTION_KEY =
+  process.env.INTEGRATION_ENCRYPTION_KEY ?? 'test-integration-encryption-key-0123456789';
 process.env.JWT_ACCESS_SECRET =
   process.env.JWT_ACCESS_SECRET ?? 'test-secret-test-secret-test-secret-1234';
 

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { DelegationsModule } from '@/modules/delegations/delegations.module';
 import { FxModule } from '@/modules/fx/fx.module';
 import { TaxModule } from '@/modules/tax/tax.module';
 import { AccountingModule } from '@/modules/accounting/accounting.module';
@@ -17,7 +18,14 @@ import {
 
 /** Accounts receivable: customers, invoices/credit/debit notes, receipts, allocations, aging, statements. */
 @Module({
-  imports: [AccountingModule, OrdersCoreModule, InventoryCoreModule, TaxModule, FxModule],
+  imports: [
+    AccountingModule,
+    OrdersCoreModule,
+    InventoryCoreModule,
+    TaxModule,
+    FxModule,
+    DelegationsModule,
+  ],
   controllers: [
     CustomersController,
     InvoicesController,

@@ -30,6 +30,7 @@ import { BankingService } from '@/modules/banking/banking.service';
 import { SodService } from '@/modules/rbac/sod.service';
 import { TaxEngineService } from '@/modules/tax/tax-engine.service';
 import { ApprovalsService } from '@/modules/workflows/approvals.service';
+import { AuthorityService } from '@/modules/delegations/authority.service';
 
 const MODULE = 'EXPENSE_CLAIMS';
 
@@ -69,6 +70,7 @@ export class ExpenseClaimsService {
     private readonly banking: BankingService,
     private readonly sod: SodService,
     private readonly approvals: ApprovalsService,
+    private readonly authority: AuthorityService,
   ) {}
 
   async list(
@@ -338,6 +340,16 @@ export class ExpenseClaimsService {
         currency: existing.currency,
         requestedBy: existing.claimantUserId,
       });
+      const authority = await this.authority.assert(tx, actor, P['expense-claim.approve'], {
+        companyId,
+        amount: existing.total,
+        currency: existing.currency,
+        documentType: 'EXPENSE_CLAIM',
+        documentId: id,
+        documentNumber: existing.claimNumber,
+        createdBy: existing.claimantUserId,
+        action: 'Approved expense claim',
+      });
       await tx
         .update(expenseClaims)
         .set({ status: 'APPROVED', approvedBy: actor.id, approvedAt: new Date() })
@@ -350,7 +362,7 @@ export class ExpenseClaimsService {
           entityId: id,
           previousValue: { status: existing.status },
           newValue: { status: 'APPROVED' },
-          metadata: { actor: actor.email, claimNumber: existing.claimNumber },
+          metadata: { actor: actor.email, claimNumber: existing.claimNumber, ...authority.audit },
           companyId,
         },
         tx,

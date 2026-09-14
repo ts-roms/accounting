@@ -13,7 +13,7 @@ import {
   type SQL,
 } from 'drizzle-orm';
 import { Money } from '@accounting/money';
-import type { PaginatedResult, ReturnType } from '@accounting/types';
+import { P, type PaginatedResult, type ReturnType } from '@accounting/types';
 import type {
   CancelOrderInput,
   CreateReturnInput,
@@ -39,6 +39,7 @@ import {
 import { DocumentNumberingService } from '@/modules/accounting/numbering/document-numbering.service';
 import { AuditService } from '@/modules/audit/audit.service';
 import { BillsService } from '@/modules/payables/bills.service';
+import { AuthorityService } from '@/modules/delegations/authority.service';
 import { InvoicesService } from '@/modules/receivables/invoices.service';
 import { OrderFulfillmentService } from './order-fulfillment.service';
 import { netUnitPrice } from './orders.logic';
@@ -79,6 +80,7 @@ export class ReturnsService {
     private readonly fulfillment: OrderFulfillmentService,
     private readonly invoicesService: InvoicesService,
     private readonly billsService: BillsService,
+    private readonly authority: AuthorityService,
   ) {}
 
   async list(
@@ -280,6 +282,21 @@ export class ReturnsService {
     await this.db.transaction(async (tx) => {
       const existing = await this.lock(tx, companyId, type, id);
       this.assertStatus(existing, ['DRAFT'], 'approved');
+      const authority = await this.authority.assert(
+        tx,
+        actor,
+        type === 'SALES' ? P['sales-return.approve'] : P['purchase-return.approve'],
+        {
+          companyId,
+          amount: existing.total,
+          currency: existing.currency,
+          documentType: 'ORDER',
+          documentId: id,
+          documentNumber: existing.documentNumber,
+          createdBy: existing.createdBy,
+          action: type === 'SALES' ? 'Approved sales return' : 'Approved purchase return',
+        },
+      );
       await tx
         .update(returns)
         .set({ status: 'APPROVED', approvedBy: actor.id, approvedAt: new Date() })
@@ -292,7 +309,7 @@ export class ReturnsService {
           entityId: id,
           previousValue: { status: 'DRAFT' },
           newValue: { status: 'APPROVED' },
-          metadata: { documentNumber: existing.documentNumber },
+          metadata: { documentNumber: existing.documentNumber, ...authority.audit },
           companyId,
         },
         tx,

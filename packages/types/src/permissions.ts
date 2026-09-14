@@ -18,6 +18,7 @@ export const PERMISSION_MODULES = [
   'REPORTING',
   'AUDIT',
   'AI',
+  'INTEGRATIONS',
 ] as const;
 
 export type PermissionModule = (typeof PERMISSION_MODULES)[number];
@@ -192,6 +193,19 @@ export const PERMISSION_DEFINITIONS = [
   define('ai.view', 'AI', 'View AI intake, anomaly flags, forecasts and conversations'),
   define('ai.use', 'AI', 'Upload documents for extraction, ask the assistant, run scans'),
   define('ai.review', 'AI', 'Accept or dismiss AI drafts and anomaly flags'),
+
+  // Integration platform & delegated authority (Prompt #4)
+  define('integration.view', 'INTEGRATIONS', 'View integrations, sync jobs, logs and health'),
+  define('integration.manage', 'INTEGRATIONS', 'Connect, configure, sync and disconnect integrations'),
+  define('api-key.view', 'INTEGRATIONS', 'View API keys'),
+  define('api-key.manage', 'INTEGRATIONS', 'Create, rotate and revoke API keys'),
+  define('webhook.view', 'INTEGRATIONS', 'View outbound webhooks and deliveries'),
+  define('webhook.manage', 'INTEGRATIONS', 'Create, test, replay and disable outbound webhooks'),
+  define('delegation.view', 'ADMINISTRATION', 'View delegations of authority'),
+  define('delegation.create', 'ADMINISTRATION', 'Delegate own approval authority to another user'),
+  define('delegation.approve', 'ADMINISTRATION', 'Approve or reject delegations of authority'),
+  define('delegation.manage', 'ADMINISTRATION', 'Revoke any delegation and configure the delegation policy'),
+  define('notification.view', 'ADMINISTRATION', 'View own notifications'),
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_DEFINITIONS)[number]['key'];

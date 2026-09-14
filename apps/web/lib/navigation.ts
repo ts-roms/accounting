@@ -34,6 +34,12 @@ import {
   Undo2,
   Users,
   Wallet,
+  Bell,
+  Cable,
+  KeyRound,
+  ScrollText,
+  UserCheck,
+  Webhook,
 } from 'lucide-react';
 import { P, type PermissionKey } from '@accounting/types';
 
@@ -468,6 +474,42 @@ export const NAVIGATION: NavSection[] = [
         href: '/admin/approvals',
         icon: Inbox,
         permissions: [P['approval.view']],
+      },
+      {
+        title: 'Delegated Authority',
+        href: '/admin/delegations',
+        icon: UserCheck,
+        permissions: [P['delegation.view']],
+      },
+      {
+        title: 'Integrations',
+        href: '/admin/integrations',
+        icon: Cable,
+        permissions: [P['integration.view']],
+      },
+      {
+        title: 'API Keys',
+        href: '/admin/api-keys',
+        icon: KeyRound,
+        permissions: [P['api-key.view']],
+      },
+      {
+        title: 'Webhooks',
+        href: '/admin/webhooks',
+        icon: Webhook,
+        permissions: [P['webhook.view']],
+      },
+      {
+        title: 'Integration Logs',
+        href: '/admin/integration-logs',
+        icon: ScrollText,
+        permissions: [P['integration.view']],
+      },
+      {
+        title: 'Notifications',
+        href: '/admin/notifications',
+        icon: Bell,
+        permissions: [P['notification.view']],
       },
     ],
   },

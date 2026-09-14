@@ -15,3 +15,5 @@ export * from './enterprise';
 export * from './ai';
 export * from './reconciliation';
 export * from './financial-close';
+export * from './integrations';
+export * from './delegations';

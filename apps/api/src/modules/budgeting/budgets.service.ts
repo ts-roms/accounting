@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, getTableColumns, inArray, sql, type SQL } from 'drizzle-orm';
 import { Money } from '@accounting/money';
-import { LEDGER_STATUSES, type AccountType, type PaginatedResult } from '@accounting/types';
+import { LEDGER_STATUSES, P, type AccountType, type PaginatedResult } from '@accounting/types';
 import type {
   BudgetLineInput,
   CreateBudgetInput,
@@ -35,6 +35,7 @@ import { DimensionsService } from '@/modules/accounting/dimensions/dimensions.se
 import { dimensionConditions } from '@/modules/accounting/ledger/general-ledger.service';
 import { AuditService } from '@/modules/audit/audit.service';
 import { SodService } from '@/modules/rbac/sod.service';
+import { AuthorityService } from '@/modules/delegations/authority.service';
 
 const MODULE = 'BUDGETING';
 const DEFAULT_TYPES: AccountType[] = ['REVENUE', 'EXPENSE'];
@@ -118,6 +119,7 @@ export class BudgetsService {
     private readonly accounts: AccountsService,
     private readonly dimensions: DimensionsService,
     private readonly sod: SodService,
+    private readonly authority: AuthorityService,
   ) {}
 
   // ----------------------------------------------------------------- budgets
@@ -473,6 +475,14 @@ export class BudgetsService {
           ErrorCodes.VALIDATION_FAILED,
           'An empty version cannot be approved.',
         );
+      await this.authority.assert(tx, actor, P['budget.approve'], {
+        companyId,
+        documentType: 'BUDGET_VERSION',
+        documentId: versionId,
+        documentNumber: version.name,
+        createdBy: version.createdBy,
+        action: `Approved budget version ${budget.name}`,
+      });
       await tx
         .update(budgetVersions)
         .set({ status: 'SUPERSEDED' })

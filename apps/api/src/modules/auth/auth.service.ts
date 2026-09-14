@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, isNull } from 'drizzle-orm';
 import { PinoLogger } from 'nestjs-pino';
+import type { DelegatedGrant } from '@accounting/types';
 import type { ChangePasswordInput, LoginInput } from '@accounting/validation';
 import { AuditService } from '@/modules/audit/audit.service';
 import { OrganizationsService } from '@/modules/organizations/organizations.service';
@@ -33,6 +34,8 @@ export interface MeResponse {
   permissions: string[];
   roleKeys: string[];
   activeCompanyId: string | null;
+  /** Active delegations lending the user approval authority in the active company. */
+  delegations: readonly DelegatedGrant[];
   companies: Pick<Company, 'id' | 'code' | 'name' | 'baseCurrency'>[];
 }
 
@@ -271,6 +274,7 @@ export class AuthService {
       permissions: [...principal.permissions].sort(),
       roleKeys: [...principal.roleKeys],
       activeCompanyId: principal.companyId ?? null,
+      delegations: principal.delegations ?? [],
       companies: companies.map((c) => ({
         id: c.id,
         code: c.code,

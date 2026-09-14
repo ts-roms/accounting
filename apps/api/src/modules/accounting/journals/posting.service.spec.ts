@@ -34,6 +34,7 @@ describe('AccountingPostingService.validateLines', () => {
     {} as never,
     {} as never,
     {} as never,
+    { enqueue: async () => null } as never,
     { setContext: () => undefined } as never,
   );
   const cash = account({ id: 'cash', code: '1110' });
@@ -121,6 +122,7 @@ describe('AccountingPostingService period states and authority', () => {
     {} as never,
     {} as never,
     {} as never,
+    { enqueue: async () => null } as never,
     { setContext: () => undefined } as never,
   );
   const user = (...perms: string[]) => ({ id: 'u', permissions: new Set(perms) });

@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import type { PermissionKey } from '@accounting/types';
+import type { DelegatedGrant, PermissionKey } from '@accounting/types';
 import { api, getActiveCompanyId, setActiveCompanyId } from '../api/client';
 import { useMe } from '../api/hooks';
 import type { CompanySummary, MeResponse } from '../api/types';
@@ -13,6 +13,10 @@ interface SessionContextValue {
   setActiveCompany: (companyId: string | null) => void;
   hasPermission: (...keys: PermissionKey[]) => boolean;
   hasAnyPermission: (...keys: PermissionKey[]) => boolean;
+  /** Own permission OR an active delegation for it in the active company. */
+  hasAuthority: (key: PermissionKey) => boolean;
+  /** The delegation lending `key`, when the user does not hold it natively. */
+  delegationFor: (key: PermissionKey) => DelegatedGrant | null;
   logout: () => Promise<void>;
 }
 
@@ -80,6 +84,12 @@ export function SessionProvider({
       setActiveCompany,
       hasPermission: (...keys) => keys.every((k) => granted.has(k)),
       hasAnyPermission: (...keys) => keys.length === 0 || keys.some((k) => granted.has(k)),
+      hasAuthority: (key) =>
+        granted.has(key) || (me.delegations ?? []).some((d) => d.permission === key),
+      delegationFor: (key) =>
+        granted.has(key)
+          ? null
+          : ((me.delegations ?? []).find((d) => d.permission === key) ?? null),
       logout,
     };
   }, [me, companyId, setActiveCompany, logout]);

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { DelegationsModule } from '@/modules/delegations/delegations.module';
 import { RbacModule } from '@/modules/rbac/rbac.module';
 import { WorkflowsModule } from '@/modules/workflows/workflows.module';
 import { AccountsController } from './accounts/accounts.controller';
@@ -20,7 +21,7 @@ import { DocumentNumberingService } from './numbering/document-numbering.service
  * `AccountingPostingService` and `AccountsService.resolveMapped` only.
  */
 @Module({
-  imports: [RbacModule, WorkflowsModule],
+  imports: [RbacModule, WorkflowsModule, DelegationsModule],
   controllers: [
     AccountsController,
     FiscalPeriodsController,

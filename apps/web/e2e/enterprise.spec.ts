@@ -19,7 +19,9 @@ test.describe('enterprise: FX, intercompany, workflows, attachments', () => {
   }) => {
     await login(page);
     await page.goto('/accounting/exchange-rates');
-    await expect(page.getByTestId('rate-row').filter({ hasText: 'USD → PHP' }).first()).toBeVisible();
+    await expect(
+      page.getByTestId('rate-row').filter({ hasText: 'USD → PHP' }).first(),
+    ).toBeVisible();
     await page.getByTestId('new-rate').click();
     await page.getByTestId('rate-fromCurrency').fill('GBP');
     await page.getByTestId('rate-value').fill('71.5');
@@ -31,7 +33,9 @@ test.describe('enterprise: FX, intercompany, workflows, attachments', () => {
     await expect(page.getByText('Group trial balance')).toBeVisible();
   });
 
-  test('a workflow gates a large journal until an approver decides in the inbox', async ({ page }) => {
+  test('a workflow gates a large journal until an approver decides in the inbox', async ({
+    page,
+  }) => {
     await login(page);
     // Workflow: journals >= 50,000 need one journal.approve decision.
     await page.goto('/admin/workflows');
@@ -40,7 +44,9 @@ test.describe('enterprise: FX, intercompany, workflows, attachments', () => {
     await page.getByTestId('wf-min').fill('50000');
     await page.getByTestId('wf-step-name').first().fill('Finance review');
     await page.getByTestId('wf-save').click();
-    await expect(page.getByTestId('workflow-row').filter({ hasText: `Large journals ${stamp}` })).toBeVisible();
+    await expect(
+      page.getByTestId('workflow-row').filter({ hasText: `Large journals ${stamp}` }),
+    ).toBeVisible();
 
     // Admin drafts and submits a large journal; approving is blocked with a clear message.
     await page.goto('/accounting/journal-entries/new');
@@ -65,7 +71,11 @@ test.describe('enterprise: FX, intercompany, workflows, attachments', () => {
     await login(page, FINANCE);
     await page.goto('/admin/approvals');
     await page.getByTestId('approvals-mine').click();
-    await page.getByRole('row').filter({ hasText: `Large journals ${stamp}` }).first().click();
+    await page
+      .getByRole('row')
+      .filter({ hasText: `Large journals ${stamp}` })
+      .first()
+      .click();
     await page.getByTestId('approval-approve').click();
     await expect(page.getByRole('dialog')).toContainText('Approved');
     await page.keyboard.press('Escape');
@@ -76,16 +86,33 @@ test.describe('enterprise: FX, intercompany, workflows, attachments', () => {
     // Deactivate the workflow so other suites are not gated.
     await login(page);
     await page.goto('/admin/workflows');
-    await page.getByTestId('workflow-row').filter({ hasText: `Large journals ${stamp}` }).getByRole('button', { name: 'Deactivate' }).click();
-    await expect(page.getByTestId('workflow-row').filter({ hasText: `Large journals ${stamp}` })).toContainText('INACTIVE');
+    await page
+      .getByTestId('workflow-row')
+      .filter({ hasText: `Large journals ${stamp}` })
+      .getByRole('button', { name: 'Deactivate' })
+      .click();
+    await expect(
+      page.getByTestId('workflow-row').filter({ hasText: `Large journals ${stamp}` }),
+    ).toContainText('INACTIVE');
   });
 
   test('attachments upload and list on a journal entry', async ({ page }) => {
     await login(page);
     await page.goto('/accounting/journal-entries');
-    await page.getByRole('link', { name: /^JE-2026-\d{6}$/ }).first().click();
+    await page
+      .getByRole('link', { name: /^JE-2026-\d{6}$/ })
+      .first()
+      .click();
     await expect(page.getByTestId('attachments-panel')).toBeVisible();
-    await page.getByTestId('attachment-file').setInputFiles({ name: `voucher-${stamp}.pdf`, mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n%%EOF') });
-    await expect(page.getByTestId('attachment-row').filter({ hasText: `voucher-${stamp}.pdf` })).toBeVisible();
+    await page
+      .getByTestId('attachment-file')
+      .setInputFiles({
+        name: `voucher-${stamp}.pdf`,
+        mimeType: 'application/pdf',
+        buffer: Buffer.from('%PDF-1.4\n%%EOF'),
+      });
+    await expect(
+      page.getByTestId('attachment-row').filter({ hasText: `voucher-${stamp}.pdf` }),
+    ).toBeVisible();
   });
 });

@@ -43,6 +43,7 @@ import { validateAllocations } from '@/modules/subledger/subledger.logic';
 import { CustomersService } from './customers.service';
 import { ExchangeRatesService } from '@/modules/fx/exchange-rates.service';
 import { FxService } from '@/modules/fx/fx.service';
+import { OutboxService } from '@/modules/integrations/events/outbox.service';
 import { InvoicesService, type AllocationView } from './invoices.service';
 
 const MODULE = 'RECEIVABLES';
@@ -78,6 +79,7 @@ export class CustomerPaymentsService {
     private readonly invoicesService: InvoicesService,
     private readonly rates: ExchangeRatesService,
     private readonly fx: FxService,
+    private readonly outbox: OutboxService,
   ) {}
 
   async list(
@@ -255,6 +257,21 @@ export class CustomerPaymentsService {
         },
         tx,
       );
+      await this.outbox.enqueue(tx, {
+        eventType: 'payment.created',
+        companyId,
+        dedupeKey: 'payment.created:' + created.id,
+        payload: {
+          paymentId: created.id,
+          documentNumber,
+          customerId: created.customerId,
+          paymentType: created.paymentType,
+          paymentDate: created.paymentDate,
+          amount: created.amount,
+          currency: created.currency,
+          status: 'DRAFT',
+        },
+      });
       return created.id;
     });
     return this.get(companyId, id);
@@ -517,6 +534,24 @@ export class CustomerPaymentsService {
         },
         tx,
       );
+      await this.outbox.enqueue(tx, {
+        eventType: 'payment.completed',
+        companyId,
+        dedupeKey: 'payment.completed:' + id,
+        payload: {
+          paymentId: id,
+          documentNumber: existing.documentNumber,
+          customerId: existing.customerId,
+          paymentType: existing.paymentType,
+          paymentDate: existing.paymentDate,
+          amount: existing.amount,
+          currency: existing.currency,
+          allocated: allocated.toString(),
+          journalEntryId: entry.id,
+          journalNumber: entry.documentNumber,
+          status: 'POSTED',
+        },
+      });
     });
     return this.get(companyId, id);
   }
@@ -703,6 +738,20 @@ export class CustomerPaymentsService {
         },
         tx,
       );
+      await this.outbox.enqueue(tx, {
+        eventType: 'payment.failed',
+        companyId,
+        dedupeKey: 'payment.failed:' + id,
+        payload: {
+          paymentId: id,
+          documentNumber: existing.documentNumber,
+          customerId: existing.customerId,
+          amount: existing.amount,
+          currency: existing.currency,
+          status: 'VOID',
+          reason: input.reason,
+        },
+      });
     });
     return this.get(companyId, id);
   }
