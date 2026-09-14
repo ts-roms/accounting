@@ -64,6 +64,10 @@ export const PERMISSION_DEFINITIONS = [
   define('period.manage', 'ACCOUNTING', 'Create fiscal years and periods'),
   define('period.close', 'ACCOUNTING', 'Close fiscal periods'),
   define('period.reopen', 'ACCOUNTING', 'Reopen closed fiscal periods'),
+  define('period.lock', 'ACCOUNTING', 'Lock fiscal periods permanently'),
+  define('period.post-soft-closed', 'ACCOUNTING', 'Post into soft-closed fiscal periods'),
+  define('journal.correct', 'ACCOUNTING', 'Reverse and re-draft a posted journal as a correction'),
+  define('integrity.check', 'ACCOUNTING', 'Run and view financial integrity checks'),
 
   // Sales / AR
   define('customer.view', 'SALES', 'View customers'),

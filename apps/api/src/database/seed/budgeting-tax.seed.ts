@@ -15,15 +15,76 @@ const DIMENSIONS = [
   { dimensionType: 'DEPARTMENT' as const, code: 'OPS', name: 'Operations' },
   { dimensionType: 'COST_CENTER' as const, code: 'CC-HQ', name: 'Head Office' },
   { dimensionType: 'COST_CENTER' as const, code: 'CC-WH', name: 'Warehouse' },
-  { dimensionType: 'PROJECT' as const, code: 'PRJ-ERP', name: 'ERP Rollout', startDate: '2026-01-01', endDate: '2026-12-31' },
+  {
+    dimensionType: 'PROJECT' as const,
+    code: 'PRJ-ERP',
+    name: 'ERP Rollout',
+    startDate: '2026-01-01',
+    endDate: '2026-12-31',
+  },
 ];
 
 const TAX_CODES = [
-  { code: 'VAT12', name: 'VAT 12%', kind: 'SALES_TAX' as const, appliesTo: 'BOTH' as const, reportingCategory: 'TAXABLE' as const, salesCode: '2130', purchaseCode: '1450', isDefaultSales: true, isDefaultPurchases: true, rate: '12' },
-  { code: 'VAT0', name: 'VAT zero-rated', kind: 'SALES_TAX' as const, appliesTo: 'BOTH' as const, reportingCategory: 'ZERO_RATED' as const, salesCode: '2130', purchaseCode: '1450', isDefaultSales: false, isDefaultPurchases: false, rate: '0' },
-  { code: 'EXEMPT', name: 'VAT exempt', kind: 'SALES_TAX' as const, appliesTo: 'BOTH' as const, reportingCategory: 'EXEMPT' as const, salesCode: '2130', purchaseCode: '1450', isDefaultSales: false, isDefaultPurchases: false, rate: '0' },
-  { code: 'EWT1', name: 'Expanded withholding 1% (goods)', kind: 'WITHHOLDING' as const, appliesTo: 'BOTH' as const, reportingCategory: 'WITHHOLDING' as const, salesCode: '1460', purchaseCode: '2140', isDefaultSales: false, isDefaultPurchases: false, rate: '1' },
-  { code: 'EWT2', name: 'Expanded withholding 2% (services)', kind: 'WITHHOLDING' as const, appliesTo: 'BOTH' as const, reportingCategory: 'WITHHOLDING' as const, salesCode: '1460', purchaseCode: '2140', isDefaultSales: false, isDefaultPurchases: false, rate: '2' },
+  {
+    code: 'VAT12',
+    name: 'VAT 12%',
+    kind: 'SALES_TAX' as const,
+    appliesTo: 'BOTH' as const,
+    reportingCategory: 'TAXABLE' as const,
+    salesCode: '2130',
+    purchaseCode: '1450',
+    isDefaultSales: true,
+    isDefaultPurchases: true,
+    rate: '12',
+  },
+  {
+    code: 'VAT0',
+    name: 'VAT zero-rated',
+    kind: 'SALES_TAX' as const,
+    appliesTo: 'BOTH' as const,
+    reportingCategory: 'ZERO_RATED' as const,
+    salesCode: '2130',
+    purchaseCode: '1450',
+    isDefaultSales: false,
+    isDefaultPurchases: false,
+    rate: '0',
+  },
+  {
+    code: 'EXEMPT',
+    name: 'VAT exempt',
+    kind: 'SALES_TAX' as const,
+    appliesTo: 'BOTH' as const,
+    reportingCategory: 'EXEMPT' as const,
+    salesCode: '2130',
+    purchaseCode: '1450',
+    isDefaultSales: false,
+    isDefaultPurchases: false,
+    rate: '0',
+  },
+  {
+    code: 'EWT1',
+    name: 'Expanded withholding 1% (goods)',
+    kind: 'WITHHOLDING' as const,
+    appliesTo: 'BOTH' as const,
+    reportingCategory: 'WITHHOLDING' as const,
+    salesCode: '1460',
+    purchaseCode: '2140',
+    isDefaultSales: false,
+    isDefaultPurchases: false,
+    rate: '1',
+  },
+  {
+    code: 'EWT2',
+    name: 'Expanded withholding 2% (services)',
+    kind: 'WITHHOLDING' as const,
+    appliesTo: 'BOTH' as const,
+    reportingCategory: 'WITHHOLDING' as const,
+    salesCode: '1460',
+    purchaseCode: '2140',
+    isDefaultSales: false,
+    isDefaultPurchases: false,
+    rate: '2',
+  },
 ];
 
 /** Monthly budget per account code for the sample budget (same amount every period). */
@@ -48,7 +109,13 @@ export async function seedBudgetingTax(
     const [existing] = await tx
       .select({ id: schema.dimensions.id })
       .from(schema.dimensions)
-      .where(and(eq(schema.dimensions.companyId, company.id), eq(schema.dimensions.dimensionType, d.dimensionType), eq(schema.dimensions.code, d.code)));
+      .where(
+        and(
+          eq(schema.dimensions.companyId, company.id),
+          eq(schema.dimensions.dimensionType, d.dimensionType),
+          eq(schema.dimensions.code, d.code),
+        ),
+      );
     if (existing) continue;
     await tx.insert(schema.dimensions).values({ companyId: company.id, ...d });
   }
@@ -77,7 +144,14 @@ export async function seedBudgetingTax(
         isDefaultPurchases: t.isDefaultPurchases,
       })
       .returning();
-    await tx.insert(schema.taxRates).values({ taxCodeId: code!.id, ratePercent: t.rate, effectiveFrom: '2000-01-01', effectiveTo: null });
+    await tx
+      .insert(schema.taxRates)
+      .values({
+        taxCodeId: code!.id,
+        ratePercent: t.rate,
+        effectiveFrom: '2000-01-01',
+        effectiveTo: null,
+      });
   }
 
   // Sample budget on the earliest fiscal year, approved so variance works out of the box.
@@ -101,16 +175,37 @@ export async function seedBudgetingTax(
         .orderBy(asc(schema.fiscalPeriods.periodNumber));
       const [budget] = await tx
         .insert(schema.budgets)
-        .values({ companyId: company.id, fiscalYearId: year.id, code: budgetCode, name: `Operating budget ${year.name}`, status: 'ACTIVE', currency: company.baseCurrency, createdBy: adminUserId })
+        .values({
+          companyId: company.id,
+          fiscalYearId: year.id,
+          code: budgetCode,
+          name: `Operating budget ${year.name}`,
+          status: 'ACTIVE',
+          currency: company.baseCurrency,
+          createdBy: adminUserId,
+        })
         .returning();
       const [version] = await tx
         .insert(schema.budgetVersions)
-        .values({ budgetId: budget!.id, versionNumber: 1, name: 'Original', status: 'APPROVED', approvedBy: adminUserId, approvedAt: new Date(), createdBy: adminUserId })
+        .values({
+          budgetId: budget!.id,
+          versionNumber: 1,
+          name: 'Original',
+          status: 'APPROVED',
+          approvedBy: adminUserId,
+          approvedAt: new Date(),
+          createdBy: adminUserId,
+        })
         .returning();
       const lines = BUDGET_LINES.flatMap((l) => {
         const accountId = codeToId.get(l.code);
         if (!accountId) return [];
-        return periods.map((p) => ({ versionId: version!.id, accountId, fiscalPeriodId: p.id, amount: l.monthly }));
+        return periods.map((p) => ({
+          versionId: version!.id,
+          accountId,
+          fiscalPeriodId: p.id,
+          amount: l.monthly,
+        }));
       });
       if (lines.length) await tx.insert(schema.budgetLines).values(lines);
     }

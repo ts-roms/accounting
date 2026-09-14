@@ -15,6 +15,7 @@ import {
 } from 'drizzle-orm';
 import { Money } from '@accounting/money';
 import {
+  P,
   OPEN_DOCUMENT_STATUSES,
   type DocumentType,
   type PaginatedResult,
@@ -248,7 +249,13 @@ export class BillsService {
           `Vendor ${vendor.code} is inactive.`,
         );
       const currency = vendor.currency;
-      const { rate: exchangeRate, baseCurrency } = await this.rates.documentRate(companyId, currency, input.documentDate, input.exchangeRate, tx);
+      const { rate: exchangeRate, baseCurrency } = await this.rates.documentRate(
+        companyId,
+        currency,
+        input.documentDate,
+        input.exchangeRate,
+        tx,
+      );
       const { lines, subtotal } = computeLines(input.lines, currency);
       await this.assertLineAccounts(
         companyId,
@@ -257,10 +264,17 @@ export class BillsService {
       );
       await this.stock.validateLines(tx, companyId, lines);
       await this.dimensions.validateRefs(tx, companyId, lines, input.documentDate);
-      const taxed = await this.tax.applyToLines(tx, companyId, 'PURCHASES', input.documentDate, currency, lines);
+      const taxed = await this.tax.applyToLines(
+        tx,
+        companyId,
+        'PURCHASES',
+        input.documentDate,
+        currency,
+        lines,
+      );
       const total = subtotal.add(taxed.totals.taxTotal).subtract(taxed.totals.withholdingTotal);
       const baseTotal = total.convert(baseCurrency, exchangeRate);
-      await this.posting.resolvePeriod(tx, companyId, input.documentDate);
+      await this.posting.resolvePeriod(tx, companyId, input.documentDate, { draft: true });
       const dueDate = input.dueDate ?? addDays(input.documentDate, vendor.paymentTermsDays);
       if (dueDate < input.documentDate)
         throw new BusinessRuleError(
@@ -337,7 +351,9 @@ export class BillsService {
         throw err;
       }
       if (!created) throw new Error('Insert returned no row');
-      await tx.insert(billLines).values(lines.map((l, i) => ({ ...l, ...taxed.lines[i]!, billId: created.id })));
+      await tx
+        .insert(billLines)
+        .values(lines.map((l, i) => ({ ...l, ...taxed.lines[i]!, billId: created.id })));
       if (created.documentType === 'INVOICE') {
         await this.matching.evaluateBill(tx, companyId, created.id, warnings.length > 0);
       }
@@ -376,14 +392,26 @@ export class BillsService {
         tx,
       );
       const documentDate = input.documentDate ?? existing.documentDate;
-      await this.posting.resolvePeriod(tx, companyId, documentDate);
+      await this.posting.resolvePeriod(tx, companyId, documentDate, { draft: true });
       if (vendor.currency !== existing.currency) {
-        throw new BusinessRuleError(ErrorCodes.CURRENCY_MISMATCH, `${existing.documentNumber} is in ${existing.currency}; the vendor is billed in ${vendor.currency}.`);
+        throw new BusinessRuleError(
+          ErrorCodes.CURRENCY_MISMATCH,
+          `${existing.documentNumber} is in ${existing.currency}; the vendor is billed in ${vendor.currency}.`,
+        );
       }
       const rateChanged = input.exchangeRate !== undefined || input.documentDate !== undefined;
       const { rate: exchangeRate, baseCurrency } = rateChanged
-        ? await this.rates.documentRate(companyId, existing.currency, documentDate, input.exchangeRate, tx)
-        : { rate: existing.exchangeRate, baseCurrency: await this.accounts.companyCurrency(companyId, tx) };
+        ? await this.rates.documentRate(
+            companyId,
+            existing.currency,
+            documentDate,
+            input.exchangeRate,
+            tx,
+          )
+        : {
+            rate: existing.exchangeRate,
+            baseCurrency: await this.accounts.companyCurrency(companyId, tx),
+          };
       let totals = {
         subtotal: existing.subtotal,
         taxTotal: existing.taxTotal,
@@ -399,7 +427,14 @@ export class BillsService {
         );
         await this.stock.validateLines(tx, companyId, lines);
         await this.dimensions.validateRefs(tx, companyId, lines, documentDate);
-        const taxed = await this.tax.applyToLines(tx, companyId, 'PURCHASES', documentDate, existing.currency, lines);
+        const taxed = await this.tax.applyToLines(
+          tx,
+          companyId,
+          'PURCHASES',
+          documentDate,
+          existing.currency,
+          lines,
+        );
         if (existing.purchaseOrderId) {
           await this.fulfillment.release(
             tx,
@@ -419,12 +454,17 @@ export class BillsService {
           );
         }
         await tx.delete(billLines).where(eq(billLines.billId, id));
-        await tx.insert(billLines).values(lines.map((l, i) => ({ ...l, ...taxed.lines[i]!, billId: id })));
+        await tx
+          .insert(billLines)
+          .values(lines.map((l, i) => ({ ...l, ...taxed.lines[i]!, billId: id })));
         totals = {
           subtotal: subtotal.toString(),
           taxTotal: taxed.totals.taxTotal.toString(),
           withholdingTotal: taxed.totals.withholdingTotal.toString(),
-          total: subtotal.add(taxed.totals.taxTotal).subtract(taxed.totals.withholdingTotal).toString(),
+          total: subtotal
+            .add(taxed.totals.taxTotal)
+            .subtract(taxed.totals.withholdingTotal)
+            .toString(),
         };
       }
       const dueDate =
@@ -453,7 +493,9 @@ export class BillsService {
               ? existing.scheduledPaymentDate
               : input.scheduledPaymentDate,
           exchangeRate,
-          baseTotal: Money.of(totals.total, existing.currency).convert(baseCurrency, exchangeRate).toString(),
+          baseTotal: Money.of(totals.total, existing.currency)
+            .convert(baseCurrency, exchangeRate)
+            .toString(),
           ...totals,
         })
         .where(eq(vendorBills.id, id));
@@ -546,9 +588,22 @@ export class BillsService {
       const debitSide = isDebitDocument(existing.documentType);
       // Foreign-currency bills post in base at the document rate; the control carries the exact sum.
       const baseCurrency = await this.accounts.companyCurrency(companyId, tx);
-      const toBase = (v: string) => Money.of(v, existing.currency).convert(baseCurrency, existing.exchangeRate).toString();
-      const baseLines = lines.map((l) => ({ ...l, amount: toBase(l.amount), taxAmount: toBase(l.taxAmount), withholdingAmount: toBase(l.withholdingAmount) }));
-      const baseTotal = Money.sum(baseLines.map((l) => Money.of(l.amount, baseCurrency).add(Money.of(l.taxAmount, baseCurrency)).subtract(Money.of(l.withholdingAmount, baseCurrency))), baseCurrency);
+      const toBase = (v: string) =>
+        Money.of(v, existing.currency).convert(baseCurrency, existing.exchangeRate).toString();
+      const baseLines = lines.map((l) => ({
+        ...l,
+        amount: toBase(l.amount),
+        taxAmount: toBase(l.taxAmount),
+        withholdingAmount: toBase(l.withholdingAmount),
+      }));
+      const baseTotal = Money.sum(
+        baseLines.map((l) =>
+          Money.of(l.amount, baseCurrency)
+            .add(Money.of(l.taxAmount, baseCurrency))
+            .subtract(Money.of(l.withholdingAmount, baseCurrency)),
+        ),
+        baseCurrency,
+      );
       // Stocked product lines post to inventory / GRNI / PPV instead of the expense account (Phase 5).
       const stock = await this.stock.postPurchaseLines(tx, {
         companyId,
@@ -565,28 +620,39 @@ export class BillsService {
           .set({ costAmount: cost.toString() })
           .where(eq(billLines.id, lineId));
       }
-      const entry = await this.posting.postEvent(tx, {
-        companyId,
-        entryDate: existing.documentDate,
-        description: `${labelFor(existing.documentType)} ${existing.documentNumber}${existing.description ? ` - ${existing.description}` : ''}`,
-        reference: existing.reference ?? existing.documentNumber,
-        journalType: 'GENERAL',
-        branchId: existing.branchId,
-        sourceType: 'AP_DOCUMENT',
-        sourceId: existing.id,
-        actorId: actor.id,
-        lines: [
-          // Bills and debit notes credit the AP control account; vendor credit notes debit it.
-          {
-            accountId: control.id,
-            debit: debitSide ? '0' : baseTotal.toString(),
-            credit: debitSide ? baseTotal.toString() : '0',
-            description: `${existing.documentNumber} - vendor payable`,
-          },
-          ...stock.postingLines,
-          ...(await this.tax.postingLines(tx, companyId, 'PURCHASES', baseCurrency, baseLines, !debitSide)),
-        ],
-      });
+      const entry = await this.posting.postEvent(
+        tx,
+        {
+          companyId,
+          entryDate: existing.documentDate,
+          description: `${labelFor(existing.documentType)} ${existing.documentNumber}${existing.description ? ` - ${existing.description}` : ''}`,
+          reference: existing.reference ?? existing.documentNumber,
+          journalType: 'GENERAL',
+          branchId: existing.branchId,
+          sourceType: 'AP_DOCUMENT',
+          sourceId: existing.id,
+          actor,
+          lines: [
+            // Bills and debit notes credit the AP control account; vendor credit notes debit it.
+            {
+              accountId: control.id,
+              debit: debitSide ? '0' : baseTotal.toString(),
+              credit: debitSide ? baseTotal.toString() : '0',
+              description: `${existing.documentNumber} - vendor payable`,
+            },
+            ...stock.postingLines,
+            ...(await this.tax.postingLines(
+              tx,
+              companyId,
+              'PURCHASES',
+              baseCurrency,
+              baseLines,
+              !debitSide,
+            )),
+          ],
+        },
+        { permission: P['bill.post'] },
+      );
       await this.inventory.setJournal(tx, stock.movementIds, entry.id);
       await this.tax.record(
         tx,
@@ -677,34 +743,45 @@ export class BillsService {
           where: (l, ops) => ops.eq(l.journalEntryId, existing.journalEntryId!),
           orderBy: (l, ops) => ops.asc(l.lineNumber),
         });
-        const reversal = await this.posting.postEvent(tx, {
-          companyId,
-          entryDate: reversalDate,
-          description: `Void ${existing.documentNumber}: ${input.reason}`,
-          reference: existing.documentNumber,
-          journalType: 'REVERSAL',
-          branchId: existing.branchId,
-          sourceType: 'AP_DOCUMENT_VOID',
-          sourceId: existing.id,
-          reversalOfId: existing.journalEntryId,
-          actorId: actor.id,
-          lines: originalLines.map((l) => ({
-            accountId: l.accountId,
-            debit: l.credit,
-            credit: l.debit,
-            description: l.description,
-            branchId: l.branchId,
-            departmentId: l.departmentId,
-            costCenterId: l.costCenterId,
-            projectId: l.projectId,
-          })),
-        });
+        const reversal = await this.posting.postEvent(
+          tx,
+          {
+            companyId,
+            entryDate: reversalDate,
+            description: `Void ${existing.documentNumber}: ${input.reason}`,
+            reference: existing.documentNumber,
+            journalType: 'REVERSAL',
+            branchId: existing.branchId,
+            sourceType: 'AP_DOCUMENT_VOID',
+            sourceId: existing.id,
+            reversalOfId: existing.journalEntryId,
+            actor,
+            lines: originalLines.map((l) => ({
+              accountId: l.accountId,
+              debit: l.credit,
+              credit: l.debit,
+              description: l.description,
+              branchId: l.branchId,
+              departmentId: l.departmentId,
+              costCenterId: l.costCenterId,
+              projectId: l.projectId,
+            })),
+          },
+          { permission: P['bill.void'] },
+        );
         await tx
           .update(journalEntries)
           .set({ status: 'REVERSED', reversedById: reversal.id })
           .where(eq(journalEntries.id, existing.journalEntryId));
         await this.inventory.setJournal(tx, stockReversal.movementIds, reversal.id);
-        await this.tax.reverse(tx, 'AP_DOCUMENT', existing.id, reversal.id, reversalDate, existing.currency);
+        await this.tax.reverse(
+          tx,
+          'AP_DOCUMENT',
+          existing.id,
+          reversal.id,
+          reversalDate,
+          existing.currency,
+        );
         reversalId = reversal.id;
       }
       if (existing.purchaseOrderId) {

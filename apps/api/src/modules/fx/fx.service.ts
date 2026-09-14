@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, getTableColumns, inArray, lte, ne, sql, type SQL } from 'drizzle-orm';
 import { Money } from '@accounting/money';
-import type { FxSide, PaginatedResult } from '@accounting/types';
+import { P, type PermissionKey, type FxSide, type PaginatedResult } from '@accounting/types';
 import type { CreateFxRevaluationInput } from '@accounting/validation';
 import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { BusinessRuleError, NotFoundError } from '@/common/errors/app-error';
@@ -20,6 +20,7 @@ import {
 import { AccountsService } from '@/modules/accounting/accounts/accounts.service';
 import {
   AccountingPostingService,
+  type PostingActor,
   type PostingLine,
 } from '@/modules/accounting/journals/posting.service';
 import { DocumentNumberingService } from '@/modules/accounting/numbering/document-numbering.service';
@@ -39,9 +40,18 @@ export interface RealizedFxInput {
   settlementRate: string;
   baseCurrency: string;
   description: string;
+  /** The settled document / payment (what a void later reverses). */
   sourceType: string;
   sourceId: string;
-  actorId: string;
+  /**
+   * Unique id of this settlement event (an allocation row). Several
+   * allocations of one payment each post their own FX entry, so the journal
+   * identity must not be the payment.
+   */
+  eventId: string;
+  actor: PostingActor;
+  /** Posting authority of the calling module (e.g. customer-payment.post). */
+  permission: PermissionKey;
   branchId?: string | null;
 }
 
@@ -152,31 +162,35 @@ export class FxService {
     const magnitude = gain.abs().toString();
     // A gain always debits the control (more receivable / less payable in base); a loss credits it.
     const controlDebit = gain.isPositive();
-    const entry = await this.posting.postEvent(tx, {
-      companyId: input.companyId,
-      entryDate: input.entryDate,
-      description: input.description,
-      reference: null,
-      journalType: 'GENERAL',
-      branchId: input.branchId ?? null,
-      sourceType: 'FX_REALIZED',
-      sourceId: input.sourceId,
-      actorId: input.actorId,
-      lines: [
-        {
-          accountId: control.id,
-          debit: controlDebit ? magnitude : '0',
-          credit: controlDebit ? '0' : magnitude,
-          description: `Realized FX on ${input.side === 'AR' ? 'receivable' : 'payable'} settlement`,
-        },
-        {
-          accountId: fxAccount.id,
-          debit: controlDebit ? '0' : magnitude,
-          credit: controlDebit ? magnitude : '0',
-          description: gain.isPositive() ? 'Realized FX gain' : 'Realized FX loss',
-        },
-      ],
-    });
+    const entry = await this.posting.postEvent(
+      tx,
+      {
+        companyId: input.companyId,
+        entryDate: input.entryDate,
+        description: input.description,
+        reference: null,
+        journalType: 'GENERAL',
+        branchId: input.branchId ?? null,
+        sourceType: 'FX_REALIZED',
+        sourceId: input.eventId,
+        actor: input.actor,
+        lines: [
+          {
+            accountId: control.id,
+            debit: controlDebit ? magnitude : '0',
+            credit: controlDebit ? '0' : magnitude,
+            description: `Realized FX on ${input.side === 'AR' ? 'receivable' : 'payable'} settlement`,
+          },
+          {
+            accountId: fxAccount.id,
+            debit: controlDebit ? '0' : magnitude,
+            credit: controlDebit ? magnitude : '0',
+            description: gain.isPositive() ? 'Realized FX gain' : 'Realized FX loss',
+          },
+        ],
+      },
+      { permission: input.permission },
+    );
     const effect = controlDebit ? gain.abs() : gain.abs().negate();
     await tx.insert(fxAdjustments).values({
       companyId: input.companyId,
@@ -198,7 +212,8 @@ export class FxService {
     sourceType: string,
     sourceId: string,
     entryDate: string,
-    actorId: string,
+    actor: PostingActor,
+    permission: PermissionKey,
   ): Promise<void> {
     const rows = await tx
       .select()
@@ -217,40 +232,43 @@ export class FxService {
         .from(journalLines)
         .where(eq(journalLines.journalEntryId, row.journalEntryId))
         .orderBy(asc(journalLines.lineNumber));
-      const reversal = await this.posting.postEvent(tx, {
-        companyId,
-        entryDate,
-        description: 'Reversal of realized FX',
-        reference: null,
-        journalType: 'REVERSAL',
-        sourceType: `${sourceType}_VOID`,
-        sourceId,
-        reversalOfId: row.journalEntryId,
-        actorId,
-        lines: originalLines.map((l) => ({
-          accountId: l.accountId,
-          debit: l.credit,
-          credit: l.debit,
-          description: l.description,
-          branchId: l.branchId,
-        })),
-      });
+      const reversal = await this.posting.postEvent(
+        tx,
+        {
+          companyId,
+          entryDate,
+          description: 'Reversal of realized FX',
+          reference: null,
+          journalType: 'REVERSAL',
+          // One reversal per realized entry: keyed by the entry it reverses.
+          sourceType: 'FX_REALIZED_VOID',
+          sourceId: row.journalEntryId,
+          reversalOfId: row.journalEntryId,
+          actor,
+          lines: originalLines.map((l) => ({
+            accountId: l.accountId,
+            debit: l.credit,
+            credit: l.debit,
+            description: l.description,
+            branchId: l.branchId,
+          })),
+        },
+        { permission },
+      );
       await tx
         .update(journalEntries)
         .set({ status: 'REVERSED', reversedById: reversal.id })
         .where(eq(journalEntries.id, row.journalEntryId));
-      await tx
-        .insert(fxAdjustments)
-        .values({
-          companyId,
-          side: row.side,
-          adjustmentType: 'REALIZED',
-          adjustmentDate: entryDate,
-          amount: Money.of(row.amount, 'BASE').negate().toString(),
-          journalEntryId: reversal.id,
-          sourceType: `${sourceType}_VOID`,
-          sourceId,
-        });
+      await tx.insert(fxAdjustments).values({
+        companyId,
+        side: row.side,
+        adjustmentType: 'REALIZED',
+        adjustmentDate: entryDate,
+        amount: Money.of(row.amount, 'BASE').negate().toString(),
+        journalEntryId: reversal.id,
+        sourceType: `${sourceType}_VOID`,
+        sourceId,
+      });
     }
   }
 
@@ -448,29 +466,37 @@ export class FxService {
           createdBy: actor.id,
         })
         .returning();
-      const entry = await this.posting.postEvent(tx, {
-        companyId,
-        entryDate: input.asOfDate,
-        description: `FX revaluation ${runNumber} at ${input.asOfDate} closing rates`,
-        reference: runNumber,
-        journalType: 'ADJUSTING',
-        sourceType: 'FX_REVALUATION',
-        sourceId: run!.id,
-        actorId: actor.id,
-        lines: build(1),
-      });
-      const reversal = await this.posting.postEvent(tx, {
-        companyId,
-        entryDate: reversalDate,
-        description: `Reversal of FX revaluation ${runNumber}`,
-        reference: runNumber,
-        journalType: 'REVERSAL',
-        sourceType: 'FX_REVALUATION_REVERSAL',
-        sourceId: run!.id,
-        reversalOfId: entry.id,
-        actorId: actor.id,
-        lines: build(-1),
-      });
+      const entry = await this.posting.postEvent(
+        tx,
+        {
+          companyId,
+          entryDate: input.asOfDate,
+          description: `FX revaluation ${runNumber} at ${input.asOfDate} closing rates`,
+          reference: runNumber,
+          journalType: 'ADJUSTING',
+          sourceType: 'FX_REVALUATION',
+          sourceId: run!.id,
+          actor,
+          lines: build(1),
+        },
+        { permission: P['fx.revalue'] },
+      );
+      const reversal = await this.posting.postEvent(
+        tx,
+        {
+          companyId,
+          entryDate: reversalDate,
+          description: `Reversal of FX revaluation ${runNumber}`,
+          reference: runNumber,
+          journalType: 'REVERSAL',
+          sourceType: 'FX_REVALUATION_REVERSAL',
+          sourceId: run!.id,
+          reversalOfId: entry.id,
+          actor,
+          lines: build(-1),
+        },
+        { permission: P['fx.revalue'] },
+      );
       await tx
         .update(journalEntries)
         .set({ status: 'REVERSED', reversedById: reversal.id })
@@ -513,16 +539,14 @@ export class FxService {
           journalEntryId: reversal.id,
         });
       }
-      await tx
-        .insert(fxAdjustments)
-        .values(
-          adjRows.map((r) => ({
-            ...r,
-            companyId,
-            sourceType: 'FX_REVALUATION',
-            sourceId: run!.id,
-          })),
-        );
+      await tx.insert(fxAdjustments).values(
+        adjRows.map((r) => ({
+          ...r,
+          companyId,
+          sourceType: 'FX_REVALUATION',
+          sourceId: run!.id,
+        })),
+      );
       await this.audit.record(
         {
           action: 'POST',

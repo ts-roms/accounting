@@ -78,7 +78,14 @@ export class TaxEngineService {
     const out: TaxedLine[] = lines.map((line) => {
       const base = Money.of(line.amount, currency);
       const tax = this.lineTax(codes, line.taxCodeId, 'SALES_TAX', side, documentDate, base);
-      const wht = this.lineTax(codes, line.withholdingTaxCodeId, 'WITHHOLDING', side, documentDate, base);
+      const wht = this.lineTax(
+        codes,
+        line.withholdingTaxCodeId,
+        'WITHHOLDING',
+        side,
+        documentDate,
+        base,
+      );
       taxTotal = taxTotal.add(tax.amount);
       withholdingTotal = withholdingTotal.add(wht.amount);
       return {
@@ -100,14 +107,28 @@ export class TaxEngineService {
     documentDate: string,
     currency: string,
     lines: readonly TaxableLine[],
-  ): Promise<Array<{ base: string; taxCodeId: string | null; taxRate: string; taxAmount: string }>> {
+  ): Promise<
+    Array<{ base: string; taxCodeId: string | null; taxRate: string; taxAmount: string }>
+  > {
     const codes = await this.loadCodes(tx, companyId, lines);
     return lines.map((line) => {
       const gross = Money.of(line.amount, currency);
-      if (!line.taxCodeId) return { base: gross.toString(), taxCodeId: null, taxRate: '0.0000', taxAmount: '0.0000' };
-      const { code, rate } = this.codeAndRate(codes, line.taxCodeId, 'SALES_TAX', 'PURCHASES', documentDate);
+      if (!line.taxCodeId)
+        return { base: gross.toString(), taxCodeId: null, taxRate: '0.0000', taxAmount: '0.0000' };
+      const { code, rate } = this.codeAndRate(
+        codes,
+        line.taxCodeId,
+        'SALES_TAX',
+        'PURCHASES',
+        documentDate,
+      );
       const { base, tax } = extractInclusiveTax(gross, rate.ratePercent);
-      return { base: base.toString(), taxCodeId: code.id, taxRate: Money.of(rate.ratePercent, currency).toString(), taxAmount: tax.toString() };
+      return {
+        base: base.toString(),
+        taxCodeId: code.id,
+        taxRate: Money.of(rate.ratePercent, currency).toString(),
+        taxAmount: tax.toString(),
+      };
     });
   }
 
@@ -126,17 +147,29 @@ export class TaxEngineService {
     negate: boolean,
   ): Promise<PostingLine[]> {
     const codes = await this.loadCodes(tx, companyId, lines);
-    const buckets = new Map<string, { accountId: string; amount: Money; debitNormal: boolean; code: TaxCode }>();
+    const buckets = new Map<
+      string,
+      { accountId: string; amount: Money; debitNormal: boolean; code: TaxCode }
+    >();
     const add = (codeId: string | null, amount: string, kind: 'SALES_TAX' | 'WITHHOLDING') => {
       if (!codeId || Money.of(amount, currency).isZero()) return;
       const code = codes.get(codeId);
       if (!code) throw new NotFoundError('Tax code', codeId);
       const accountId = side === 'SALES' ? code.salesAccountId : code.purchaseAccountId;
-      if (!accountId) throw new BusinessRuleError(ErrorCodes.VALIDATION_FAILED, `Tax code ${code.code} has no ${side.toLowerCase()} account.`);
+      if (!accountId)
+        throw new BusinessRuleError(
+          ErrorCodes.VALIDATION_FAILED,
+          `Tax code ${code.code} has no ${side.toLowerCase()} account.`,
+        );
       // Debit-normal: purchase-side sales tax (input tax asset) and sales-side withholding (receivable).
       const debitNormal = side === 'SALES' ? kind === 'WITHHOLDING' : kind === 'SALES_TAX';
       const key = `${accountId}|${debitNormal}`;
-      const bucket = buckets.get(key) ?? { accountId, amount: Money.zero(currency), debitNormal, code };
+      const bucket = buckets.get(key) ?? {
+        accountId,
+        amount: Money.zero(currency),
+        debitNormal,
+        code,
+      };
       bucket.amount = bucket.amount.add(Money.of(amount, currency));
       buckets.set(key, bucket);
     };
@@ -156,15 +189,33 @@ export class TaxEngineService {
   }
 
   /** Records one tax transaction per line and tax code. Zero-rated lines are kept: their base feeds the return. */
-  async record(tx: DbExecutor, ctx: TaxRecordContext, lines: readonly StoredTaxedLine[], currency: string): Promise<void> {
+  async record(
+    tx: DbExecutor,
+    ctx: TaxRecordContext,
+    lines: readonly StoredTaxedLine[],
+    currency: string,
+  ): Promise<void> {
     const rows = [];
-    const sign = (v: string) => (ctx.negate ? Money.of(v, currency).negate() : Money.of(v, currency)).toString();
+    const sign = (v: string) =>
+      (ctx.negate ? Money.of(v, currency).negate() : Money.of(v, currency)).toString();
     for (const line of lines) {
       if (line.taxCodeId) {
-        rows.push({ taxCodeId: line.taxCodeId, sourceLineId: line.id, ratePercent: line.taxRate, baseAmount: sign(line.amount), taxAmount: sign(line.taxAmount) });
+        rows.push({
+          taxCodeId: line.taxCodeId,
+          sourceLineId: line.id,
+          ratePercent: line.taxRate,
+          baseAmount: sign(line.amount),
+          taxAmount: sign(line.taxAmount),
+        });
       }
       if (line.withholdingTaxCodeId) {
-        rows.push({ taxCodeId: line.withholdingTaxCodeId, sourceLineId: line.id, ratePercent: line.withholdingRate, baseAmount: sign(line.amount), taxAmount: sign(line.withholdingAmount) });
+        rows.push({
+          taxCodeId: line.withholdingTaxCodeId,
+          sourceLineId: line.id,
+          ratePercent: line.withholdingRate,
+          baseAmount: sign(line.amount),
+          taxAmount: sign(line.withholdingAmount),
+        });
       }
     }
     if (rows.length === 0) return;
@@ -186,12 +237,23 @@ export class TaxEngineService {
   }
 
   /** Mirrors every transaction of a source with negated amounts (document void / reversal). */
-  async reverse(tx: DbExecutor, sourceType: TaxSourceType, sourceId: string, reversalJournalEntryId: string, transactionDate: string, currency: string): Promise<void> {
+  async reverse(
+    tx: DbExecutor,
+    sourceType: TaxSourceType,
+    sourceId: string,
+    reversalJournalEntryId: string,
+    transactionDate: string,
+    currency: string,
+  ): Promise<void> {
     const originals = await tx
       .select()
       .from(taxTransactions)
-      .where(and(eq(taxTransactions.sourceType, sourceType), eq(taxTransactions.sourceId, sourceId)));
-    const live = originals.filter((o) => !o.reversalOfId && !originals.some((r) => r.reversalOfId === o.id));
+      .where(
+        and(eq(taxTransactions.sourceType, sourceType), eq(taxTransactions.sourceId, sourceId)),
+      );
+    const live = originals.filter(
+      (o) => !o.reversalOfId && !originals.some((r) => r.reversalOfId === o.id),
+    );
     if (live.length === 0) return;
     await tx.insert(taxTransactions).values(
       live.map((o) => ({
@@ -220,7 +282,15 @@ export class TaxEngineService {
     const [row] = await tx
       .select()
       .from(taxCodes)
-      .where(and(eq(taxCodes.companyId, companyId), eq(taxCodes.status, 'ACTIVE'), side === 'SALES' ? eq(taxCodes.isDefaultSales, true) : eq(taxCodes.isDefaultPurchases, true)));
+      .where(
+        and(
+          eq(taxCodes.companyId, companyId),
+          eq(taxCodes.status, 'ACTIVE'),
+          side === 'SALES'
+            ? eq(taxCodes.isDefaultSales, true)
+            : eq(taxCodes.isDefaultPurchases, true),
+        ),
+      );
     return row ?? null;
   }
 
@@ -236,7 +306,10 @@ export class TaxEngineService {
   ): { rate: string; amount: Money } {
     if (!codeId) return { rate: '0.0000', amount: Money.zero(base.currency) };
     const { rate } = this.codeAndRate(codes, codeId, kind, side, documentDate);
-    return { rate: Money.of(rate.ratePercent, base.currency).toString(), amount: taxOn(base, rate.ratePercent) };
+    return {
+      rate: Money.of(rate.ratePercent, base.currency).toString(),
+      amount: taxOn(base, rate.ratePercent),
+    };
   }
 
   private codeAndRate(
@@ -248,22 +321,57 @@ export class TaxEngineService {
   ): { code: TaxCode; rate: TaxRate } {
     const code = codes.get(codeId);
     if (!code) throw new NotFoundError('Tax code', codeId);
-    if (code.status !== 'ACTIVE') throw new BusinessRuleError(ErrorCodes.VALIDATION_FAILED, `Tax code ${code.code} is inactive.`);
-    if (code.kind !== kind) throw new BusinessRuleError(ErrorCodes.VALIDATION_FAILED, `Tax code ${code.code} is a ${code.kind === 'SALES_TAX' ? 'sales tax' : 'withholding tax'} code.`);
-    if (code.appliesTo !== 'BOTH' && code.appliesTo !== side) throw new BusinessRuleError(ErrorCodes.VALIDATION_FAILED, `Tax code ${code.code} does not apply to ${side.toLowerCase()}.`);
+    if (code.status !== 'ACTIVE')
+      throw new BusinessRuleError(
+        ErrorCodes.VALIDATION_FAILED,
+        `Tax code ${code.code} is inactive.`,
+      );
+    if (code.kind !== kind)
+      throw new BusinessRuleError(
+        ErrorCodes.VALIDATION_FAILED,
+        `Tax code ${code.code} is a ${code.kind === 'SALES_TAX' ? 'sales tax' : 'withholding tax'} code.`,
+      );
+    if (code.appliesTo !== 'BOTH' && code.appliesTo !== side)
+      throw new BusinessRuleError(
+        ErrorCodes.VALIDATION_FAILED,
+        `Tax code ${code.code} does not apply to ${side.toLowerCase()}.`,
+      );
     const rate = resolveRate(code.rates, documentDate);
-    if (!rate) throw new BusinessRuleError(ErrorCodes.VALIDATION_FAILED, `Tax code ${code.code} has no rate effective on ${documentDate}.`);
+    if (!rate)
+      throw new BusinessRuleError(
+        ErrorCodes.VALIDATION_FAILED,
+        `Tax code ${code.code} has no rate effective on ${documentDate}.`,
+      );
     return { code, rate };
   }
 
-  private async loadCodes(tx: DbExecutor, companyId: string, lines: readonly TaxableLine[]): Promise<Map<string, TaxCode & { rates: TaxRate[] }>> {
-    const ids = [...new Set(lines.flatMap((l) => [l.taxCodeId, l.withholdingTaxCodeId]).filter((x): x is string => Boolean(x)))];
+  private async loadCodes(
+    tx: DbExecutor,
+    companyId: string,
+    lines: readonly TaxableLine[],
+  ): Promise<Map<string, TaxCode & { rates: TaxRate[] }>> {
+    const ids = [
+      ...new Set(
+        lines
+          .flatMap((l) => [l.taxCodeId, l.withholdingTaxCodeId])
+          .filter((x): x is string => Boolean(x)),
+      ),
+    ];
     if (ids.length === 0) return new Map();
     const [codes, rates] = await Promise.all([
-      tx.select().from(taxCodes).where(and(eq(taxCodes.companyId, companyId), inArray(taxCodes.id, ids))),
-      tx.select().from(taxRates).where(inArray(taxRates.taxCodeId, ids)).orderBy(asc(taxRates.effectiveFrom)),
+      tx
+        .select()
+        .from(taxCodes)
+        .where(and(eq(taxCodes.companyId, companyId), inArray(taxCodes.id, ids))),
+      tx
+        .select()
+        .from(taxRates)
+        .where(inArray(taxRates.taxCodeId, ids))
+        .orderBy(asc(taxRates.effectiveFrom)),
     ]);
-    const map = new Map(codes.map((c) => [c.id, { ...c, rates: rates.filter((r) => r.taxCodeId === c.id) }]));
+    const map = new Map(
+      codes.map((c) => [c.id, { ...c, rates: rates.filter((r) => r.taxCodeId === c.id) }]),
+    );
     for (const id of ids) if (!map.has(id)) throw new NotFoundError('Tax code', id);
     return map;
   }

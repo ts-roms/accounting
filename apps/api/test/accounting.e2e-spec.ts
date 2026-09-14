@@ -312,8 +312,8 @@ describe('Accounting core (e2e)', () => {
     );
     expect(bs.body.balanced).toBe(true);
     expect(bs.body.totalAssets).toBe(bs.body.totalLiabilitiesAndEquity);
-    const accumulated = bs.body.assets.rows.find((r: { code: string }) => r.code === '1520');
-    expect(accumulated.amount).toBe('-2000.0000');
+    const accrued = bs.body.liabilities.rows.find((r: { code: string }) => r.code === '2120');
+    expect(accrued.amount).toBe('10500.0000'); // seed 8,500 + 2,000 accrued electricity
 
     const is = await as(
       admin,
@@ -435,7 +435,7 @@ describe('Accounting core (e2e)', () => {
   it('reverses a locked entry with a mirror-image posted reversal', async () => {
     const list = await as(
       admin,
-      http().get('/api/v1/journal-entries?search=Depreciation&pageSize=5'),
+      http().get('/api/v1/journal-entries?search=Accrued%20electricity&pageSize=5'),
     ).expect(200);
     const original = list.body.items[0];
     expect(original.status).toBe('LOCKED');
@@ -452,7 +452,7 @@ describe('Accounting core (e2e)', () => {
     const debits = reversal.body.lines
       .filter((l: { debit: string }) => l.debit !== '0.0000')
       .map((l: { accountCode: string }) => l.accountCode);
-    expect(debits).toEqual(['1520']); // original debited 6500 / credited 1520
+    expect(debits).toEqual(['2120']); // original debited 6300 / credited 2120
 
     const after = await as(admin, http().get(`/api/v1/journal-entries/${original.id}`)).expect(200);
     expect(after.body.status).toBe('REVERSED');
@@ -524,7 +524,7 @@ describe('Accounting core (e2e)', () => {
     );
     expect(again.body.code).toBe('FISCAL_YEAR_CLOSED');
     const reopen = await as(admin, http().post(`/api/v1/fiscal-periods/${periods[11]!.id}/reopen`))
-      .send({})
+      .send({ reason: 'Trying after year close' })
       .expect(422);
     expect(reopen.body.code).toBe('FISCAL_YEAR_CLOSED');
   });

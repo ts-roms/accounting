@@ -58,7 +58,9 @@ describe('navigation', () => {
       ...['assets', 'depreciation', 'categories'].map((p) => `/fixed-assets/${p}`),
       ...['budgets', 'variance', 'dimensions', 'expense-claims'].map((p) => `/budgeting/${p}`),
       ...['codes', 'transactions', 'reports'].map((p) => `/tax/${p}`),
-      ...['exchange-rates', 'fx-revaluation', 'intercompany'].map((p) => `/accounting/${p}`),
+      ...['exchange-rates', 'fx-revaluation', 'intercompany', 'integrity'].map(
+        (p) => `/accounting/${p}`,
+      ),
       '/reports/consolidation',
       '/admin/workflows',
       '/admin/approvals',

@@ -116,6 +116,12 @@ export const NAVIGATION: NavSection[] = [
         icon: GitBranch,
         permissions: [P['intercompany.view']],
       },
+      {
+        title: 'Integrity',
+        href: '/accounting/integrity',
+        icon: ShieldCheck,
+        permissions: [P['integrity.check']],
+      },
     ],
   },
   {

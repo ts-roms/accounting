@@ -166,7 +166,8 @@ const DOCUMENTS: Doc[] = [
         description: 'Office equipment - workstation set',
         quantity: '4',
         unitPrice: '30000',
-        code: '1510',
+        // Purchases of equipment land in the clearing account until the asset register capitalises them.
+        code: '1590',
       },
     ],
     payments: [

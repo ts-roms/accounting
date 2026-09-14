@@ -17,6 +17,7 @@ import {
   createJournalEntrySchema,
   listJournalEntriesQuerySchema,
   rejectJournalEntrySchema,
+  correctJournalEntrySchema,
   reverseJournalEntrySchema,
   updateJournalEntrySchema,
 } from '@accounting/validation';
@@ -31,6 +32,7 @@ class CreateJournalEntryDto extends createZodDto(createJournalEntrySchema) {}
 class UpdateJournalEntryDto extends createZodDto(updateJournalEntrySchema) {}
 class RejectJournalEntryDto extends createZodDto(rejectJournalEntrySchema) {}
 class ReverseJournalEntryDto extends createZodDto(reverseJournalEntrySchema) {}
+class CorrectJournalEntryDto extends createZodDto(correctJournalEntrySchema) {}
 
 @ApiTags('Journal Entries')
 @Controller('journal-entries')
@@ -114,5 +116,18 @@ export class JournalEntriesController {
     @Body() body: ReverseJournalEntryDto,
   ) {
     return this.service.reverse(user.companyId!, user, id, body);
+  }
+
+  @Post(':id/correct')
+  @RequirePermissions(P['journal.correct'])
+  @ApiOperation({
+    summary: 'Reverse a posted entry and open a DRAFT correcting entry linked to it',
+  })
+  correct(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: CorrectJournalEntryDto,
+  ) {
+    return this.service.correct(user.companyId!, user, id, body);
   }
 }

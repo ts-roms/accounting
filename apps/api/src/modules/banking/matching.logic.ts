@@ -56,7 +56,13 @@ export function matchStatementLines(
   for (const line of lines) {
     const key = `${line.lineDate}|${Money.of(line.amount, currency).toString()}|${(line.reference ?? '').trim().toLowerCase()}`;
     if (seenKeys.has(key)) {
-      outcomes.push({ statementLineId: line.id, status: 'DUPLICATE', journalLineId: null, candidates: [], note: 'Identical line appears earlier in the statement.' });
+      outcomes.push({
+        statementLineId: line.id,
+        status: 'DUPLICATE',
+        journalLineId: null,
+        candidates: [],
+        note: 'Identical line appears earlier in the statement.',
+      });
       continue;
     }
     seenKeys.add(key);
@@ -68,12 +74,23 @@ export function matchStatementLines(
         Math.abs(daysBetween(c.entryDate, line.lineDate)) <= toleranceDays,
     );
     if (hits.length === 0) {
-      outcomes.push({ statementLineId: line.id, status: 'UNMATCHED', journalLineId: null, candidates: [], note: 'No ledger line with this amount in the date window.' });
+      outcomes.push({
+        statementLineId: line.id,
+        status: 'UNMATCHED',
+        journalLineId: null,
+        candidates: [],
+        note: 'No ledger line with this amount in the date window.',
+      });
       continue;
     }
     const ref = (line.reference ?? '').trim().toLowerCase();
     const byRef = ref
-      ? hits.filter((c) => (c.reference ?? '').toLowerCase().includes(ref) || (c.description ?? '').toLowerCase().includes(ref) || line.description.toLowerCase().includes((c.reference ?? '').toLowerCase()))
+      ? hits.filter(
+          (c) =>
+            (c.reference ?? '').toLowerCase().includes(ref) ||
+            (c.description ?? '').toLowerCase().includes(ref) ||
+            line.description.toLowerCase().includes((c.reference ?? '').toLowerCase()),
+        )
       : [];
     const chosen = hits.length === 1 ? hits[0]! : byRef.length === 1 ? byRef[0]! : null;
     if (chosen) {
@@ -83,7 +100,10 @@ export function matchStatementLines(
         status: 'MATCHED',
         journalLineId: chosen.journalLineId,
         candidates: [chosen.journalLineId],
-        note: hits.length === 1 ? 'Single amount / date match.' : 'Reference match among several candidates.',
+        note:
+          hits.length === 1
+            ? 'Single amount / date match.'
+            : 'Reference match among several candidates.',
       });
     } else {
       outcomes.push({

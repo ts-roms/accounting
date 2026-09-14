@@ -14,6 +14,11 @@ export interface AuthenticatedUser {
   companyId?: string;
   permissions: ReadonlySet<string>;
   roleKeys: readonly string[];
+  /**
+   * Set only on the scheduler principal: automated postings (depreciation,
+   * recurring journals) are gated by configuration, not per-user permissions.
+   */
+  system?: boolean;
 }
 
 export interface AccessTokenPayload {

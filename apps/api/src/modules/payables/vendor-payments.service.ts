@@ -13,7 +13,7 @@ import {
   type SQL,
 } from 'drizzle-orm';
 import { Money } from '@accounting/money';
-import type { PaginatedResult } from '@accounting/types';
+import { P, type PaginatedResult } from '@accounting/types';
 import type {
   AllocateInput,
   CreatePaymentInput,
@@ -176,9 +176,15 @@ export class VendorPaymentsService {
           `Vendor ${vendor.code} is inactive.`,
         );
       const currency = vendor.currency;
-      const { rate: exchangeRate, baseCurrency } = await this.rates.documentRate(companyId, currency, input.paymentDate, input.exchangeRate, tx);
+      const { rate: exchangeRate, baseCurrency } = await this.rates.documentRate(
+        companyId,
+        currency,
+        input.paymentDate,
+        input.exchangeRate,
+        tx,
+      );
       await this.assertCashAccount(companyId, input.cashAccountId, tx);
-      await this.posting.resolvePeriod(tx, companyId, input.paymentDate);
+      await this.posting.resolvePeriod(tx, companyId, input.paymentDate, { draft: true });
       const amount = Money.parse(input.amount, currency);
       if (input.paymentType === 'REFUND' && input.allocations.length > 0) {
         throw new BusinessRuleError(
@@ -272,18 +278,30 @@ export class VendorPaymentsService {
       const vendorId = input.partyId ?? existing.vendorId;
       const vendor = await this.vendorsService.getOrThrow(companyId, vendorId, tx);
       const paymentDate = input.paymentDate ?? existing.paymentDate;
-      await this.posting.resolvePeriod(tx, companyId, paymentDate);
+      await this.posting.resolvePeriod(tx, companyId, paymentDate, { draft: true });
       if (input.cashAccountId) await this.assertCashAccount(companyId, input.cashAccountId, tx);
       if (vendor.currency !== existing.currency) {
-        throw new BusinessRuleError(ErrorCodes.CURRENCY_MISMATCH, `${existing.documentNumber} is in ${existing.currency}; the vendor settles in ${vendor.currency}.`);
+        throw new BusinessRuleError(
+          ErrorCodes.CURRENCY_MISMATCH,
+          `${existing.documentNumber} is in ${existing.currency}; the vendor settles in ${vendor.currency}.`,
+        );
       }
       const amount = input.amount
         ? Money.parse(input.amount, existing.currency)
         : Money.of(existing.amount, existing.currency);
       const rateChanged = input.exchangeRate !== undefined || input.paymentDate !== undefined;
       const { rate: exchangeRate, baseCurrency } = rateChanged
-        ? await this.rates.documentRate(companyId, existing.currency, paymentDate, input.exchangeRate, tx)
-        : { rate: existing.exchangeRate, baseCurrency: await this.accounts.companyCurrency(companyId, tx) };
+        ? await this.rates.documentRate(
+            companyId,
+            existing.currency,
+            paymentDate,
+            input.exchangeRate,
+            tx,
+          )
+        : {
+            rate: existing.exchangeRate,
+            baseCurrency: await this.accounts.companyCurrency(companyId, tx),
+          };
       const paymentType = input.paymentType ?? existing.paymentType;
       if (input.allocations) {
         if (paymentType === 'REFUND' && input.allocations.length > 0)
@@ -383,7 +401,15 @@ export class VendorPaymentsService {
           ErrorCodes.DOCUMENT_INVALID_STATE,
           `${existing.documentNumber} is ${existing.status}.`,
         );
-      await this.approvals.assertApproved(tx, { companyId, documentType: 'VENDOR_PAYMENT', documentId: id, documentNumber: existing.documentNumber, amount: existing.amount, currency: existing.currency, requestedBy: existing.createdBy ?? actor.id });
+      await this.approvals.assertApproved(tx, {
+        companyId,
+        documentType: 'VENDOR_PAYMENT',
+        documentId: id,
+        documentNumber: existing.documentNumber,
+        amount: existing.amount,
+        currency: existing.currency,
+        requestedBy: existing.createdBy ?? actor.id,
+      });
       const currency = existing.currency;
       const amount = Money.of(existing.amount, currency);
       const draftAllocations = await tx
@@ -423,7 +449,11 @@ export class VendorPaymentsService {
       const baseAmount = amount.convert(baseCurrency, existing.exchangeRate);
       const gain = isDisbursement
         ? this.fx.settlementGain(
-            draftAllocations.map((a) => ({ amount: a.amount, currency, documentRate: targets.get(a.billId)!.exchangeRate })),
+            draftAllocations.map((a) => ({
+              amount: a.amount,
+              currency,
+              documentRate: targets.get(a.billId)!.exchangeRate,
+            })),
             existing.exchangeRate,
             baseCurrency,
             'AP',
@@ -432,31 +462,35 @@ export class VendorPaymentsService {
       // AP: bank pays baseAmount; the payable relieved is baseAmount + gain.
       const controlBase = baseAmount.add(gain);
       const fxLines = await this.fx.realizedLines(tx, companyId, gain);
-      const entry = await this.posting.postEvent(tx, {
-        companyId,
-        entryDate: existing.paymentDate,
-        description: `${isDisbursement ? 'Vendor payment' : 'Vendor refund'} ${existing.documentNumber}${existing.memo ? ` - ${existing.memo}` : ''}`,
-        reference: existing.reference ?? existing.documentNumber,
-        branchId: existing.branchId,
-        sourceType: 'AP_PAYMENT',
-        sourceId: existing.id,
-        actorId: actor.id,
-        lines: [
-          {
-            accountId: control.id,
-            debit: isDisbursement ? controlBase.toString() : '0',
-            credit: isDisbursement ? '0' : controlBase.toString(),
-            description: `${existing.documentNumber} - vendor payable`,
-          },
-          {
-            accountId: existing.cashAccountId,
-            debit: isDisbursement ? '0' : baseAmount.toString(),
-            credit: isDisbursement ? baseAmount.toString() : '0',
-            description: `${existing.documentNumber} ${existing.method.toLowerCase().replace('_', ' ')}`,
-          },
-          ...fxLines,
-        ],
-      });
+      const entry = await this.posting.postEvent(
+        tx,
+        {
+          companyId,
+          entryDate: existing.paymentDate,
+          description: `${isDisbursement ? 'Vendor payment' : 'Vendor refund'} ${existing.documentNumber}${existing.memo ? ` - ${existing.memo}` : ''}`,
+          reference: existing.reference ?? existing.documentNumber,
+          branchId: existing.branchId,
+          sourceType: 'AP_PAYMENT',
+          sourceId: existing.id,
+          actor,
+          lines: [
+            {
+              accountId: control.id,
+              debit: isDisbursement ? controlBase.toString() : '0',
+              credit: isDisbursement ? '0' : controlBase.toString(),
+              description: `${existing.documentNumber} - vendor payable`,
+            },
+            {
+              accountId: existing.cashAccountId,
+              debit: isDisbursement ? '0' : baseAmount.toString(),
+              credit: isDisbursement ? baseAmount.toString() : '0',
+              description: `${existing.documentNumber} ${existing.method.toLowerCase().replace('_', ' ')}`,
+            },
+            ...fxLines,
+          ],
+        },
+        { permission: P['vendor-payment.post'] },
+      );
 
       await this.billsService.applyToTargets(
         tx,
@@ -530,25 +564,45 @@ export class VendorPaymentsService {
         available,
         currency,
       );
-      await tx.insert(vendorPaymentAllocations).values(
-        input.allocations.map((a) => ({
-          companyId,
-          billId: a.documentId,
-          paymentId: id,
-          amount: Money.parse(a.amount, currency).toString(),
-          allocationDate,
-          createdBy: actor.id,
-        })),
-      );
+      const inserted = await tx
+        .insert(vendorPaymentAllocations)
+        .values(
+          input.allocations.map((a) => ({
+            companyId,
+            billId: a.documentId,
+            paymentId: id,
+            amount: Money.parse(a.amount, currency).toString(),
+            allocationDate,
+            createdBy: actor.id,
+          })),
+        )
+        .returning({ id: vendorPaymentAllocations.id });
       await this.billsService.applyToTargets(tx, targets, input.allocations, currency);
       const baseCurrency = await this.accounts.companyCurrency(companyId, tx);
       const gain = this.fx.settlementGain(
-        input.allocations.map((a) => ({ amount: a.amount, currency, documentRate: targets.get(a.documentId)!.exchangeRate })),
+        input.allocations.map((a) => ({
+          amount: a.amount,
+          currency,
+          documentRate: targets.get(a.documentId)!.exchangeRate,
+        })),
         existing.exchangeRate,
         baseCurrency,
         'AP',
       );
-      await this.fx.postRealizedGain(tx, { companyId, side: 'AP', entryDate: allocationDate, gain, baseCurrency, description: `Realized FX on allocating ${existing.documentNumber}`, sourceType: 'AP_PAYMENT_ALLOCATION', sourceId: existing.id, actorId: actor.id, branchId: existing.branchId });
+      await this.fx.postRealizedGain(tx, {
+        companyId,
+        side: 'AP',
+        entryDate: allocationDate,
+        gain,
+        baseCurrency,
+        description: `Realized FX on allocating ${existing.documentNumber}`,
+        sourceType: 'AP_PAYMENT_ALLOCATION',
+        sourceId: existing.id,
+        eventId: inserted[0]!.id,
+        actor,
+        permission: P['vendor-payment.post'],
+        branchId: existing.branchId,
+      });
       await tx
         .update(vendorPayments)
         .set({
@@ -591,32 +645,44 @@ export class VendorPaymentsService {
         .where(eq(vendorPaymentAllocations.paymentId, id));
       await this.billsService.releaseFromTargets(tx, companyId, allocations, existing.currency);
       await tx.delete(vendorPaymentAllocations).where(eq(vendorPaymentAllocations.paymentId, id));
-      await this.fx.reverseRealized(tx, companyId, 'AP_PAYMENT_ALLOCATION', existing.id, input.reversalDate ?? existing.paymentDate, actor.id);
+      await this.fx.reverseRealized(
+        tx,
+        companyId,
+        'AP_PAYMENT_ALLOCATION',
+        existing.id,
+        input.reversalDate ?? existing.paymentDate,
+        actor,
+        P['vendor-payment.post'],
+      );
 
       const originalLines = await tx
         .select()
         .from(journalLines)
         .where(eq(journalLines.journalEntryId, existing.journalEntryId!))
         .orderBy(asc(journalLines.lineNumber));
-      const reversal = await this.posting.postEvent(tx, {
-        companyId,
-        entryDate: input.reversalDate ?? existing.paymentDate,
-        description: `Void ${existing.documentNumber}: ${input.reason}`,
-        reference: existing.documentNumber,
-        journalType: 'REVERSAL',
-        branchId: existing.branchId,
-        sourceType: 'AP_PAYMENT_VOID',
-        sourceId: existing.id,
-        reversalOfId: existing.journalEntryId,
-        actorId: actor.id,
-        lines: originalLines.map((l) => ({
-          accountId: l.accountId,
-          debit: l.credit,
-          credit: l.debit,
-          description: l.description,
-          branchId: l.branchId,
-        })),
-      });
+      const reversal = await this.posting.postEvent(
+        tx,
+        {
+          companyId,
+          entryDate: input.reversalDate ?? existing.paymentDate,
+          description: `Void ${existing.documentNumber}: ${input.reason}`,
+          reference: existing.documentNumber,
+          journalType: 'REVERSAL',
+          branchId: existing.branchId,
+          sourceType: 'AP_PAYMENT_VOID',
+          sourceId: existing.id,
+          reversalOfId: existing.journalEntryId,
+          actor,
+          lines: originalLines.map((l) => ({
+            accountId: l.accountId,
+            debit: l.credit,
+            credit: l.debit,
+            description: l.description,
+            branchId: l.branchId,
+          })),
+        },
+        { permission: P['vendor-payment.post'] },
+      );
       await tx
         .update(journalEntries)
         .set({ status: 'REVERSED', reversedById: reversal.id })

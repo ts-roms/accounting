@@ -66,6 +66,7 @@ export class DepreciationJob implements OnModuleInit {
       sessionId: 'scheduler',
       permissions: new Set<string>(),
       roleKeys: [],
+      system: true,
     };
   }
 }

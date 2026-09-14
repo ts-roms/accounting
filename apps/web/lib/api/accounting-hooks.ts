@@ -11,6 +11,7 @@ import type {
   ListAccountsQuery,
   ListJournalEntriesQuery,
   RejectJournalEntryInput,
+  CorrectJournalEntryInput,
   ReverseJournalEntryInput,
   SetAccountMappingInput,
   TrialBalanceQuery,
@@ -26,6 +27,8 @@ import type {
   FiscalPeriod,
   FiscalYear,
   IncomeStatementReport,
+  IntegrityReport,
+  JournalCorrectionResult,
   JournalEntryDetail,
   JournalEntryView,
   LedgerResult,
@@ -138,7 +141,7 @@ export const usePeriodAction = () => {
       reason,
     }: {
       id: string;
-      action: 'close' | 'reopen';
+      action: 'close' | 'reopen' | 'soft-close' | 'lock';
       reason?: string;
     }) => api.post<FiscalPeriod>(`/fiscal-periods/${id}/${action}`, { reason }),
     onSuccess: () => invalidateLedgerViews(qc),
@@ -224,6 +227,15 @@ export const useReverseJournalEntry = () => {
   });
 };
 
+export const useCorrectJournalEntry = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...input }: CorrectJournalEntryInput & { id: string }) =>
+      api.post<JournalCorrectionResult>(`/journal-entries/${id}/correct`, input),
+    onSuccess: () => invalidateLedgerViews(qc),
+  });
+};
+
 // ------------------------------------------------------------------ reports
 
 export const useGeneralLedger = (query: Partial<GeneralLedgerQuery>, enabled: boolean) =>
@@ -256,4 +268,13 @@ export const useBalanceSheet = (query: BalanceSheetQuery, enabled = true) =>
     queryFn: () => api.get<BalanceSheetReport>('/reports/balance-sheet', { query }),
     enabled,
     placeholderData: (p) => p,
+  });
+
+// ---------------------------------------------------------------- integrity
+
+export const useIntegrityReport = (asOf: string) =>
+  useQuery({
+    queryKey: ['integrity', getActiveCompanyId() ?? 'none', asOf] as const,
+    queryFn: () => api.get<IntegrityReport>('/integrity', { query: { asOf } }),
+    staleTime: 30_000,
   });

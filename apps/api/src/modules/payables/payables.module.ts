@@ -18,7 +18,14 @@ import {
 
 /** Accounts receivable: vendors, bills/credit/debit notes, receipts, allocations, aging, statements. */
 @Module({
-  imports: [AccountingModule, OrdersCoreModule, InventoryCoreModule, TaxModule, FxModule, WorkflowsModule],
+  imports: [
+    AccountingModule,
+    OrdersCoreModule,
+    InventoryCoreModule,
+    TaxModule,
+    FxModule,
+    WorkflowsModule,
+  ],
   controllers: [VendorsController, BillsController, VendorPaymentsController, ApReportsController],
   providers: [VendorsService, BillsService, VendorPaymentsService, ApReportsService],
   exports: [VendorsService, BillsService, VendorPaymentsService, ApReportsService],

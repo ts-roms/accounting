@@ -45,8 +45,12 @@ export class TaxCodesService {
     const rows = await this.db
       .select({
         ...getTableColumns(taxCodes),
-        salesAccountCode: sql<string | null>`(select a.code from accounts a where a.id = ${sql.raw('"tax_codes"."sales_account_id"')})`,
-        purchaseAccountCode: sql<string | null>`(select a.code from accounts a where a.id = ${sql.raw('"tax_codes"."purchase_account_id"')})`,
+        salesAccountCode: sql<
+          string | null
+        >`(select a.code from accounts a where a.id = ${sql.raw('"tax_codes"."sales_account_id"')})`,
+        purchaseAccountCode: sql<
+          string | null
+        >`(select a.code from accounts a where a.id = ${sql.raw('"tax_codes"."purchase_account_id"')})`,
         transactionCount: sql<number>`(select count(*)::int from tax_transactions t where t.tax_code_id = ${sql.raw('"tax_codes"."id"')})`,
       })
       .from(taxCodes)
@@ -56,7 +60,12 @@ export class TaxCodesService {
     const rates = await this.db
       .select()
       .from(taxRates)
-      .where(inArray(taxRates.taxCodeId, rows.map((r) => r.id)))
+      .where(
+        inArray(
+          taxRates.taxCodeId,
+          rows.map((r) => r.id),
+        ),
+      )
       .orderBy(asc(taxRates.effectiveFrom));
     const today = new Date().toISOString().slice(0, 10);
     return rows.map((r) => {
@@ -71,7 +80,11 @@ export class TaxCodesService {
     return row;
   }
 
-  async create(companyId: string, actor: AuthenticatedUser, input: CreateTaxCodeInput): Promise<TaxCodeView> {
+  async create(
+    companyId: string,
+    actor: AuthenticatedUser,
+    input: CreateTaxCodeInput,
+  ): Promise<TaxCodeView> {
     const id = await this.db.transaction(async (tx) => {
       await this.assertAccounts(tx, companyId, input.salesAccountId, input.purchaseAccountId);
       assertRates(input.rates);
@@ -92,32 +105,89 @@ export class TaxCodesService {
             isDefaultPurchases: input.isDefaultPurchases,
           })
           .returning();
-        await tx.insert(taxRates).values(input.rates.map((r) => ({ taxCodeId: row!.id, ratePercent: r.ratePercent, effectiveFrom: r.effectiveFrom, effectiveTo: r.effectiveTo ?? null })));
-        await this.clearOtherDefaults(tx, companyId, row!.id, input.isDefaultSales, input.isDefaultPurchases);
-        await this.audit.record({ action: 'CREATE', module: MODULE, entityType: 'TaxCode', entityId: row!.id, newValue: { code: input.code, kind: input.kind, rates: input.rates }, metadata: { actor: actor.email }, companyId }, tx);
+        await tx
+          .insert(taxRates)
+          .values(
+            input.rates.map((r) => ({
+              taxCodeId: row!.id,
+              ratePercent: r.ratePercent,
+              effectiveFrom: r.effectiveFrom,
+              effectiveTo: r.effectiveTo ?? null,
+            })),
+          );
+        await this.clearOtherDefaults(
+          tx,
+          companyId,
+          row!.id,
+          input.isDefaultSales,
+          input.isDefaultPurchases,
+        );
+        await this.audit.record(
+          {
+            action: 'CREATE',
+            module: MODULE,
+            entityType: 'TaxCode',
+            entityId: row!.id,
+            newValue: { code: input.code, kind: input.kind, rates: input.rates },
+            metadata: { actor: actor.email },
+            companyId,
+          },
+          tx,
+        );
         return row!.id;
       } catch (err) {
-        if (isUniqueViolation(err, 'tax_codes_company_code_uq')) throw new DuplicateError('Tax code', 'code', input.code);
+        if (isUniqueViolation(err, 'tax_codes_company_code_uq'))
+          throw new DuplicateError('Tax code', 'code', input.code);
         throw err;
       }
     });
     return this.get(companyId, id);
   }
 
-  async update(companyId: string, actor: AuthenticatedUser, id: string, input: UpdateTaxCodeInput): Promise<TaxCodeView> {
+  async update(
+    companyId: string,
+    actor: AuthenticatedUser,
+    id: string,
+    input: UpdateTaxCodeInput,
+  ): Promise<TaxCodeView> {
     await this.db.transaction(async (tx) => {
-      const [existing] = await tx.select().from(taxCodes).where(and(eq(taxCodes.id, id), eq(taxCodes.companyId, companyId))).for('update');
+      const [existing] = await tx
+        .select()
+        .from(taxCodes)
+        .where(and(eq(taxCodes.id, id), eq(taxCodes.companyId, companyId)))
+        .for('update');
       if (!existing) throw new NotFoundError('Tax code', id);
-      const salesAccountId = input.salesAccountId === undefined ? existing.salesAccountId : input.salesAccountId;
-      const purchaseAccountId = input.purchaseAccountId === undefined ? existing.purchaseAccountId : input.purchaseAccountId;
-      if (existing.appliesTo !== 'PURCHASES' && !salesAccountId) throw new BusinessRuleError(ErrorCodes.VALIDATION_FAILED, 'A sales-side account is required.');
-      if (existing.appliesTo !== 'SALES' && !purchaseAccountId) throw new BusinessRuleError(ErrorCodes.VALIDATION_FAILED, 'A purchase-side account is required.');
+      const salesAccountId =
+        input.salesAccountId === undefined ? existing.salesAccountId : input.salesAccountId;
+      const purchaseAccountId =
+        input.purchaseAccountId === undefined
+          ? existing.purchaseAccountId
+          : input.purchaseAccountId;
+      if (existing.appliesTo !== 'PURCHASES' && !salesAccountId)
+        throw new BusinessRuleError(
+          ErrorCodes.VALIDATION_FAILED,
+          'A sales-side account is required.',
+        );
+      if (existing.appliesTo !== 'SALES' && !purchaseAccountId)
+        throw new BusinessRuleError(
+          ErrorCodes.VALIDATION_FAILED,
+          'A purchase-side account is required.',
+        );
       await this.assertAccounts(tx, companyId, salesAccountId, purchaseAccountId);
       if (input.rates) {
         assertRates(input.rates);
         // Rates used by posted transactions must remain resolvable: keep history, replace the set.
         await tx.delete(taxRates).where(eq(taxRates.taxCodeId, id));
-        await tx.insert(taxRates).values(input.rates.map((r) => ({ taxCodeId: id, ratePercent: r.ratePercent, effectiveFrom: r.effectiveFrom, effectiveTo: r.effectiveTo ?? null })));
+        await tx
+          .insert(taxRates)
+          .values(
+            input.rates.map((r) => ({
+              taxCodeId: id,
+              ratePercent: r.ratePercent,
+              effectiveFrom: r.effectiveFrom,
+              effectiveTo: r.effectiveTo ?? null,
+            })),
+          );
       }
       const isDefaultSales = input.isDefaultSales ?? existing.isDefaultSales;
       const isDefaultPurchases = input.isDefaultPurchases ?? existing.isDefaultPurchases;
@@ -135,7 +205,19 @@ export class TaxCodesService {
         })
         .where(eq(taxCodes.id, id));
       await this.clearOtherDefaults(tx, companyId, id, isDefaultSales, isDefaultPurchases);
-      await this.audit.record({ action: 'UPDATE', module: MODULE, entityType: 'TaxCode', entityId: id, previousValue: { name: existing.name, status: existing.status }, newValue: input, metadata: { actor: actor.email, code: existing.code }, companyId }, tx);
+      await this.audit.record(
+        {
+          action: 'UPDATE',
+          module: MODULE,
+          entityType: 'TaxCode',
+          entityId: id,
+          previousValue: { name: existing.name, status: existing.status },
+          newValue: input,
+          metadata: { actor: actor.email, code: existing.code },
+          companyId,
+        },
+        tx,
+      );
     });
     return this.get(companyId, id);
   }
@@ -145,19 +227,53 @@ export class TaxCodesService {
     return this.list(companyId, { side, status: 'ACTIVE' });
   }
 
-  private async clearOtherDefaults(tx: DbExecutor, companyId: string, id: string, sales: boolean, purchases: boolean): Promise<void> {
-    if (sales) await tx.update(taxCodes).set({ isDefaultSales: false }).where(and(eq(taxCodes.companyId, companyId), ne(taxCodes.id, id), eq(taxCodes.isDefaultSales, true)));
-    if (purchases) await tx.update(taxCodes).set({ isDefaultPurchases: false }).where(and(eq(taxCodes.companyId, companyId), ne(taxCodes.id, id), eq(taxCodes.isDefaultPurchases, true)));
+  private async clearOtherDefaults(
+    tx: DbExecutor,
+    companyId: string,
+    id: string,
+    sales: boolean,
+    purchases: boolean,
+  ): Promise<void> {
+    if (sales)
+      await tx
+        .update(taxCodes)
+        .set({ isDefaultSales: false })
+        .where(
+          and(
+            eq(taxCodes.companyId, companyId),
+            ne(taxCodes.id, id),
+            eq(taxCodes.isDefaultSales, true),
+          ),
+        );
+    if (purchases)
+      await tx
+        .update(taxCodes)
+        .set({ isDefaultPurchases: false })
+        .where(
+          and(
+            eq(taxCodes.companyId, companyId),
+            ne(taxCodes.id, id),
+            eq(taxCodes.isDefaultPurchases, true),
+          ),
+        );
   }
 
-  private async assertAccounts(tx: DbExecutor, companyId: string, ...ids: Array<string | null | undefined>): Promise<void> {
+  private async assertAccounts(
+    tx: DbExecutor,
+    companyId: string,
+    ...ids: Array<string | null | undefined>
+  ): Promise<void> {
     const wanted = [...new Set(ids.filter((x): x is string => Boolean(x)))];
     if (wanted.length === 0) return;
     const rows = await this.accounts.findByIds(companyId, wanted, tx);
     for (const id of wanted) {
       const account = rows.find((a) => a.id === id);
       if (!account) throw new NotFoundError('Account', id);
-      if (account.isHeader || account.status !== 'ACTIVE') throw new BusinessRuleError(ErrorCodes.ACCOUNT_NOT_POSTABLE, `${account.code} ${account.name} cannot be used for postings.`);
+      if (account.isHeader || account.status !== 'ACTIVE')
+        throw new BusinessRuleError(
+          ErrorCodes.ACCOUNT_NOT_POSTABLE,
+          `${account.code} ${account.name} cannot be used for postings.`,
+        );
     }
   }
 }
@@ -167,10 +283,17 @@ function assertRates(rates: readonly TaxRateInput[]): void {
   const sorted = [...rates].sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
   for (let i = 0; i < sorted.length; i++) {
     const r = sorted[i]!;
-    if (r.effectiveTo && r.effectiveTo < r.effectiveFrom) throw new BusinessRuleError(ErrorCodes.VALIDATION_FAILED, 'A rate cannot end before it starts.');
+    if (r.effectiveTo && r.effectiveTo < r.effectiveFrom)
+      throw new BusinessRuleError(
+        ErrorCodes.VALIDATION_FAILED,
+        'A rate cannot end before it starts.',
+      );
     const next = sorted[i + 1];
     if (next && (!r.effectiveTo || r.effectiveTo >= next.effectiveFrom)) {
-      throw new BusinessRuleError(ErrorCodes.VALIDATION_FAILED, `Rate windows overlap around ${next.effectiveFrom}.`);
+      throw new BusinessRuleError(
+        ErrorCodes.VALIDATION_FAILED,
+        `Rate windows overlap around ${next.effectiveFrom}.`,
+      );
     }
   }
 }

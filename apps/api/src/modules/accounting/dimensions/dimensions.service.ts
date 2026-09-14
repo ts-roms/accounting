@@ -49,7 +49,9 @@ export class DimensionsService {
     return this.db
       .select({
         ...getTableColumns(dimensions),
-        parentCode: sql<string | null>`(select p.code from dimensions p where p.id = ${OUTER_PARENT})`,
+        parentCode: sql<
+          string | null
+        >`(select p.code from dimensions p where p.id = ${OUTER_PARENT})`,
         usageCount: sql<number>`(select count(*)::int from journal_lines l where l.department_id = ${OUTER_ID} or l.cost_center_id = ${OUTER_ID} or l.project_id = ${OUTER_ID})`,
       })
       .from(dimensions)
@@ -64,11 +66,18 @@ export class DimensionsService {
     return row;
   }
 
-  async create(companyId: string, actor: AuthenticatedUser, input: CreateDimensionInput): Promise<DimensionView> {
+  async create(
+    companyId: string,
+    actor: AuthenticatedUser,
+    input: CreateDimensionInput,
+  ): Promise<DimensionView> {
     const id = await this.db.transaction(async (tx) => {
       await this.assertParent(tx, companyId, input.dimensionType, input.parentId);
       if (input.startDate && input.endDate && input.endDate < input.startDate) {
-        throw new BusinessRuleError(ErrorCodes.VALIDATION_FAILED, 'End date cannot precede the start date.');
+        throw new BusinessRuleError(
+          ErrorCodes.VALIDATION_FAILED,
+          'End date cannot precede the start date.',
+        );
       }
       try {
         const [row] = await tx
@@ -85,28 +94,56 @@ export class DimensionsService {
             managerUserId: input.managerUserId ?? null,
           })
           .returning();
-        await this.audit.record({ action: 'CREATE', module: MODULE, entityType: 'Dimension', entityId: row!.id, newValue: { type: input.dimensionType, code: input.code, name: input.name }, metadata: { actor: actor.email }, companyId }, tx);
+        await this.audit.record(
+          {
+            action: 'CREATE',
+            module: MODULE,
+            entityType: 'Dimension',
+            entityId: row!.id,
+            newValue: { type: input.dimensionType, code: input.code, name: input.name },
+            metadata: { actor: actor.email },
+            companyId,
+          },
+          tx,
+        );
         return row!.id;
       } catch (err) {
-        if (isUniqueViolation(err, 'dimensions_company_type_code_uq')) throw new DuplicateError(input.dimensionType, 'code', input.code);
+        if (isUniqueViolation(err, 'dimensions_company_type_code_uq'))
+          throw new DuplicateError(input.dimensionType, 'code', input.code);
         throw err;
       }
     });
     return this.get(companyId, id);
   }
 
-  async update(companyId: string, actor: AuthenticatedUser, id: string, input: UpdateDimensionInput): Promise<DimensionView> {
+  async update(
+    companyId: string,
+    actor: AuthenticatedUser,
+    id: string,
+    input: UpdateDimensionInput,
+  ): Promise<DimensionView> {
     await this.db.transaction(async (tx) => {
-      const [existing] = await tx.select().from(dimensions).where(and(eq(dimensions.id, id), eq(dimensions.companyId, companyId))).for('update');
+      const [existing] = await tx
+        .select()
+        .from(dimensions)
+        .where(and(eq(dimensions.id, id), eq(dimensions.companyId, companyId)))
+        .for('update');
       if (!existing) throw new NotFoundError('Dimension', id);
       if (input.parentId !== undefined) {
-        if (input.parentId === id) throw new BusinessRuleError(ErrorCodes.VALIDATION_FAILED, 'A dimension cannot be its own parent.');
+        if (input.parentId === id)
+          throw new BusinessRuleError(
+            ErrorCodes.VALIDATION_FAILED,
+            'A dimension cannot be its own parent.',
+          );
         await this.assertParent(tx, companyId, existing.dimensionType, input.parentId);
       }
       const startDate = input.startDate === undefined ? existing.startDate : input.startDate;
       const endDate = input.endDate === undefined ? existing.endDate : input.endDate;
       if (startDate && endDate && endDate < startDate) {
-        throw new BusinessRuleError(ErrorCodes.VALIDATION_FAILED, 'End date cannot precede the start date.');
+        throw new BusinessRuleError(
+          ErrorCodes.VALIDATION_FAILED,
+          'End date cannot precede the start date.',
+        );
       }
       await tx
         .update(dimensions)
@@ -116,11 +153,24 @@ export class DimensionsService {
           parentId: input.parentId === undefined ? existing.parentId : input.parentId,
           startDate,
           endDate,
-          managerUserId: input.managerUserId === undefined ? existing.managerUserId : input.managerUserId,
+          managerUserId:
+            input.managerUserId === undefined ? existing.managerUserId : input.managerUserId,
           status: input.status ?? existing.status,
         })
         .where(eq(dimensions.id, id));
-      await this.audit.record({ action: 'UPDATE', module: MODULE, entityType: 'Dimension', entityId: id, previousValue: { name: existing.name, status: existing.status }, newValue: input, metadata: { actor: actor.email, code: existing.code }, companyId }, tx);
+      await this.audit.record(
+        {
+          action: 'UPDATE',
+          module: MODULE,
+          entityType: 'Dimension',
+          entityId: id,
+          previousValue: { name: existing.name, status: existing.status },
+          newValue: input,
+          metadata: { actor: actor.email, code: existing.code },
+          companyId,
+        },
+        tx,
+      );
     });
     return this.get(companyId, id);
   }
@@ -129,7 +179,12 @@ export class DimensionsService {
    * Checks every dimension reference on a set of lines: exists in the company,
    * is ACTIVE, has the type the column implies and (projects) is within its dates.
    */
-  async validateRefs(tx: DbExecutor, companyId: string, refs: readonly DimensionRefs[], asOf?: string): Promise<void> {
+  async validateRefs(
+    tx: DbExecutor,
+    companyId: string,
+    refs: readonly DimensionRefs[],
+    asOf?: string,
+  ): Promise<void> {
     const wanted = new Map<string, DimensionType>();
     for (const ref of refs) {
       for (const field of Object.keys(FIELD_TYPE) as Array<keyof DimensionRefs>) {
@@ -147,20 +202,45 @@ export class DimensionsService {
       const row = byId.get(id);
       if (!row) throw new NotFoundError('Dimension', id);
       if (row.dimensionType !== expected) {
-        throw new BusinessRuleError(ErrorCodes.VALIDATION_FAILED, `${row.code} is a ${label(row.dimensionType)}, not a ${label(expected)}.`);
+        throw new BusinessRuleError(
+          ErrorCodes.VALIDATION_FAILED,
+          `${row.code} is a ${label(row.dimensionType)}, not a ${label(expected)}.`,
+        );
       }
-      if (row.status !== 'ACTIVE') throw new BusinessRuleError(ErrorCodes.VALIDATION_FAILED, `${label(row.dimensionType)} ${row.code} is inactive.`);
-      if (asOf && ((row.startDate && asOf < row.startDate) || (row.endDate && asOf > row.endDate))) {
-        throw new BusinessRuleError(ErrorCodes.VALIDATION_FAILED, `${label(row.dimensionType)} ${row.code} is not open on ${asOf}.`);
+      if (row.status !== 'ACTIVE')
+        throw new BusinessRuleError(
+          ErrorCodes.VALIDATION_FAILED,
+          `${label(row.dimensionType)} ${row.code} is inactive.`,
+        );
+      if (
+        asOf &&
+        ((row.startDate && asOf < row.startDate) || (row.endDate && asOf > row.endDate))
+      ) {
+        throw new BusinessRuleError(
+          ErrorCodes.VALIDATION_FAILED,
+          `${label(row.dimensionType)} ${row.code} is not open on ${asOf}.`,
+        );
       }
     }
   }
 
-  private async assertParent(tx: DbExecutor, companyId: string, type: DimensionType, parentId: string | null | undefined): Promise<void> {
+  private async assertParent(
+    tx: DbExecutor,
+    companyId: string,
+    type: DimensionType,
+    parentId: string | null | undefined,
+  ): Promise<void> {
     if (!parentId) return;
-    const [parent] = await tx.select().from(dimensions).where(and(eq(dimensions.id, parentId), eq(dimensions.companyId, companyId)));
+    const [parent] = await tx
+      .select()
+      .from(dimensions)
+      .where(and(eq(dimensions.id, parentId), eq(dimensions.companyId, companyId)));
     if (!parent) throw new NotFoundError('Dimension', parentId);
-    if (parent.dimensionType !== type) throw new BusinessRuleError(ErrorCodes.VALIDATION_FAILED, 'A parent must be of the same dimension type.');
+    if (parent.dimensionType !== type)
+      throw new BusinessRuleError(
+        ErrorCodes.VALIDATION_FAILED,
+        'A parent must be of the same dimension type.',
+      );
   }
 }
 

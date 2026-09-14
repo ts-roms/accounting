@@ -13,7 +13,7 @@ import {
   type SQL,
 } from 'drizzle-orm';
 import { Money } from '@accounting/money';
-import type { PaginatedResult, StockDocumentType } from '@accounting/types';
+import { P, type PaginatedResult, type StockDocumentType } from '@accounting/types';
 import type {
   CancelOrderInput,
   CreateAdjustmentInput,
@@ -393,7 +393,7 @@ export class StockDocumentsService {
       const existing = await this.lock(tx, companyId, type, id);
       if (existing.status === 'POSTED') return;
       this.assertStatus(existing, ['DRAFT'], 'posted');
-      await this.posting.resolvePeriod(tx, companyId, existing.documentDate);
+      await this.posting.resolvePeriod(tx, companyId, existing.documentDate, { draft: true });
       const currency = existing.currency;
       const lines = await tx
         .select()
@@ -514,18 +514,22 @@ export class StockDocumentsService {
             credit: adjustmentTotal.isPositive() ? adjustmentTotal.toString() : '0',
             description: `${LABEL[type]} ${existing.documentNumber}${existing.reason ? ` - ${existing.reason}` : ''}`,
           });
-          const entry = await this.posting.postEvent(tx, {
-            companyId,
-            entryDate: existing.documentDate,
-            description: `${LABEL[type]} ${existing.documentNumber}${existing.notes ? ` - ${existing.notes}` : ''}`,
-            reference: existing.reference ?? existing.documentNumber,
-            journalType: 'GENERAL',
-            branchId: null,
-            sourceType,
-            sourceId: existing.id,
-            actorId: actor.id,
-            lines: postingLines,
-          });
+          const entry = await this.posting.postEvent(
+            tx,
+            {
+              companyId,
+              entryDate: existing.documentDate,
+              description: `${LABEL[type]} ${existing.documentNumber}${existing.notes ? ` - ${existing.notes}` : ''}`,
+              reference: existing.reference ?? existing.documentNumber,
+              journalType: 'GENERAL',
+              branchId: null,
+              sourceType,
+              sourceId: existing.id,
+              actor,
+              lines: postingLines,
+            },
+            { permission: P['inventory.post'] },
+          );
           journalEntryId = entry.id;
           await this.inventory.setJournal(tx, movementIds, entry.id);
         }

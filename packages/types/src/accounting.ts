@@ -78,7 +78,12 @@ export const LEDGER_STATUSES: readonly JournalStatus[] = ['POSTED', 'LOCKED', 'R
 export const JOURNAL_TYPES = ['GENERAL', 'ADJUSTING', 'REVERSAL', 'CLOSING', 'OPENING'] as const;
 export type JournalType = (typeof JOURNAL_TYPES)[number];
 
-export const FISCAL_PERIOD_STATUSES = ['OPEN', 'CLOSED'] as const;
+/**
+ * OPEN: normal posting. SOFT_CLOSED: only holders of `period.post-soft-closed`
+ * may post (late adjustments). CLOSED: no posting; reopening needs a reason and
+ * `period.reopen`. LOCKED: final - cannot be reopened or posted to by anyone.
+ */
+export const FISCAL_PERIOD_STATUSES = ['OPEN', 'SOFT_CLOSED', 'CLOSED', 'LOCKED'] as const;
 export type FiscalPeriodStatus = (typeof FISCAL_PERIOD_STATUSES)[number];
 
 export const FISCAL_YEAR_STATUSES = ['OPEN', 'CLOSED'] as const;

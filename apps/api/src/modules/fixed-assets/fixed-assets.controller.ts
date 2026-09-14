@@ -94,7 +94,11 @@ export class FixedAssetsController {
 
   @Patch(':id')
   @RequirePermissions(P['fixed-asset.manage'])
-  update(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: UpdateAssetDto) {
+  update(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: UpdateAssetDto,
+  ) {
     return this.assets.update(user.companyId!, user, id, body);
   }
 
@@ -107,33 +111,55 @@ export class FixedAssetsController {
 
   @Post(':id/capitalize')
   @RequirePermissions(P['fixed-asset.post'])
-  @ApiOperation({ summary: 'Dr asset cost / Cr clearing (or given account); asset starts depreciating' })
-  capitalize(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: CapitalizeDto) {
+  @ApiOperation({
+    summary: 'Dr asset cost / Cr clearing (or given account); asset starts depreciating',
+  })
+  capitalize(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: CapitalizeDto,
+  ) {
     return this.assets.capitalize(user.companyId!, user, id, body);
   }
 
   @Post(':id/transfer')
   @RequirePermissions(P['fixed-asset.manage'])
-  transfer(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: TransferDto) {
+  transfer(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: TransferDto,
+  ) {
     return this.assets.transfer(user.companyId!, user, id, body);
   }
 
   @Post(':id/impair')
   @RequirePermissions(P['fixed-asset.post'])
-  impair(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: ImpairDto) {
+  impair(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: ImpairDto,
+  ) {
     return this.assets.impair(user.companyId!, user, id, body);
   }
 
   @Post(':id/revalue')
   @RequirePermissions(P['fixed-asset.post'])
-  revalue(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: RevalueDto) {
+  revalue(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: RevalueDto,
+  ) {
     return this.assets.revalue(user.companyId!, user, id, body);
   }
 
   @Post(':id/dispose')
   @RequirePermissions(P['fixed-asset.post'])
   @ApiOperation({ summary: 'Dispose (proceeds > 0) or write off; books gain / loss on disposal' })
-  dispose(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: DisposeDto) {
+  dispose(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: DisposeDto,
+  ) {
     return this.assets.dispose(user.companyId!, user, id, body);
   }
 }
@@ -158,7 +184,11 @@ export class AssetCategoriesController {
 
   @Patch(':id')
   @RequirePermissions(P['fixed-asset.manage'])
-  update(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: UpdateCategoryDto) {
+  update(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: UpdateCategoryDto,
+  ) {
     return this.assets.updateCategory(user.companyId!, user, id, body);
   }
 }
@@ -209,7 +239,11 @@ export class DepreciationRunsController {
 
   @Post(':id/reverse')
   @RequirePermissions(P['depreciation.run'])
-  reverse(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: ReverseRunDto) {
+  reverse(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: ReverseRunDto,
+  ) {
     return this.runs.reverse(user.companyId!, user, id, body.reason);
   }
 

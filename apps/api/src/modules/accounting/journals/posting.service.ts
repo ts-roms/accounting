@@ -1,22 +1,37 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { and, asc, eq, gte, inArray, lte } from 'drizzle-orm';
+import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 import { PinoLogger } from 'nestjs-pino';
 import { Money } from '@accounting/money';
-import type { JournalType } from '@accounting/types';
+import { P, type JournalType, type PermissionKey } from '@accounting/types';
 import { AuditService } from '@/modules/audit/audit.service';
-import { BusinessRuleError } from '@/common/errors/app-error';
+import { BusinessRuleError, PermissionDeniedError } from '@/common/errors/app-error';
 import { ErrorCodes } from '@/common/errors/error-codes';
 import { DRIZZLE, type Database, type DbExecutor } from '@/database/database.types';
 import {
   accounts,
+  bankTransactions,
+  branches,
   companies,
+  customerPayments,
+  depreciationRuns,
+  expenseClaims,
   fiscalPeriods,
+  fixedAssets,
+  fxRevaluations,
+  goodsReceipts,
+  invoices,
   journalEntries,
   journalLines,
+  stockDocuments,
+  vendorBills,
+  vendorPayments,
   type Account,
+  type FiscalPeriod,
   type JournalEntry,
 } from '@/database/schema';
+import { DimensionsService } from '../dimensions/dimensions.service';
 import { DocumentNumberingService } from '../numbering/document-numbering.service';
 
 const MODULE = 'ACCOUNTING';
@@ -28,10 +43,20 @@ export interface PostingLine {
   credit: string;
   description?: string | null;
   branchId?: string | null;
-  /** Cost-accounting dimensions (Phase 7); validated by the calling module. */
+  /** Cost-accounting dimensions (Phase 7); validated here before any row is written. */
   departmentId?: string | null;
   costCenterId?: string | null;
   projectId?: string | null;
+}
+
+/**
+ * Who is posting. A user principal carries its effective permissions; the
+ * scheduler principal is marked `system` and is gated by configuration instead.
+ */
+export interface PostingActor {
+  id: string | null;
+  permissions?: ReadonlySet<string>;
+  system?: boolean;
 }
 
 /**
@@ -51,7 +76,7 @@ export interface AccountingEvent {
   sourceId?: string | null;
   idempotencyKey?: string | null;
   reversalOfId?: string | null;
-  actorId: string | null;
+  actor: PostingActor;
 }
 
 export interface ValidatedLines {
@@ -64,6 +89,14 @@ export interface ValidatedLines {
 export interface PostOptions {
   /** Only the year-end closing routine may post into a closed period. */
   allowClosedPeriod?: boolean;
+  /** Resolving the period for a DRAFT: soft-closed is fine, posting is gated later. */
+  draft?: boolean;
+  /**
+   * Authority the actor must hold for this posting. Subledger modules pass
+   * their own posting permission (`bill.post`, `depreciation.run`, ...);
+   * manual journals use the default `journal.post`.
+   */
+  permission?: PermissionKey;
 }
 
 export const JOURNAL_POSTED_EVENT = 'accounting.journal.posted';
@@ -81,12 +114,51 @@ export interface JournalPostedEvent {
 }
 
 /**
+ * Source documents the gateway can verify. A posting that names one of these
+ * types must point at a row of the company; unknown types are allowed (the
+ * unique (company, sourceType, sourceId) index still guards duplicates).
+ */
+const SOURCE_TABLES = {
+  AR_DOCUMENT: invoices,
+  AR_DOCUMENT_VOID: invoices,
+  AP_DOCUMENT: vendorBills,
+  AP_DOCUMENT_VOID: vendorBills,
+  AR_PAYMENT: customerPayments,
+  AR_PAYMENT_VOID: customerPayments,
+  AP_PAYMENT: vendorPayments,
+  AP_PAYMENT_VOID: vendorPayments,
+  BANK_TRANSACTION: bankTransactions,
+  BANK_TRANSACTION_VOID: bankTransactions,
+  DEPRECIATION_RUN: depreciationRuns,
+  DEPRECIATION_RUN_REVERSAL: depreciationRuns,
+  FIXED_ASSET_CAPITALIZATION: fixedAssets,
+  FIXED_ASSET_IMPAIRMENT: fixedAssets,
+  FIXED_ASSET_REVALUATION: fixedAssets,
+  FIXED_ASSET_DISPOSAL: fixedAssets,
+  EXPENSE_CLAIM: expenseClaims,
+  EXPENSE_CLAIM_PAYMENT: expenseClaims,
+  GOODS_RECEIPT: goodsReceipts,
+  GOODS_RECEIPT_CANCEL: goodsReceipts,
+  STOCK_DOCUMENT: stockDocuments,
+  FX_REVALUATION: fxRevaluations,
+  FX_REVALUATION_REVERSAL: fxRevaluations,
+  JOURNAL_REVERSAL: journalEntries,
+} as const satisfies Record<string, SourceTable>;
+
+/** Shape every verifiable source table shares. */
+type SourceTable = { id: PgColumn; companyId: PgColumn } & PgTable;
+
+/**
  * The posting engine. Every ledger write in the system goes through here.
  *
- * Responsibilities (see docs/accounting-engine.md):
- *  - validate accounts (exist, active, postable, same company)
- *  - validate the fiscal period is open for the entry date
+ * Responsibilities (see docs/accounting-engine.md and docs/accounting-controls.md):
+ *  - validate the actor's authority for this posting
+ *  - validate accounts (exist, active, postable, same company, currency)
+ *  - validate branches and cost dimensions belong to the company and are active
+ *  - validate the source document exists in the company
+ *  - validate the fiscal period state (OPEN / SOFT_CLOSED / CLOSED / LOCKED)
  *  - validate SUM(debit) = SUM(credit) with exact decimal arithmetic
+ *  - guarantee idempotency on idempotency key and source document
  *  - assign posting date/status/actor, write the audit entry, emit an event
  *
  * It never opens its own transaction: callers pass the transaction that also
@@ -98,6 +170,7 @@ export class AccountingPostingService {
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly audit: AuditService,
     private readonly numbering: DocumentNumberingService,
+    private readonly dimensions: DimensionsService,
     private readonly events: EventEmitter2,
     private readonly logger: PinoLogger,
   ) {
@@ -200,13 +273,81 @@ export class AccountingPostingService {
     return { currency, totalDebit, totalCredit, accountsById };
   }
 
-  /** Finds the period for a date and asserts it is open (unless explicitly allowed). */
+  /** Branches on the header / lines must belong to the company and be active. */
+  async validateBranches(
+    tx: DbExecutor,
+    companyId: string,
+    headerBranchId: string | null | undefined,
+    lines: readonly PostingLine[],
+  ): Promise<void> {
+    const ids = [
+      ...new Set(
+        [headerBranchId, ...lines.map((l) => l.branchId)].filter((x): x is string => Boolean(x)),
+      ),
+    ];
+    if (!ids.length) return;
+    const rows = await tx
+      .select({ id: branches.id, status: branches.status, code: branches.code })
+      .from(branches)
+      .where(and(eq(branches.companyId, companyId), inArray(branches.id, ids)));
+    const found = new Map(rows.map((r) => [r.id, r]));
+    for (const id of ids) {
+      const b = found.get(id);
+      if (!b)
+        throw new BusinessRuleError(
+          ErrorCodes.NOT_FOUND,
+          'Branch does not exist in this company.',
+          {
+            branchId: id,
+          },
+        );
+      if (b.status !== 'ACTIVE')
+        throw new BusinessRuleError(ErrorCodes.VALIDATION_FAILED, `Branch ${b.code} is inactive.`, {
+          branchId: id,
+        });
+    }
+  }
+
+  /** The named source document must exist in the company (for the types the gateway knows). */
+  async validateSource(
+    tx: DbExecutor,
+    companyId: string,
+    sourceType: string | null | undefined,
+    sourceId: string | null | undefined,
+  ): Promise<void> {
+    if (!sourceType && !sourceId) return;
+    if (!sourceType || !sourceId)
+      throw new BusinessRuleError(
+        ErrorCodes.SOURCE_DOCUMENT_INVALID,
+        'A source document needs both a type and an id.',
+        { sourceType, sourceId },
+      );
+    const table: SourceTable | undefined = SOURCE_TABLES[sourceType as keyof typeof SOURCE_TABLES];
+    if (!table) return;
+    const [row] = await tx
+      .select({ id: table.id })
+      .from(table)
+      .where(and(eq(table.id, sourceId), eq(table.companyId, companyId)));
+    if (!row)
+      throw new BusinessRuleError(
+        ErrorCodes.SOURCE_DOCUMENT_INVALID,
+        `Source ${sourceType} ${sourceId} does not exist in this company.`,
+        { sourceType, sourceId },
+      );
+  }
+
+  /**
+   * Finds the period for a date and asserts the actor may post into it:
+   * OPEN always; SOFT_CLOSED with `period.post-soft-closed` (or a system
+   * posting); CLOSED only for the year-end routine; LOCKED never.
+   */
   async resolvePeriod(
     tx: DbExecutor,
     companyId: string,
     entryDate: string,
     options: PostOptions = {},
-  ) {
+    actor?: PostingActor,
+  ): Promise<FiscalPeriod> {
     const [period] = await tx
       .select()
       .from(fiscalPeriods)
@@ -224,14 +365,45 @@ export class AccountingPostingService {
         { date: entryDate },
       );
     }
-    if (period.status === 'CLOSED' && !options.allowClosedPeriod) {
-      throw new BusinessRuleError(
-        ErrorCodes.ACCOUNTING_PERIOD_CLOSED,
-        `The accounting period ${period.name} is closed.`,
-        { periodId: period.id, period: period.name },
-      );
+    const details = { periodId: period.id, period: period.name, status: period.status };
+    switch (period.status) {
+      case 'OPEN':
+        return period;
+      case 'LOCKED':
+        throw new BusinessRuleError(
+          ErrorCodes.ACCOUNTING_PERIOD_LOCKED,
+          `The accounting period ${period.name} is locked; nothing can be posted into it.`,
+          details,
+        );
+      case 'CLOSED':
+        if (options.allowClosedPeriod) return period;
+        throw new BusinessRuleError(
+          ErrorCodes.ACCOUNTING_PERIOD_CLOSED,
+          `The accounting period ${period.name} is closed.`,
+          details,
+        );
+      case 'SOFT_CLOSED': {
+        const allowed =
+          options.draft ||
+          options.allowClosedPeriod ||
+          actor?.system ||
+          actor?.permissions?.has(P['period.post-soft-closed']);
+        if (allowed) return period;
+        throw new BusinessRuleError(
+          ErrorCodes.ACCOUNTING_PERIOD_SOFT_CLOSED,
+          `The accounting period ${period.name} is soft-closed; posting needs the "post into soft-closed periods" permission.`,
+          { ...details, required: P['period.post-soft-closed'] },
+        );
+      }
     }
-    return period;
+  }
+
+  /** The actor must hold the posting authority named by the caller (default `journal.post`). */
+  assertAuthority(actor: PostingActor, options: PostOptions = {}): void {
+    if (actor.system) return;
+    const required = options.permission ?? P['journal.post'];
+    if (!actor.permissions) throw new PermissionDeniedError([required]);
+    if (!actor.permissions.has(required)) throw new PermissionDeniedError([required]);
   }
 
   /**
@@ -244,6 +416,7 @@ export class AccountingPostingService {
     event: AccountingEvent,
     options: PostOptions = {},
   ): Promise<JournalEntry> {
+    this.assertAuthority(event.actor, options);
     const existing = await this.findExisting(tx, event);
     if (existing) {
       this.logger.info(
@@ -255,7 +428,16 @@ export class AccountingPostingService {
 
     const currency = await this.companyCurrency(tx, event.companyId);
     const validated = await this.validateLines(tx, event.companyId, currency, event.lines);
-    const period = await this.resolvePeriod(tx, event.companyId, event.entryDate, options);
+    await this.validateBranches(tx, event.companyId, event.branchId, event.lines);
+    await this.dimensions.validateRefs(tx, event.companyId, event.lines, event.entryDate);
+    await this.validateSource(tx, event.companyId, event.sourceType, event.sourceId);
+    const period = await this.resolvePeriod(
+      tx,
+      event.companyId,
+      event.entryDate,
+      options,
+      event.actor,
+    );
     const documentNumber = await this.numbering.allocate(
       event.companyId,
       'JE',
@@ -282,8 +464,8 @@ export class AccountingPostingService {
         sourceId: event.sourceId ?? null,
         idempotencyKey: event.idempotencyKey ?? null,
         reversalOfId: event.reversalOfId ?? null,
-        createdBy: event.actorId,
-        approvedBy: event.actorId,
+        createdBy: event.actor.id,
+        approvedBy: event.actor.id,
         approvedAt: new Date(),
       })
       .returning();
@@ -305,16 +487,17 @@ export class AccountingPostingService {
       })),
     );
 
-    return this.postEntry(tx, entry.id, event.actorId, options);
+    return this.postEntry(tx, entry.id, event.actor, options);
   }
 
   /** Posts an APPROVED entry that already exists (document workflow path). */
   async postEntry(
     tx: DbExecutor,
     entryId: string,
-    actorId: string | null,
+    actor: PostingActor,
     options: PostOptions = {},
   ): Promise<JournalEntry> {
+    this.assertAuthority(actor, options);
     const [entry] = await tx
       .select()
       .from(journalEntries)
@@ -338,13 +521,10 @@ export class AccountingPostingService {
       .from(journalLines)
       .where(eq(journalLines.journalEntryId, entry.id))
       .orderBy(asc(journalLines.lineNumber));
-    const validated = await this.validateLines(
-      tx,
-      entry.companyId,
-      entry.currency,
-      lines.map((l) => ({ accountId: l.accountId, debit: l.debit, credit: l.credit })),
-    );
-    const period = await this.resolvePeriod(tx, entry.companyId, entry.entryDate, options);
+    const validated = await this.validateLines(tx, entry.companyId, entry.currency, lines);
+    await this.validateBranches(tx, entry.companyId, entry.branchId, lines);
+    await this.dimensions.validateRefs(tx, entry.companyId, lines, entry.entryDate);
+    const period = await this.resolvePeriod(tx, entry.companyId, entry.entryDate, options, actor);
 
     const [posted] = await tx
       .update(journalEntries)
@@ -354,7 +534,7 @@ export class AccountingPostingService {
         postingDate: entry.entryDate,
         totalDebit: validated.totalDebit.toString(),
         totalCredit: validated.totalCredit.toString(),
-        postedBy: actorId,
+        postedBy: actor.id,
         postedAt: new Date(),
       })
       .where(eq(journalEntries.id, entry.id))
@@ -378,9 +558,12 @@ export class AccountingPostingService {
           documentNumber: posted.documentNumber,
           journalType: posted.journalType,
           lines: lines.length,
+          periodStatus: period.status,
+          authority: options.permission ?? P['journal.post'],
+          system: Boolean(actor.system),
         },
         companyId: posted.companyId,
-        userId: actorId,
+        userId: actor.id,
       },
       tx,
     );

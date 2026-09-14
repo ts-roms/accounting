@@ -94,6 +94,11 @@ export type CreateFiscalYearInput = z.infer<typeof createFiscalYearSchema>;
 export const periodActionSchema = z.object({
   reason: z.string().trim().max(500).optional(),
 });
+/** Reopening a closed period is never silent: a reason is mandatory. */
+export const periodReopenSchema = z.object({
+  reason: z.string().trim().min(5, 'Give a reason for reopening (at least 5 characters)').max(500),
+});
+export type PeriodReopenInput = z.infer<typeof periodReopenSchema>;
 export type PeriodActionInput = z.infer<typeof periodActionSchema>;
 
 // ----------------------------------------------------------------- journals
@@ -143,6 +148,18 @@ export const reverseJournalEntrySchema = z.object({
   description: optionalText(500),
 });
 export type ReverseJournalEntryInput = z.infer<typeof reverseJournalEntrySchema>;
+
+/**
+ * Correction = reversal of the posted original plus a new DRAFT entry
+ * pre-filled with the original lines, linked as its correction.
+ */
+export const correctJournalEntrySchema = z.object({
+  reversalDate: isoDateSchema,
+  /** Entry date of the correcting draft; defaults to the reversal date. */
+  correctionDate: isoDateSchema.optional(),
+  reason: z.string().trim().min(5, 'Give a reason for the correction').max(500),
+});
+export type CorrectJournalEntryInput = z.infer<typeof correctJournalEntrySchema>;
 
 export const listJournalEntriesQuerySchema = paginationQuerySchema.extend({
   status: z.enum(JOURNAL_STATUSES).optional(),

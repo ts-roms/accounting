@@ -12,6 +12,7 @@ import { AppConfigService } from './config/app-config.service';
 import { DatabaseModule } from './database/database.module';
 import { AccountingModule } from './modules/accounting/accounting.module';
 import { AiModule } from './modules/ai/ai.module';
+import { IntegrityModule } from './modules/accounting/integrity/integrity.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AttachmentsModule } from './modules/attachments/attachments.module';
@@ -95,6 +96,7 @@ import { UsersModule } from './modules/users/users.module';
     FxModule,
     ConsolidationModule,
     AiModule,
+    IntegrityModule,
     WorkflowsModule,
     AttachmentsModule,
     BudgetingModule,

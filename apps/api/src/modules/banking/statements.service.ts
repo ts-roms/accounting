@@ -704,14 +704,12 @@ export class StatementsService {
     );
     for (const o of outcomes) {
       if (o.status === 'MATCHED' && o.journalLineId) {
-        await tx
-          .insert(bankLineMatches)
-          .values({
-            statementLineId: o.statementLineId,
-            journalLineId: o.journalLineId,
-            kind: 'AUTO',
-            matchedBy: actorId,
-          });
+        await tx.insert(bankLineMatches).values({
+          statementLineId: o.statementLineId,
+          journalLineId: o.journalLineId,
+          kind: 'AUTO',
+          matchedBy: actorId,
+        });
       }
       await tx
         .update(bankStatementLines)

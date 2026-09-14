@@ -13,7 +13,7 @@ import {
   type SQL,
 } from 'drizzle-orm';
 import { Money } from '@accounting/money';
-import type { PaginatedResult } from '@accounting/types';
+import { P, type PaginatedResult } from '@accounting/types';
 import type {
   AllocateInput,
   CreatePaymentInput,
@@ -174,9 +174,15 @@ export class CustomerPaymentsService {
           `Customer ${customer.code} is inactive.`,
         );
       const currency = customer.currency;
-      const { rate: exchangeRate, baseCurrency } = await this.rates.documentRate(companyId, currency, input.paymentDate, input.exchangeRate, tx);
+      const { rate: exchangeRate, baseCurrency } = await this.rates.documentRate(
+        companyId,
+        currency,
+        input.paymentDate,
+        input.exchangeRate,
+        tx,
+      );
       await this.assertCashAccount(companyId, input.cashAccountId, tx);
-      await this.posting.resolvePeriod(tx, companyId, input.paymentDate);
+      await this.posting.resolvePeriod(tx, companyId, input.paymentDate, { draft: true });
       const amount = Money.parse(input.amount, currency);
       if (input.paymentType === 'REFUND' && input.allocations.length > 0) {
         throw new BusinessRuleError(
@@ -270,18 +276,30 @@ export class CustomerPaymentsService {
       const customerId = input.partyId ?? existing.customerId;
       const customer = await this.customersService.getOrThrow(companyId, customerId, tx);
       const paymentDate = input.paymentDate ?? existing.paymentDate;
-      await this.posting.resolvePeriod(tx, companyId, paymentDate);
+      await this.posting.resolvePeriod(tx, companyId, paymentDate, { draft: true });
       if (input.cashAccountId) await this.assertCashAccount(companyId, input.cashAccountId, tx);
       if (customer.currency !== existing.currency) {
-        throw new BusinessRuleError(ErrorCodes.CURRENCY_MISMATCH, `${existing.documentNumber} is in ${existing.currency}; the party settles in ${customer.currency}.`);
+        throw new BusinessRuleError(
+          ErrorCodes.CURRENCY_MISMATCH,
+          `${existing.documentNumber} is in ${existing.currency}; the party settles in ${customer.currency}.`,
+        );
       }
       const amount = input.amount
         ? Money.parse(input.amount, existing.currency)
         : Money.of(existing.amount, existing.currency);
       const rateChanged = input.exchangeRate !== undefined || input.paymentDate !== undefined;
       const { rate: exchangeRate, baseCurrency } = rateChanged
-        ? await this.rates.documentRate(companyId, existing.currency, paymentDate, input.exchangeRate, tx)
-        : { rate: existing.exchangeRate, baseCurrency: await this.accounts.companyCurrency(companyId, tx) };
+        ? await this.rates.documentRate(
+            companyId,
+            existing.currency,
+            paymentDate,
+            input.exchangeRate,
+            tx,
+          )
+        : {
+            rate: existing.exchangeRate,
+            baseCurrency: await this.accounts.companyCurrency(companyId, tx),
+          };
       const paymentType = input.paymentType ?? existing.paymentType;
       if (input.allocations) {
         if (paymentType === 'REFUND' && input.allocations.length > 0)
@@ -419,7 +437,11 @@ export class CustomerPaymentsService {
       const baseAmount = amount.convert(baseCurrency, existing.exchangeRate);
       const gain = isReceipt
         ? this.fx.settlementGain(
-            draftAllocations.map((a) => ({ amount: a.amount, currency, documentRate: targets.get(a.invoiceId)!.exchangeRate })),
+            draftAllocations.map((a) => ({
+              amount: a.amount,
+              currency,
+              documentRate: targets.get(a.invoiceId)!.exchangeRate,
+            })),
             existing.exchangeRate,
             baseCurrency,
             'AR',
@@ -428,31 +450,35 @@ export class CustomerPaymentsService {
       // AR: bank receives baseAmount; the receivable relieved is baseAmount - gain.
       const controlBase = baseAmount.subtract(gain);
       const fxLines = await this.fx.realizedLines(tx, companyId, gain);
-      const entry = await this.posting.postEvent(tx, {
-        companyId,
-        entryDate: existing.paymentDate,
-        description: `${isReceipt ? 'Customer receipt' : 'Customer refund'} ${existing.documentNumber}${existing.memo ? ` - ${existing.memo}` : ''}`,
-        reference: existing.reference ?? existing.documentNumber,
-        branchId: existing.branchId,
-        sourceType: 'AR_PAYMENT',
-        sourceId: existing.id,
-        actorId: actor.id,
-        lines: [
-          {
-            accountId: existing.cashAccountId,
-            debit: isReceipt ? baseAmount.toString() : '0',
-            credit: isReceipt ? '0' : baseAmount.toString(),
-            description: `${existing.documentNumber} ${existing.method.toLowerCase().replace('_', ' ')}`,
-          },
-          {
-            accountId: control.id,
-            debit: isReceipt ? '0' : controlBase.toString(),
-            credit: isReceipt ? controlBase.toString() : '0',
-            description: `${existing.documentNumber} - customer receivable`,
-          },
-          ...fxLines,
-        ],
-      });
+      const entry = await this.posting.postEvent(
+        tx,
+        {
+          companyId,
+          entryDate: existing.paymentDate,
+          description: `${isReceipt ? 'Customer receipt' : 'Customer refund'} ${existing.documentNumber}${existing.memo ? ` - ${existing.memo}` : ''}`,
+          reference: existing.reference ?? existing.documentNumber,
+          branchId: existing.branchId,
+          sourceType: 'AR_PAYMENT',
+          sourceId: existing.id,
+          actor,
+          lines: [
+            {
+              accountId: existing.cashAccountId,
+              debit: isReceipt ? baseAmount.toString() : '0',
+              credit: isReceipt ? '0' : baseAmount.toString(),
+              description: `${existing.documentNumber} ${existing.method.toLowerCase().replace('_', ' ')}`,
+            },
+            {
+              accountId: control.id,
+              debit: isReceipt ? '0' : controlBase.toString(),
+              credit: isReceipt ? controlBase.toString() : '0',
+              description: `${existing.documentNumber} - customer receivable`,
+            },
+            ...fxLines,
+          ],
+        },
+        { permission: P['customer-payment.post'] },
+      );
 
       await this.invoicesService.applyToTargets(
         tx,
@@ -526,25 +552,45 @@ export class CustomerPaymentsService {
         available,
         currency,
       );
-      await tx.insert(paymentAllocations).values(
-        input.allocations.map((a) => ({
-          companyId,
-          invoiceId: a.documentId,
-          paymentId: id,
-          amount: Money.parse(a.amount, currency).toString(),
-          allocationDate,
-          createdBy: actor.id,
-        })),
-      );
+      const inserted = await tx
+        .insert(paymentAllocations)
+        .values(
+          input.allocations.map((a) => ({
+            companyId,
+            invoiceId: a.documentId,
+            paymentId: id,
+            amount: Money.parse(a.amount, currency).toString(),
+            allocationDate,
+            createdBy: actor.id,
+          })),
+        )
+        .returning({ id: paymentAllocations.id });
       await this.invoicesService.applyToTargets(tx, targets, input.allocations, currency);
       const baseCurrency = await this.accounts.companyCurrency(companyId, tx);
       const gain = this.fx.settlementGain(
-        input.allocations.map((a) => ({ amount: a.amount, currency, documentRate: targets.get(a.documentId)!.exchangeRate })),
+        input.allocations.map((a) => ({
+          amount: a.amount,
+          currency,
+          documentRate: targets.get(a.documentId)!.exchangeRate,
+        })),
         existing.exchangeRate,
         baseCurrency,
         'AR',
       );
-      await this.fx.postRealizedGain(tx, { companyId, side: 'AR', entryDate: allocationDate, gain, baseCurrency, description: `Realized FX on allocating ${existing.documentNumber}`, sourceType: 'AR_PAYMENT_ALLOCATION', sourceId: existing.id, actorId: actor.id, branchId: existing.branchId });
+      await this.fx.postRealizedGain(tx, {
+        companyId,
+        side: 'AR',
+        entryDate: allocationDate,
+        gain,
+        baseCurrency,
+        description: `Realized FX on allocating ${existing.documentNumber}`,
+        sourceType: 'AR_PAYMENT_ALLOCATION',
+        sourceId: existing.id,
+        eventId: inserted[0]!.id,
+        actor,
+        permission: P['customer-payment.post'],
+        branchId: existing.branchId,
+      });
       await tx
         .update(customerPayments)
         .set({
@@ -587,32 +633,44 @@ export class CustomerPaymentsService {
         .where(eq(paymentAllocations.paymentId, id));
       await this.invoicesService.releaseFromTargets(tx, companyId, allocations, existing.currency);
       await tx.delete(paymentAllocations).where(eq(paymentAllocations.paymentId, id));
-      await this.fx.reverseRealized(tx, companyId, 'AR_PAYMENT_ALLOCATION', existing.id, input.reversalDate ?? existing.paymentDate, actor.id);
+      await this.fx.reverseRealized(
+        tx,
+        companyId,
+        'AR_PAYMENT_ALLOCATION',
+        existing.id,
+        input.reversalDate ?? existing.paymentDate,
+        actor,
+        P['customer-payment.post'],
+      );
 
       const originalLines = await tx
         .select()
         .from(journalLines)
         .where(eq(journalLines.journalEntryId, existing.journalEntryId!))
         .orderBy(asc(journalLines.lineNumber));
-      const reversal = await this.posting.postEvent(tx, {
-        companyId,
-        entryDate: input.reversalDate ?? existing.paymentDate,
-        description: `Void ${existing.documentNumber}: ${input.reason}`,
-        reference: existing.documentNumber,
-        journalType: 'REVERSAL',
-        branchId: existing.branchId,
-        sourceType: 'AR_PAYMENT_VOID',
-        sourceId: existing.id,
-        reversalOfId: existing.journalEntryId,
-        actorId: actor.id,
-        lines: originalLines.map((l) => ({
-          accountId: l.accountId,
-          debit: l.credit,
-          credit: l.debit,
-          description: l.description,
-          branchId: l.branchId,
-        })),
-      });
+      const reversal = await this.posting.postEvent(
+        tx,
+        {
+          companyId,
+          entryDate: input.reversalDate ?? existing.paymentDate,
+          description: `Void ${existing.documentNumber}: ${input.reason}`,
+          reference: existing.documentNumber,
+          journalType: 'REVERSAL',
+          branchId: existing.branchId,
+          sourceType: 'AR_PAYMENT_VOID',
+          sourceId: existing.id,
+          reversalOfId: existing.journalEntryId,
+          actor,
+          lines: originalLines.map((l) => ({
+            accountId: l.accountId,
+            debit: l.credit,
+            credit: l.debit,
+            description: l.description,
+            branchId: l.branchId,
+          })),
+        },
+        { permission: P['customer-payment.post'] },
+      );
       await tx
         .update(journalEntries)
         .set({ status: 'REVERSED', reversedById: reversal.id })

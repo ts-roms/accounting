@@ -1,6 +1,6 @@
 'use client';
 import * as React from 'react';
-import { CalendarPlus, Lock, LockOpen } from 'lucide-react';
+import { CalendarPlus, Lock, LockKeyhole, LockOpen, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { P } from '@accounting/types';
 import {
@@ -39,6 +39,47 @@ import { useSession } from '@/lib/auth/session';
 import { formatDateTime } from '@/lib/format';
 import { Can, ConfirmDialog, EmptyState, PageHeader } from '@/components/ui-ext/page';
 
+type PeriodAction = 'soft-close' | 'close' | 'lock' | 'reopen';
+const CLOSED_STATES = new Set<FiscalPeriod['status']>(['CLOSED', 'LOCKED']);
+const STATUS_VARIANT: Record<
+  FiscalPeriod['status'],
+  'success' | 'warning' | 'secondary' | 'destructive'
+> = {
+  OPEN: 'success',
+  SOFT_CLOSED: 'warning',
+  CLOSED: 'secondary',
+  LOCKED: 'destructive',
+};
+const ACTION_LABEL: Record<
+  PeriodAction,
+  { title: string; help: string; button: string; done: string }
+> = {
+  'soft-close': {
+    title: 'Soft close',
+    help: 'Provisionally closes the books: only users allowed to post into soft-closed periods can still post late adjustments. Reversible with a reason.',
+    button: 'Soft close',
+    done: 'soft-closed',
+  },
+  close: {
+    title: 'Close',
+    help: 'Posted entries in this period become locked and no further postings are accepted. Reopening later requires elevated permission and a reason. The action is audited.',
+    button: 'Close period',
+    done: 'closed',
+  },
+  lock: {
+    title: 'Lock',
+    help: 'Final: a locked period can never be reopened and accepts no postings from anyone - the database enforces it. Use once statements have been issued.',
+    button: 'Lock permanently',
+    done: 'locked',
+  },
+  reopen: {
+    title: 'Reopen',
+    help: 'Reopening allows postings again. It requires elevated permission and is audited with the reason below (at least 5 characters).',
+    button: 'Reopen period',
+    done: 'reopened',
+  },
+};
+
 export default function PeriodClosingPage() {
   const { hasPermission } = useSession();
   const years = useFiscalYears();
@@ -47,7 +88,7 @@ export default function PeriodClosingPage() {
   const [createOpen, setCreateOpen] = React.useState(false);
   const [pending, setPending] = React.useState<{
     period: FiscalPeriod;
-    action: 'close' | 'reopen';
+    action: PeriodAction;
   } | null>(null);
   const [reason, setReason] = React.useState('');
   const [yearToClose, setYearToClose] = React.useState<FiscalYear | null>(null);
@@ -60,9 +101,7 @@ export default function PeriodClosingPage() {
         action: pending.action,
         reason: reason || undefined,
       });
-      toast.success(
-        `${pending.period.name} ${pending.action === 'close' ? 'closed' : 'reopened'}.`,
-      );
+      toast.success(`${pending.period.name} ${ACTION_LABEL[pending.action].done}.`);
       setPending(null);
       setReason('');
     } catch (err) {
@@ -132,10 +171,10 @@ export default function PeriodClosingPage() {
                 <TableBody>
                   {year.periods.map((p, index) => {
                     const previousClosed =
-                      index === 0 || year.periods[index - 1]!.status === 'CLOSED';
+                      index === 0 || CLOSED_STATES.has(year.periods[index - 1]!.status);
                     const laterClosed = year.periods
                       .slice(index + 1)
-                      .some((q) => q.status === 'CLOSED');
+                      .some((q) => q.status === 'CLOSED' || q.status === 'LOCKED');
                     return (
                       <TableRow key={p.id}>
                         <TableCell className="text-xs text-muted-foreground">
@@ -146,9 +185,14 @@ export default function PeriodClosingPage() {
                           {p.startDate} - {p.endDate}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={p.status === 'CLOSED' ? 'secondary' : 'success'}>
-                            {p.status}
+                          <Badge variant={STATUS_VARIANT[p.status]} data-testid="period-status">
+                            {p.status.replace('_', ' ')}
                           </Badge>
+                          {p.reopenReason ? (
+                            <div className="mt-0.5 text-xs text-muted-foreground">
+                              reopened: {p.reopenReason}
+                            </div>
+                          ) : null}
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">
                           {p.closedAt ? formatDateTime(p.closedAt) : '-'}
@@ -159,21 +203,45 @@ export default function PeriodClosingPage() {
                           hasPermission(P['period.close']) ? (
                             <Button
                               size="sm"
+                              variant="ghost"
+                              onClick={() => setPending({ period: p, action: 'soft-close' })}
+                              data-testid="period-soft-close"
+                            >
+                              <ShieldAlert /> Soft close
+                            </Button>
+                          ) : null}
+                          {year.status === 'OPEN' &&
+                          (p.status === 'OPEN' || p.status === 'SOFT_CLOSED') &&
+                          hasPermission(P['period.close']) ? (
+                            <Button
+                              size="sm"
                               variant="outline"
                               disabled={!previousClosed}
                               onClick={() => setPending({ period: p, action: 'close' })}
+                              data-testid="period-close"
                             >
                               <Lock /> Close
                             </Button>
                           ) : null}
+                          {p.status === 'CLOSED' && hasPermission(P['period.lock']) ? (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setPending({ period: p, action: 'lock' })}
+                              data-testid="period-lock"
+                            >
+                              <LockKeyhole /> Lock
+                            </Button>
+                          ) : null}
                           {year.status === 'OPEN' &&
-                          p.status === 'CLOSED' &&
+                          (p.status === 'CLOSED' || p.status === 'SOFT_CLOSED') &&
                           hasPermission(P['period.reopen']) ? (
                             <Button
                               size="sm"
                               variant="ghost"
                               disabled={laterClosed}
                               onClick={() => setPending({ period: p, action: 'reopen' })}
+                              data-testid="period-reopen"
                             >
                               <LockOpen /> Reopen
                             </Button>
@@ -193,12 +261,10 @@ export default function PeriodClosingPage() {
         <DialogContent size="sm">
           <DialogHeader>
             <DialogTitle>
-              {pending?.action === 'close' ? 'Close' : 'Reopen'} {pending?.period.name}?
+              {pending ? ACTION_LABEL[pending.action].title : ''} {pending?.period.name}?
             </DialogTitle>
             <DialogDescription>
-              {pending?.action === 'close'
-                ? 'Posted entries in this period become locked and no further postings are accepted. The action is audited.'
-                : 'Reopening allows postings again. This requires elevated permission and is audited with the reason below.'}
+              {pending ? ACTION_LABEL[pending.action].help : ''}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-1.5">
@@ -218,10 +284,11 @@ export default function PeriodClosingPage() {
             </Button>
             <Button
               loading={periodAction.isPending}
-              disabled={pending?.action === 'reopen' && !reason.trim()}
+              disabled={pending?.action === 'reopen' && reason.trim().length < 5}
               onClick={() => void runPeriod()}
+              data-testid="period-confirm"
             >
-              {pending?.action === 'close' ? 'Close period' : 'Reopen period'}
+              {pending ? ACTION_LABEL[pending.action].button : ''}
             </Button>
           </DialogFooter>
         </DialogContent>

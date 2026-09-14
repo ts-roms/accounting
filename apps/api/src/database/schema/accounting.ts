@@ -139,6 +139,10 @@ export const fiscalPeriods = pgTable(
     closedBy: uuid('closed_by').references(() => users.id, { onDelete: 'set null' }),
     reopenedAt: timestamp('reopened_at', { withTimezone: true }),
     reopenedBy: uuid('reopened_by').references(() => users.id, { onDelete: 'set null' }),
+    /** Last reopen reason - reopening is never silent. */
+    reopenReason: text('reopen_reason'),
+    lockedAt: timestamp('locked_at', { withTimezone: true }),
+    lockedBy: uuid('locked_by').references(() => users.id, { onDelete: 'set null' }),
     ...timestamps,
   },
   (t) => [
@@ -207,6 +211,10 @@ export const journalEntries = pgTable(
     reversedById: uuid('reversed_by_id').references((): AnyPgColumn => journalEntries.id, {
       onDelete: 'restrict',
     }),
+    /** For a correcting entry: the posted original it replaces (which was reversed first). */
+    correctionOfId: uuid('correction_of_id').references((): AnyPgColumn => journalEntries.id, {
+      onDelete: 'restrict',
+    }),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
     submittedBy: uuid('submitted_by').references(() => users.id, { onDelete: 'set null' }),
     submittedAt: timestamp('submitted_at', { withTimezone: true }),
@@ -226,6 +234,7 @@ export const journalEntries = pgTable(
     index('journal_entries_company_date_idx').on(t.companyId, t.entryDate),
     index('journal_entries_period_idx').on(t.fiscalPeriodId),
     index('journal_entries_status_idx').on(t.companyId, t.status),
+    index('journal_entries_correction_idx').on(t.correctionOfId),
     check('journal_entries_totals_chk', sql`${t.totalDebit} >= 0 AND ${t.totalCredit} >= 0`),
     // Posted documents must be balanced - enforced again in code with exact decimals.
     check(

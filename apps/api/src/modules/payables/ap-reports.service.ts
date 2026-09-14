@@ -454,7 +454,13 @@ export class ApReportsService {
     const [fx] = await this.db
       .select({ total: sql<string>`coalesce(sum(${fxAdjustments.amount}), 0)` })
       .from(fxAdjustments)
-      .where(and(eq(fxAdjustments.companyId, companyId), eq(fxAdjustments.side, 'AP'), lte(fxAdjustments.adjustmentDate, asOf)));
+      .where(
+        and(
+          eq(fxAdjustments.companyId, companyId),
+          eq(fxAdjustments.side, 'AP'),
+          lte(fxAdjustments.adjustmentDate, asOf),
+        ),
+      );
     const fxAdjustment = Money.of(fx?.total ?? '0', currency);
     const subledger = inv.add(dn).subtract(cn).subtract(receipts).add(refunds).add(fxAdjustment);
 

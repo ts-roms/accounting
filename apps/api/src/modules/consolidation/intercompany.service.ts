@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, getTableColumns, or, sql, type SQL } from 'drizzle-orm';
 import { Money } from '@accounting/money';
-import type { PaginatedResult } from '@accounting/types';
+import { P, type PaginatedResult } from '@accounting/types';
 import type { CreateIntercompanyInput, ListIntercompanyQuery } from '@accounting/validation';
 import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { BusinessRuleError, NotFoundError, PermissionDeniedError } from '@/common/errors/app-error';
@@ -203,54 +203,62 @@ export class IntercompanyService {
         tx,
       );
       const toAmount = fromAmount.convert(to.baseCurrency, rate);
-      const fromEntry = await this.posting.postEvent(tx, {
-        companyId: from.id,
-        entryDate: existing.transactionDate,
-        description: `Intercompany ${existing.documentNumber} to ${to.code}: ${existing.description}`,
-        reference: existing.reference ?? existing.documentNumber,
-        journalType: 'GENERAL',
-        sourceType: 'INTERCOMPANY',
-        sourceId: existing.id,
-        actorId: actor.id,
-        lines: [
-          {
-            accountId: existing.fromAccountId,
-            debit: fromAmount.toString(),
-            credit: '0',
-            description: existing.description,
-          },
-          {
-            accountId: payable.id,
-            debit: '0',
-            credit: fromAmount.toString(),
-            description: `Due to ${to.code}`,
-          },
-        ],
-      });
-      const toEntry = await this.posting.postEvent(tx, {
-        companyId: to.id,
-        entryDate: existing.transactionDate,
-        description: `Intercompany ${existing.documentNumber} from ${from.code}: ${existing.description}`,
-        reference: existing.reference ?? existing.documentNumber,
-        journalType: 'GENERAL',
-        sourceType: 'INTERCOMPANY',
-        sourceId: existing.id,
-        actorId: actor.id,
-        lines: [
-          {
-            accountId: receivable.id,
-            debit: toAmount.toString(),
-            credit: '0',
-            description: `Due from ${from.code}`,
-          },
-          {
-            accountId: existing.toAccountId,
-            debit: '0',
-            credit: toAmount.toString(),
-            description: existing.description,
-          },
-        ],
-      });
+      const fromEntry = await this.posting.postEvent(
+        tx,
+        {
+          companyId: from.id,
+          entryDate: existing.transactionDate,
+          description: `Intercompany ${existing.documentNumber} to ${to.code}: ${existing.description}`,
+          reference: existing.reference ?? existing.documentNumber,
+          journalType: 'GENERAL',
+          sourceType: 'INTERCOMPANY',
+          sourceId: existing.id,
+          actor,
+          lines: [
+            {
+              accountId: existing.fromAccountId,
+              debit: fromAmount.toString(),
+              credit: '0',
+              description: existing.description,
+            },
+            {
+              accountId: payable.id,
+              debit: '0',
+              credit: fromAmount.toString(),
+              description: `Due to ${to.code}`,
+            },
+          ],
+        },
+        { permission: P['intercompany.post'] },
+      );
+      const toEntry = await this.posting.postEvent(
+        tx,
+        {
+          companyId: to.id,
+          entryDate: existing.transactionDate,
+          description: `Intercompany ${existing.documentNumber} from ${from.code}: ${existing.description}`,
+          reference: existing.reference ?? existing.documentNumber,
+          journalType: 'GENERAL',
+          sourceType: 'INTERCOMPANY',
+          sourceId: existing.id,
+          actor,
+          lines: [
+            {
+              accountId: receivable.id,
+              debit: toAmount.toString(),
+              credit: '0',
+              description: `Due from ${from.code}`,
+            },
+            {
+              accountId: existing.toAccountId,
+              debit: '0',
+              credit: toAmount.toString(),
+              description: existing.description,
+            },
+          ],
+        },
+        { permission: P['intercompany.post'] },
+      );
       await tx
         .update(intercompanyTransactions)
         .set({
@@ -326,23 +334,27 @@ export class IntercompanyService {
           .from(journalLines)
           .where(eq(journalLines.journalEntryId, entryId))
           .orderBy(asc(journalLines.lineNumber));
-        const reversal = await this.posting.postEvent(tx, {
-          companyId,
-          entryDate: existing.transactionDate,
-          description: `Reversal of ${existing.documentNumber}: ${reason}`,
-          reference: existing.documentNumber,
-          journalType: 'REVERSAL',
-          sourceType: 'INTERCOMPANY_REVERSAL',
-          sourceId: existing.id,
-          reversalOfId: entryId,
-          actorId: actor.id,
-          lines: lines.map((l) => ({
-            accountId: l.accountId,
-            debit: l.credit,
-            credit: l.debit,
-            description: l.description,
-          })),
-        });
+        const reversal = await this.posting.postEvent(
+          tx,
+          {
+            companyId,
+            entryDate: existing.transactionDate,
+            description: `Reversal of ${existing.documentNumber}: ${reason}`,
+            reference: existing.documentNumber,
+            journalType: 'REVERSAL',
+            sourceType: 'INTERCOMPANY_REVERSAL',
+            sourceId: existing.id,
+            reversalOfId: entryId,
+            actor,
+            lines: lines.map((l) => ({
+              accountId: l.accountId,
+              debit: l.credit,
+              credit: l.debit,
+              description: l.description,
+            })),
+          },
+          { permission: P['intercompany.post'] },
+        );
         await tx
           .update(journalEntries)
           .set({ status: 'REVERSED', reversedById: reversal.id })

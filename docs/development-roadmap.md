@@ -235,6 +235,32 @@ reliable and covered by automated tests.
 - Tests: API unit (62 incl. 12 AI logic), API integration (104 incl. 7 AI
   scenarios), web unit (7), Playwright e2e (23)
 
+## Hardening - enterprise controls (in progress)
+
+A second programme strengthens the delivered system along the lines of
+[accounting-controls.md](accounting-controls.md); phases run in risk order.
+
+### H1 - Accounting integrity (COMPLETE)
+
+- Posting gateway validates actor authority (per-module posting permission,
+  system principal for the scheduler), branches, dimensions and the source
+  document before any write; period state enforced per posting
+- Fiscal period states OPEN / SOFT_CLOSED / CLOSED / LOCKED with soft-close,
+  lock and reason-mandatory reopen; database trigger makes LOCKED absolute
+- Correction workflow: reversal + linked correcting draft, chain navigable
+- Realized-FX identity bug fixed (one journal per settlement event; two
+  allocations of one foreign payment no longer collapse into one)
+- Integrity checker (13 invariants) as `GET /integrity` and the Accounting →
+  Integrity dashboard; it found and fixed two seed violations
+- Tests: API unit 62 (+4), API integration 110 (+6 controls), Playwright 26 (+3)
+
+### H2-H9 (planned)
+
+Subledger reconciliation records, reconciliation center, financial close,
+enterprise controls (SoD/approvals/suspense/history), data infrastructure
+(imports, opening balances, numbering), reporting engine, reliability,
+consolidation readiness.
+
 ## Beyond the roadmap
 
 All nine phases of the specification are delivered. Candidates for follow-up

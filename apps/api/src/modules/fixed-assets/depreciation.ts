@@ -18,7 +18,10 @@ export interface DepreciableAsset {
   decliningRatePercent: string | null;
 }
 
-export function bookValue(asset: Pick<DepreciableAsset, 'cost' | 'accumulatedDepreciation'>, currency: string): Money {
+export function bookValue(
+  asset: Pick<DepreciableAsset, 'cost' | 'accumulatedDepreciation'>,
+  currency: string,
+): Money {
   return Money.of(asset.cost, currency).subtract(Money.of(asset.accumulatedDepreciation, currency));
 }
 
@@ -54,7 +57,9 @@ export function schedule(asset: DepreciableAsset, currency: string, maxMonths = 
     out.push(amount);
     current = {
       ...current,
-      accumulatedDepreciation: Money.of(current.accumulatedDepreciation, currency).add(amount).toString(),
+      accumulatedDepreciation: Money.of(current.accumulatedDepreciation, currency)
+        .add(amount)
+        .toString(),
       depreciatedMonths: current.depreciatedMonths + 1,
     };
   }

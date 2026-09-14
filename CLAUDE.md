@@ -15,7 +15,7 @@ and `docs/accounting-engine.md` before changing anything financial.
 
 ## Workflow
 
-- Every ledger write goes through `AccountingPostingService.postEvent/postEntry`; resolve accounts via `AccountsService.resolveMapped`, never by id.
+- Every ledger write goes through `AccountingPostingService.postEvent/postEntry`; resolve accounts via `AccountsService.resolveMapped`, never by id. Pass the real `actor` and the module's posting `permission` (`{ permission: P['bill.post'] }`); the gateway validates authority, branches, dimensions, source document and period state (`OPEN / SOFT_CLOSED / CLOSED / LOCKED`). Draft-time period checks use `resolvePeriod(..., { draft: true })`. Give every distinct posting event its own source identity - never reuse a parent id for repeated events (see the realized-FX fix).
 - Subledger documents keep business status (DRAFT/APPROVED/PARTIALLY_PAID/PAID/VOID) separate from accounting status (UNPOSTED/POSTED/REVERSED); void = reversal journal, never an edit. Allocations never create journal entries.
 - Orders (quotation / sales order / purchase request / purchase order) share one `orders` table and `OrdersService`; they never post. Fulfilment counters change only via `OrderFulfillmentService` inside the fulfilling document's transaction.
 - Stock only moves through `InventoryService.receive/issue` (movements + FIFO layers + balances); the document that moves it posts the returned cost in the same transaction via `DocumentStockService`. Valuation in `modules/inventory/valuation.ts` is pure - keep it that way.

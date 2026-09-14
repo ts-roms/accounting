@@ -455,15 +455,13 @@ export class ApprovalsService {
           'You already decided an earlier step of this request.',
         );
       const prior = all.filter((d) => d.step === request.currentStep);
-      await tx
-        .insert(approvalDecisions)
-        .values({
-          requestId: id,
-          step: request.currentStep,
-          decision: input.decision,
-          comment: input.comment ?? null,
-          decidedBy: actor.id,
-        });
+      await tx.insert(approvalDecisions).values({
+        requestId: id,
+        step: request.currentStep,
+        decision: input.decision,
+        comment: input.comment ?? null,
+        decidedBy: actor.id,
+      });
       let status: ApprovalRequestStatus = 'PENDING';
       let currentStep = request.currentStep;
       if (input.decision === 'REJECT') status = 'REJECTED';

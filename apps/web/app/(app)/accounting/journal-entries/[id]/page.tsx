@@ -12,6 +12,7 @@ import {
   Trash2,
   Undo2,
   X,
+  Wrench,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { AttachmentsPanel } from '@/components/enterprise/attachments-panel';
@@ -50,10 +51,11 @@ import {
   useJournalAction,
   useJournalEntry,
   useRejectJournalEntry,
+  useCorrectJournalEntry,
   useReverseJournalEntry,
   type JournalAction,
 } from '@/lib/api/accounting-hooks';
-import type { JournalEntryDetail, SodConflict } from '@/lib/api/types';
+import type { JournalEntryDetail, RelatedJournalEntry, SodConflict } from '@/lib/api/types';
 import { useSession } from '@/lib/auth/session';
 import { formatDateTime, titleCase } from '@/lib/format';
 import { ConfirmDialog, PageHeader } from '@/components/ui-ext/page';
@@ -83,6 +85,8 @@ export default function JournalEntryDetailPage() {
   const action = useJournalAction();
   const reject = useRejectJournalEntry();
   const reverse = useReverseJournalEntry();
+  const correct = useCorrectJournalEntry();
+  const [correcting, setCorrecting] = React.useState(false);
   const remove = useDeleteJournalEntry();
   const [pending, setPending] = React.useState<JournalAction | null>(null);
   const [rejecting, setRejecting] = React.useState(false);
@@ -99,6 +103,10 @@ export default function JournalEntryDetailPage() {
     (e.status === 'SUBMITTED' || e.status === 'APPROVED') && hasPermission(P['journal.approve']);
   const canReverse =
     (e.status === 'POSTED' || e.status === 'LOCKED') && hasPermission(P['journal.reverse']);
+  const canCorrect =
+    (e.status === 'POSTED' || e.status === 'LOCKED' || e.status === 'REVERSED') &&
+    e.journalType !== 'CLOSING' &&
+    hasPermission(P['journal.correct']);
   const isOwnDocument = e.createdBy === me.user.id;
 
   const run = async (act: JournalAction) => {
@@ -150,6 +158,16 @@ export default function JournalEntryDetailPage() {
             {canReverse ? (
               <Button variant="outline" size="sm" onClick={() => setReversing(true)}>
                 <Undo2 /> Reverse
+              </Button>
+            ) : null}
+            {canCorrect ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCorrecting(true)}
+                data-testid="je-correct"
+              >
+                <Wrench /> Correct
               </Button>
             ) : null}
             {next && nextAllowed ? (
@@ -289,7 +307,43 @@ export default function JournalEntryDetailPage() {
                   }
                 />
               ) : null}
+              {e.correctionOfNumber ? (
+                <Field
+                  label="Corrects"
+                  value={
+                    <Link
+                      className="font-mono hover:underline"
+                      href={`/accounting/journal-entries/${e.correctionOfId}`}
+                    >
+                      {e.correctionOfNumber}
+                    </Link>
+                  }
+                />
+              ) : null}
             </dl>
+            {e.related.length ? (
+              <div className="mt-4 border-t pt-3" data-testid="je-related">
+                <div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Related entries
+                </div>
+                <ul className="space-y-1 text-sm">
+                  {e.related.map((r) => (
+                    <li key={`${r.relation}-${r.id}`} className="flex items-center gap-2">
+                      <Badge variant="outline">{RELATION_LABEL[r.relation]}</Badge>
+                      <Link
+                        className="font-mono hover:underline"
+                        href={`/accounting/journal-entries/${r.id}`}
+                      >
+                        {r.documentNumber}
+                      </Link>
+                      <span className="text-xs text-muted-foreground">
+                        {r.entryDate} · {r.status}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             <div className="mt-4 space-y-1.5 border-t pt-3 text-xs text-muted-foreground">
               <Timeline label="Created" who={e.createdByEmail} when={e.createdAt} />
               <Timeline label="Submitted" who={null} when={e.submittedAt} />
@@ -348,6 +402,24 @@ export default function JournalEntryDetailPage() {
             await reject.mutateAsync({ id: e.id, reason });
             toast.success(`${e.documentNumber} rejected.`);
             setRejecting(false);
+          } catch (err) {
+            toast.error(describeError(err));
+          }
+        }}
+      />
+      <CorrectDialog
+        open={correcting}
+        onOpenChange={setCorrecting}
+        entry={e}
+        loading={correct.isPending}
+        onCorrect={async (reversalDate, reason) => {
+          try {
+            const result = await correct.mutateAsync({ id: e.id, reversalDate, reason });
+            toast.success(
+              `Reversal ${result.reversal.documentNumber} posted; correcting draft ${result.correction.documentNumber} opened.`,
+            );
+            setCorrecting(false);
+            router.push(`/accounting/journal-entries/${result.correction.id}/edit`);
           } catch (err) {
             toast.error(describeError(err));
           }
@@ -451,6 +523,80 @@ function RejectDialog({
             onClick={() => void onReject(reason.trim())}
           >
             Reject
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const RELATION_LABEL: Record<RelatedJournalEntry['relation'], string> = {
+  ORIGINAL: 'Original',
+  REVERSAL: 'Reversal',
+  REVERSED: 'Reversed',
+  CORRECTION: 'Correction',
+  CORRECTS: 'Corrects',
+};
+
+function CorrectDialog({
+  open,
+  onOpenChange,
+  entry,
+  loading,
+  onCorrect,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  entry: JournalEntryDetail;
+  loading: boolean;
+  onCorrect: (reversalDate: string, reason: string) => Promise<void>;
+}) {
+  const [date, setDate] = React.useState(today());
+  const [reason, setReason] = React.useState('');
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent size="sm">
+        <DialogHeader>
+          <DialogTitle>Correct {entry.documentNumber}</DialogTitle>
+          <DialogDescription>
+            {entry.status === 'REVERSED'
+              ? 'The entry is already reversed. A DRAFT correcting entry pre-filled with its lines is opened for editing; it goes through the normal approval and posting.'
+              : 'A mirror-image reversal is posted immediately, then a DRAFT correcting entry pre-filled with the original lines is opened for editing. Original, reversal and correction stay linked.'}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="correction-date">Reversal / correction date</Label>
+            <Input
+              id="correction-date"
+              type="date"
+              value={date}
+              min={entry.entryDate}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="correction-reason">Reason</Label>
+            <Input
+              id="correction-reason"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="What was wrong and what the correction records"
+              data-testid="je-correct-reason"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            loading={loading}
+            disabled={reason.trim().length < 5}
+            onClick={() => void onCorrect(date, reason.trim())}
+            data-testid="je-correct-confirm"
+          >
+            Reverse and open correction
           </Button>
         </DialogFooter>
       </DialogContent>

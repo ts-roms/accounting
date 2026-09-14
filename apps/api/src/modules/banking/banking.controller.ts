@@ -49,7 +49,9 @@ class ListLinesQueryDto extends createZodDto(listStatementLinesQuerySchema) {}
 class MatchLineDto extends createZodDto(matchStatementLineSchema) {}
 class NoteDto extends createZodDto(z.object({ note: z.string().trim().min(1).max(500) })) {}
 class NotesDto extends createZodDto(z.object({ notes: z.string().trim().max(1000).optional() })) {}
-class LedgerLinesQueryDto extends createZodDto(z.object({ onlyUnmatched: queryBooleanSchema.optional() })) {}
+class LedgerLinesQueryDto extends createZodDto(
+  z.object({ onlyUnmatched: queryBooleanSchema.optional() }),
+) {}
 
 @ApiTags('Bank Accounts')
 @Controller('bank-accounts')
@@ -89,7 +91,11 @@ export class BankAccountsController {
 
   @Patch(':id')
   @RequirePermissions(P['bank-account.manage'])
-  update(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: UpdateBankAccountDto) {
+  update(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: UpdateBankAccountDto,
+  ) {
     return this.banking.updateAccount(user.companyId!, user, id, body);
   }
 }
@@ -120,7 +126,11 @@ export class BankTransactionsController {
 
   @Patch(':id')
   @RequirePermissions(P['bank-transaction.create'])
-  update(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: UpdateTransactionDto) {
+  update(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: UpdateTransactionDto,
+  ) {
     return this.banking.updateTransaction(user.companyId!, user, id, body);
   }
 
@@ -139,7 +149,11 @@ export class BankTransactionsController {
 
   @Post(':id/void')
   @RequirePermissions(P['bank-transaction.post'])
-  void(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: VoidDto) {
+  void(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: VoidDto,
+  ) {
     return this.banking.voidTransaction(user.companyId!, user, id, body);
   }
 }
@@ -164,14 +178,22 @@ export class BankStatementsController {
 
   @Get(':id/lines')
   @RequirePermissions(P['bank-account.view'])
-  lines(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Query() query: ListLinesQueryDto) {
+  lines(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: ListLinesQueryDto,
+  ) {
     return this.statements.lines(user.companyId!, id, query);
   }
 
   @Get(':id/ledger-lines')
   @RequirePermissions(P['bank-account.view'])
   @ApiOperation({ summary: 'Posted ledger lines on the bank account up to the statement date' })
-  ledgerLines(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Query() query: LedgerLinesQueryDto) {
+  ledgerLines(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: LedgerLinesQueryDto,
+  ) {
     return this.statements.ledgerLines(user.companyId!, id, Boolean(query.onlyUnmatched));
   }
 
@@ -196,26 +218,44 @@ export class BankStatementsController {
 
   @Post(':id/lines/:lineId/match')
   @RequirePermissions(P['bank-reconciliation.perform'])
-  match(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Param('lineId', ParseUUIDPipe) lineId: string, @Body() body: MatchLineDto) {
+  match(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('lineId', ParseUUIDPipe) lineId: string,
+    @Body() body: MatchLineDto,
+  ) {
     return this.statements.matchLine(user.companyId!, user, id, lineId, body.journalLineId);
   }
 
   @Post(':id/lines/:lineId/unmatch')
   @RequirePermissions(P['bank-reconciliation.perform'])
-  unmatch(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Param('lineId', ParseUUIDPipe) lineId: string) {
+  unmatch(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('lineId', ParseUUIDPipe) lineId: string,
+  ) {
     return this.statements.unmatchLine(user.companyId!, user, id, lineId);
   }
 
   @Post(':id/lines/:lineId/ignore')
   @RequirePermissions(P['bank-reconciliation.perform'])
-  ignore(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Param('lineId', ParseUUIDPipe) lineId: string, @Body() body: NoteDto) {
+  ignore(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('lineId', ParseUUIDPipe) lineId: string,
+    @Body() body: NoteDto,
+  ) {
     return this.statements.ignoreLine(user.companyId!, user, id, lineId, body.note);
   }
 
   @Post(':id/complete')
   @RequirePermissions(P['bank-reconciliation.perform'])
   @ApiOperation({ summary: 'Complete the reconciliation (every line explained, balances agree)' })
-  complete(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: NotesDto) {
+  complete(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: NotesDto,
+  ) {
     return this.statements.complete(user.companyId!, user, id, body.notes);
   }
 }

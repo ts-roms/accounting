@@ -41,7 +41,9 @@ class UpdateBudgetDto extends createZodDto(updateBudgetSchema) {}
 class ListBudgetsQueryDto extends createZodDto(listBudgetsQuerySchema) {}
 class CreateVersionDto extends createZodDto(createBudgetVersionSchema) {}
 class ReplaceLinesDto extends createZodDto(replaceBudgetLinesSchema) {}
-class VarianceQueryDto extends createZodDto(varianceQuerySchema.extend({ versionId: uuidSchema.optional() })) {}
+class VarianceQueryDto extends createZodDto(
+  varianceQuerySchema.extend({ versionId: uuidSchema.optional() }),
+) {}
 class CreateClaimDto extends createZodDto(createExpenseClaimSchema) {}
 class UpdateClaimDto extends createZodDto(updateExpenseClaimSchema) {}
 class ListClaimsQueryDto extends createZodDto(listExpenseClaimsQuerySchema) {}
@@ -75,7 +77,11 @@ export class BudgetsController {
 
   @Patch(':id')
   @RequirePermissions(P['budget.manage'])
-  update(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: UpdateBudgetDto) {
+  update(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: UpdateBudgetDto,
+  ) {
     return this.budgets.update(user.companyId!, user, id, body);
   }
 
@@ -88,41 +94,68 @@ export class BudgetsController {
 
   @Get(':id/variance')
   @RequirePermissions(P['budget.view'])
-  @ApiOperation({ summary: 'Budget vs actual per account and period (approved version by default)' })
-  variance(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Query() query: VarianceQueryDto) {
+  @ApiOperation({
+    summary: 'Budget vs actual per account and period (approved version by default)',
+  })
+  variance(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: VarianceQueryDto,
+  ) {
     const { versionId, ...rest } = query;
     return this.budgets.variance(user.companyId!, id, versionId, rest);
   }
 
   @Post(':id/versions')
   @RequirePermissions(P['budget.manage'])
-  createVersion(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: CreateVersionDto) {
+  createVersion(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: CreateVersionDto,
+  ) {
     return this.budgets.createVersion(user.companyId!, user, id, body);
   }
 
   @Get(':id/versions/:versionId')
   @RequirePermissions(P['budget.view'])
-  getVersion(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Param('versionId', ParseUUIDPipe) versionId: string) {
+  getVersion(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('versionId', ParseUUIDPipe) versionId: string,
+  ) {
     return this.budgets.getVersion(user.companyId!, id, versionId);
   }
 
   @Put(':id/versions/:versionId/lines')
   @RequirePermissions(P['budget.manage'])
   @ApiOperation({ summary: 'Replace every line of a draft version' })
-  replaceLines(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Param('versionId', ParseUUIDPipe) versionId: string, @Body() body: ReplaceLinesDto) {
+  replaceLines(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('versionId', ParseUUIDPipe) versionId: string,
+    @Body() body: ReplaceLinesDto,
+  ) {
     return this.budgets.replaceLines(user.companyId!, user, id, versionId, body);
   }
 
   @Post(':id/versions/:versionId/approve')
   @RequirePermissions(P['budget.approve'])
-  approveVersion(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Param('versionId', ParseUUIDPipe) versionId: string) {
+  approveVersion(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('versionId', ParseUUIDPipe) versionId: string,
+  ) {
     return this.budgets.approveVersion(user.companyId!, user, id, versionId);
   }
 
   @Delete(':id/versions/:versionId')
   @HttpCode(204)
   @RequirePermissions(P['budget.manage'])
-  async removeVersion(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Param('versionId', ParseUUIDPipe) versionId: string) {
+  async removeVersion(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('versionId', ParseUUIDPipe) versionId: string,
+  ) {
     await this.budgets.removeVersion(user.companyId!, id, versionId);
   }
 }
@@ -153,7 +186,11 @@ export class ExpenseClaimsController {
 
   @Patch(':id')
   @RequirePermissions(P['expense-claim.create'])
-  update(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: UpdateClaimDto) {
+  update(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: UpdateClaimDto,
+  ) {
     return this.claims.update(user.companyId!, user, id, body);
   }
 
@@ -178,13 +215,21 @@ export class ExpenseClaimsController {
 
   @Post(':id/reject')
   @RequirePermissions(P['expense-claim.approve'])
-  reject(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: RejectClaimDto) {
+  reject(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: RejectClaimDto,
+  ) {
     return this.claims.reject(user.companyId!, user, id, body.reason);
   }
 
   @Post(':id/cancel')
   @RequirePermissions(P['expense-claim.create'])
-  cancel(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: ReasonDto) {
+  cancel(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: ReasonDto,
+  ) {
     return this.claims.cancel(user.companyId!, user, id, body.reason);
   }
 
@@ -196,7 +241,11 @@ export class ExpenseClaimsController {
 
   @Post(':id/pay')
   @RequirePermissions(P['expense-claim.post'])
-  pay(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: PayClaimDto) {
+  pay(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: PayClaimDto,
+  ) {
     return this.claims.pay(user.companyId!, user, id, body);
   }
 }

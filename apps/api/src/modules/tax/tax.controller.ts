@@ -61,7 +61,10 @@ export class TaxController {
 
   @Get('transactions')
   @RequirePermissions(P['tax.view'])
-  transactions(@CurrentUser() user: AuthenticatedUser, @Query() query: ListTaxTransactionsQueryDto) {
+  transactions(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: ListTaxTransactionsQueryDto,
+  ) {
     return this.reports.transactions(user.companyId!, query);
   }
 

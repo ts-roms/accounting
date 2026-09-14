@@ -418,11 +418,12 @@ const SAMPLE_ENTRIES: SampleEntry[] = [
   },
   {
     date: '2026-03-31',
-    description: 'Depreciation of office equipment for March',
+    // Accrual: depreciation itself only ever comes from the asset register (Phase 6).
+    description: 'Accrued electricity for March',
     status: 'POSTED',
     lines: [
-      { code: '6500', debit: '2000' },
-      { code: '1520', credit: '2000' },
+      { code: '6300', debit: '2000' },
+      { code: '2120', credit: '2000' },
     ],
   },
   {
@@ -464,7 +465,12 @@ export async function seedAccounting(
 }
 
 /** Organization-wide sample rates (Phase 8): USD and EUR against the PHP base. */
-async function seedExchangeRates(tx: Tx, organizationId: string, adminUserId: string, log: Log): Promise<void> {
+async function seedExchangeRates(
+  tx: Tx,
+  organizationId: string,
+  adminUserId: string,
+  log: Log,
+): Promise<void> {
   const rates = [
     { fromCurrency: 'USD', toCurrency: 'PHP', rateDate: '2026-01-01', rate: '56.00000000' },
     { fromCurrency: 'USD', toCurrency: 'PHP', rateDate: '2026-07-01', rate: '57.50000000' },

@@ -12,7 +12,7 @@ import {
   sql,
   type SQL,
 } from 'drizzle-orm';
-import type { PaginatedResult } from '@accounting/types';
+import { P, type PaginatedResult } from '@accounting/types';
 import type {
   CancelOrderInput,
   CreateGoodsReceiptInput,
@@ -325,19 +325,23 @@ export class GoodsReceiptsService {
       });
       let journalEntryId: string | null = null;
       if (stock.postingLines.length > 0) {
-        await this.posting.resolvePeriod(tx, companyId, existing.receiptDate);
-        const entry = await this.posting.postEvent(tx, {
-          companyId,
-          entryDate: existing.receiptDate,
-          description: `Goods receipt ${existing.documentNumber}${existing.reference ? ` - ${existing.reference}` : ''}`,
-          reference: existing.reference ?? existing.documentNumber,
-          journalType: 'GENERAL',
-          branchId: null,
-          sourceType: 'GOODS_RECEIPT',
-          sourceId: existing.id,
-          actorId: actor.id,
-          lines: stock.postingLines,
-        });
+        await this.posting.resolvePeriod(tx, companyId, existing.receiptDate, { draft: true });
+        const entry = await this.posting.postEvent(
+          tx,
+          {
+            companyId,
+            entryDate: existing.receiptDate,
+            description: `Goods receipt ${existing.documentNumber}${existing.reference ? ` - ${existing.reference}` : ''}`,
+            reference: existing.reference ?? existing.documentNumber,
+            journalType: 'GENERAL',
+            branchId: null,
+            sourceType: 'GOODS_RECEIPT',
+            sourceId: existing.id,
+            actor,
+            lines: stock.postingLines,
+          },
+          { permission: P['goods-receipt.create'] },
+        );
         journalEntryId = entry.id;
         await this.inventory.setJournal(tx, stock.movementIds, entry.id);
       }
@@ -437,25 +441,29 @@ export class GoodsReceiptsService {
             where: (l, ops) => ops.eq(l.journalEntryId, existing.journalEntryId!),
             orderBy: (l, ops) => ops.asc(l.lineNumber),
           });
-          const reversal = await this.posting.postEvent(tx, {
-            companyId,
-            entryDate: existing.receiptDate,
-            description: `Cancel goods receipt ${existing.documentNumber}: ${input.reason}`,
-            reference: existing.documentNumber,
-            journalType: 'REVERSAL',
-            branchId: null,
-            sourceType: 'GOODS_RECEIPT_CANCEL',
-            sourceId: existing.id,
-            reversalOfId: existing.journalEntryId,
-            actorId: actor.id,
-            lines: originalLines.map((l) => ({
-              accountId: l.accountId,
-              debit: l.credit,
-              credit: l.debit,
-              description: l.description,
-              branchId: l.branchId,
-            })),
-          });
+          const reversal = await this.posting.postEvent(
+            tx,
+            {
+              companyId,
+              entryDate: existing.receiptDate,
+              description: `Cancel goods receipt ${existing.documentNumber}: ${input.reason}`,
+              reference: existing.documentNumber,
+              journalType: 'REVERSAL',
+              branchId: null,
+              sourceType: 'GOODS_RECEIPT_CANCEL',
+              sourceId: existing.id,
+              reversalOfId: existing.journalEntryId,
+              actor,
+              lines: originalLines.map((l) => ({
+                accountId: l.accountId,
+                debit: l.credit,
+                credit: l.debit,
+                description: l.description,
+                branchId: l.branchId,
+              })),
+            },
+            { permission: P['goods-receipt.create'] },
+          );
           await tx
             .update(journalEntries)
             .set({ status: 'REVERSED', reversedById: reversal.id })

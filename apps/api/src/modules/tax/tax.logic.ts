@@ -9,7 +9,10 @@ export interface EffectiveRate {
 }
 
 /** The rate in force on a date, or null when none covers it. */
-export function resolveRate<R extends EffectiveRate>(rates: readonly R[], onDate: string): R | null {
+export function resolveRate<R extends EffectiveRate>(
+  rates: readonly R[],
+  onDate: string,
+): R | null {
   const covering = rates.filter(
     (r) => r.effectiveFrom <= onDate && (r.effectiveTo === null || r.effectiveTo >= onDate),
   );
@@ -27,8 +30,13 @@ export function taxOn(base: Money, ratePercent: string): Money {
  * Splits a tax-inclusive gross amount into base and tax:
  * tax = gross - gross / (1 + rate%), so base + tax always equals the gross exactly.
  */
-export function extractInclusiveTax(gross: Money, ratePercent: string): { base: Money; tax: Money } {
-  const divisor = Money.of('1', gross.currency).add(Money.of(ratePercent, gross.currency).multiply('0.01'));
+export function extractInclusiveTax(
+  gross: Money,
+  ratePercent: string,
+): { base: Money; tax: Money } {
+  const divisor = Money.of('1', gross.currency).add(
+    Money.of(ratePercent, gross.currency).multiply('0.01'),
+  );
   const base = gross.divide(divisor.toString());
   return { base, tax: gross.subtract(base) };
 }

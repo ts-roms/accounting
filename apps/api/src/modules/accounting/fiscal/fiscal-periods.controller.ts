@@ -2,7 +2,11 @@ import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/commo
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { createZodDto } from 'nestjs-zod';
 import { P } from '@accounting/types';
-import { createFiscalYearSchema, periodActionSchema } from '@accounting/validation';
+import {
+  createFiscalYearSchema,
+  periodActionSchema,
+  periodReopenSchema,
+} from '@accounting/validation';
 import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { CompanyScoped } from '@/common/decorators/company-scoped.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
@@ -11,6 +15,7 @@ import { FiscalPeriodsService } from './fiscal-periods.service';
 
 class CreateFiscalYearDto extends createZodDto(createFiscalYearSchema) {}
 class PeriodActionDto extends createZodDto(periodActionSchema) {}
+class PeriodReopenDto extends createZodDto(periodReopenSchema) {}
 
 @ApiTags('Fiscal Periods')
 @Controller()
@@ -38,7 +43,7 @@ export class FiscalPeriodsController {
     summary: 'Year-end close: posts the closing entry to retained earnings and locks the year',
   })
   closeYear(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
-    return this.service.closeYear(user.companyId!, id, user.id);
+    return this.service.closeYear(user.companyId!, id, user);
   }
 
   @Post('fiscal-periods/:id/close')
@@ -51,12 +56,32 @@ export class FiscalPeriodsController {
     return this.service.closePeriod(user.companyId!, id, user.id, body.reason);
   }
 
+  @Post('fiscal-periods/:id/soft-close')
+  @RequirePermissions(P['period.close'])
+  softClosePeriod(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: PeriodActionDto,
+  ) {
+    return this.service.softClosePeriod(user.companyId!, id, user.id, body.reason);
+  }
+
+  @Post('fiscal-periods/:id/lock')
+  @RequirePermissions(P['period.lock'])
+  lockPeriod(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: PeriodActionDto,
+  ) {
+    return this.service.lockPeriod(user.companyId!, id, user.id, body.reason);
+  }
+
   @Post('fiscal-periods/:id/reopen')
   @RequirePermissions(P['period.reopen'])
   reopenPeriod(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: PeriodActionDto,
+    @Body() body: PeriodReopenDto,
   ) {
     return this.service.reopenPeriod(user.companyId!, id, user.id, body.reason);
   }

@@ -219,6 +219,8 @@ export interface FiscalPeriod {
   status: FiscalPeriodStatus;
   closedAt: string | null;
   reopenedAt: string | null;
+  reopenReason: string | null;
+  lockedAt: string | null;
 }
 
 export interface FiscalYear {
@@ -280,11 +282,28 @@ export interface JournalEntryView {
   postedByEmail: string | null;
   reversalOfNumber: string | null;
   reversedByNumber: string | null;
+  correctionOfId: string | null;
+  correctionOfNumber: string | null;
+}
+
+export interface RelatedJournalEntry {
+  id: string;
+  documentNumber: string;
+  status: JournalStatus;
+  entryDate: string;
+  relation: 'ORIGINAL' | 'REVERSAL' | 'REVERSED' | 'CORRECTION' | 'CORRECTS';
 }
 
 export interface JournalEntryDetail extends JournalEntryView {
   lines: JournalLineView[];
+  related: RelatedJournalEntry[];
   sodWarnings?: SodConflict[];
+}
+
+export interface JournalCorrectionResult {
+  original: JournalEntryDetail;
+  reversal: JournalEntryDetail;
+  correction: JournalEntryDetail;
 }
 
 export interface LedgerLine {
@@ -1859,4 +1878,25 @@ export interface AiForecast {
   forecast: { period: string; value: string; low: string; high: string }[];
   slopePerMonth: string;
   r2: number;
+}
+
+// ------------------------------------------------------- Hardening: integrity
+
+export type IntegritySeverity = 'INFO' | 'WARNING' | 'CRITICAL';
+
+export interface IntegrityFinding {
+  check: string;
+  severity: IntegritySeverity;
+  title: string;
+  count: number;
+  samples: Array<Record<string, unknown>>;
+  detail?: string;
+}
+
+export interface IntegrityReport {
+  asOf: string;
+  currency: string;
+  ranAt: string;
+  status: 'OK' | 'WARNING' | 'CRITICAL';
+  findings: IntegrityFinding[];
 }

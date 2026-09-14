@@ -33,6 +33,7 @@ describe('AccountingPostingService.validateLines', () => {
     {} as never,
     {} as never,
     {} as never,
+    {} as never,
     { setContext: () => undefined } as never,
   );
   const cash = account({ id: 'cash', code: '1110' });
@@ -93,5 +94,116 @@ describe('AccountingPostingService.validateLines', () => {
     ).rejects.toMatchObject({
       code: 'JOURNAL_UNBALANCED',
     });
+  });
+});
+
+const periodTx = (status: string): DbExecutor =>
+  ({
+    select: () => ({
+      from: () => ({
+        where: async () => [
+          {
+            id: 'p1',
+            name: 'Sep 2026',
+            status,
+            startDate: '2026-09-01',
+            endDate: '2026-09-30',
+          },
+        ],
+      }),
+    }),
+  }) as unknown as DbExecutor;
+
+describe('AccountingPostingService period states and authority', () => {
+  const service = new AccountingPostingService(
+    {} as never,
+    {} as never,
+    {} as never,
+    {} as never,
+    {} as never,
+    { setContext: () => undefined } as never,
+  );
+  const user = (...perms: string[]) => ({ id: 'u', permissions: new Set(perms) });
+
+  it('posts freely into OPEN periods', async () => {
+    await expect(
+      service.resolvePeriod(periodTx('OPEN'), 'c', '2026-09-10', {}, user()),
+    ).resolves.toMatchObject({ id: 'p1' });
+  });
+
+  it('SOFT_CLOSED needs period.post-soft-closed, a system actor, or the closing routine', async () => {
+    await expect(
+      service.resolvePeriod(periodTx('SOFT_CLOSED'), 'c', '2026-09-10', {}, user('journal.post')),
+    ).rejects.toMatchObject({ code: 'ACCOUNTING_PERIOD_SOFT_CLOSED' });
+    await expect(
+      service.resolvePeriod(
+        periodTx('SOFT_CLOSED'),
+        'c',
+        '2026-09-10',
+        {},
+        user('period.post-soft-closed'),
+      ),
+    ).resolves.toBeDefined();
+    await expect(
+      service.resolvePeriod(
+        periodTx('SOFT_CLOSED'),
+        'c',
+        '2026-09-10',
+        {},
+        { id: null, system: true },
+      ),
+    ).resolves.toBeDefined();
+    await expect(
+      service.resolvePeriod(
+        periodTx('SOFT_CLOSED'),
+        'c',
+        '2026-09-10',
+        { allowClosedPeriod: true },
+        user(),
+      ),
+    ).resolves.toBeDefined();
+  });
+
+  it('CLOSED admits only the year-end routine; LOCKED admits nobody', async () => {
+    await expect(
+      service.resolvePeriod(
+        periodTx('CLOSED'),
+        'c',
+        '2026-09-10',
+        {},
+        user('period.post-soft-closed'),
+      ),
+    ).rejects.toMatchObject({ code: 'ACCOUNTING_PERIOD_CLOSED' });
+    await expect(
+      service.resolvePeriod(
+        periodTx('CLOSED'),
+        'c',
+        '2026-09-10',
+        { allowClosedPeriod: true },
+        user(),
+      ),
+    ).resolves.toBeDefined();
+    await expect(
+      service.resolvePeriod(
+        periodTx('LOCKED'),
+        'c',
+        '2026-09-10',
+        { allowClosedPeriod: true },
+        { id: null, system: true },
+      ),
+    ).rejects.toMatchObject({ code: 'ACCOUNTING_PERIOD_LOCKED' });
+  });
+
+  it('requires the posting authority named by the caller (journal.post by default)', () => {
+    expect(() => service.assertAuthority(user('journal.post'))).not.toThrow();
+    expect(() => service.assertAuthority(user('journal.view'))).toThrow(/permission/i);
+    expect(() =>
+      service.assertAuthority(user('bill.post'), { permission: 'bill.post' }),
+    ).not.toThrow();
+    expect(() =>
+      service.assertAuthority(user('journal.post'), { permission: 'bill.post' }),
+    ).toThrow(/permission/i);
+    expect(() => service.assertAuthority({ id: null })).toThrow(/permission/i);
+    expect(() => service.assertAuthority({ id: null, system: true })).not.toThrow();
   });
 });

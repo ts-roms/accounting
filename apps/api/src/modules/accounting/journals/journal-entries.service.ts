@@ -18,6 +18,7 @@ import type {
   CreateJournalEntryInput,
   ListJournalEntriesQuery,
   RejectJournalEntryInput,
+  CorrectJournalEntryInput,
   ReverseJournalEntryInput,
   UpdateJournalEntryInput,
 } from '@accounting/validation';
@@ -68,10 +69,22 @@ export interface JournalEntryView extends JournalEntry {
   postedByEmail: string | null;
   reversalOfNumber: string | null;
   reversedByNumber: string | null;
+  /** For a correcting entry: the original it replaces. */
+  correctionOfNumber: string | null;
+}
+
+export interface RelatedEntry {
+  id: string;
+  documentNumber: string;
+  status: JournalEntry['status'];
+  entryDate: string;
+  relation: 'ORIGINAL' | 'REVERSAL' | 'REVERSED' | 'CORRECTION' | 'CORRECTS';
 }
 
 export interface JournalEntryDetail extends JournalEntryView {
   lines: JournalLineView[];
+  /** Original / reversal / correction chain, for navigation and audit. */
+  related: RelatedEntry[];
   sodWarnings?: SodConflict[];
 }
 
@@ -158,8 +171,55 @@ export class JournalEntriesService {
       and(eq(journalEntries.id, id), eq(journalEntries.companyId, companyId)),
     );
     if (!entry) throw new NotFoundError('Journal entry', id);
-    const lines = await this.lines(this.db, id);
-    return { ...entry, lines };
+    const [lines, related] = await Promise.all([this.lines(this.db, id), this.related(entry)]);
+    return { ...entry, lines, related };
+  }
+
+  /** Every entry linked to this one through reversal or correction, in both directions. */
+  private async related(entry: JournalEntry): Promise<RelatedEntry[]> {
+    const pick = {
+      id: journalEntries.id,
+      documentNumber: journalEntries.documentNumber,
+      status: journalEntries.status,
+      entryDate: journalEntries.entryDate,
+    };
+    const out: RelatedEntry[] = [];
+    const add = (rows: Omit<RelatedEntry, 'relation'>[], relation: RelatedEntry['relation']) => {
+      for (const r of rows) out.push({ ...r, relation });
+    };
+    if (entry.reversalOfId)
+      add(
+        await this.db
+          .select(pick)
+          .from(journalEntries)
+          .where(eq(journalEntries.id, entry.reversalOfId)),
+        'ORIGINAL',
+      );
+    if (entry.reversedById)
+      add(
+        await this.db
+          .select(pick)
+          .from(journalEntries)
+          .where(eq(journalEntries.id, entry.reversedById)),
+        'REVERSAL',
+      );
+    if (entry.correctionOfId)
+      add(
+        await this.db
+          .select(pick)
+          .from(journalEntries)
+          .where(eq(journalEntries.id, entry.correctionOfId)),
+        'CORRECTS',
+      );
+    add(
+      await this.db
+        .select(pick)
+        .from(journalEntries)
+        .where(eq(journalEntries.correctionOfId, entry.id))
+        .orderBy(asc(journalEntries.createdAt)),
+      'CORRECTION',
+    );
+    return out;
   }
 
   // ---------------------------------------------------------------- commands
@@ -185,7 +245,9 @@ export class JournalEntriesService {
       const currency = await this.companyCurrency(tx, companyId);
       const validated = await this.posting.validateLines(tx, companyId, currency, input.lines);
       await this.dimensions.validateRefs(tx, companyId, input.lines, input.entryDate);
-      const period = await this.posting.resolvePeriod(tx, companyId, input.entryDate);
+      const period = await this.posting.resolvePeriod(tx, companyId, input.entryDate, {
+        draft: true,
+      });
       await this.assertBranch(tx, companyId, input.branchId);
       const documentNumber = await this.numbering.allocate(
         companyId,
@@ -253,7 +315,7 @@ export class JournalEntriesService {
       }
       const currency = entry.currency;
       const entryDate = input.entryDate ?? entry.entryDate;
-      const period = await this.posting.resolvePeriod(tx, companyId, entryDate);
+      const period = await this.posting.resolvePeriod(tx, companyId, entryDate, { draft: true });
       const branchId = input.branchId === undefined ? entry.branchId : input.branchId;
       await this.assertBranch(tx, companyId, branchId);
 
@@ -349,8 +411,16 @@ export class JournalEntriesService {
     await this.db.transaction(async (tx) => {
       const entry = await this.lock(tx, companyId, id);
       this.assertStatus(entry, ['DRAFT', 'REJECTED'], 'submitted');
-      await this.posting.resolvePeriod(tx, companyId, entry.entryDate);
-      await this.approvals.open(tx, { companyId, documentType: 'JOURNAL_ENTRY', documentId: id, documentNumber: entry.documentNumber, amount: entry.totalDebit, currency: entry.currency, requestedBy: actor.id });
+      await this.posting.resolvePeriod(tx, companyId, entry.entryDate, { draft: true });
+      await this.approvals.open(tx, {
+        companyId,
+        documentType: 'JOURNAL_ENTRY',
+        documentId: id,
+        documentNumber: entry.documentNumber,
+        amount: entry.totalDebit,
+        currency: entry.currency,
+        requestedBy: actor.id,
+      });
       await tx
         .update(journalEntries)
         .set({
@@ -376,7 +446,15 @@ export class JournalEntriesService {
     await this.db.transaction(async (tx) => {
       const entry = await this.lock(tx, companyId, id);
       this.assertStatus(entry, ['SUBMITTED'], 'approved');
-      await this.approvals.assertApproved(tx, { companyId, documentType: 'JOURNAL_ENTRY', documentId: id, documentNumber: entry.documentNumber, amount: entry.totalDebit, currency: entry.currency, requestedBy: entry.createdBy ?? actor.id });
+      await this.approvals.assertApproved(tx, {
+        companyId,
+        documentType: 'JOURNAL_ENTRY',
+        documentId: id,
+        documentNumber: entry.documentNumber,
+        amount: entry.totalDebit,
+        currency: entry.currency,
+        requestedBy: entry.createdBy ?? actor.id,
+      });
       const conflict = await this.sod.checkActorSeparation(
         actor.organizationId,
         [P['journal.create'], P['journal.approve']],
@@ -385,7 +463,7 @@ export class JournalEntriesService {
         tx,
       );
       if (conflict) warnings.push(conflict);
-      await this.posting.resolvePeriod(tx, companyId, entry.entryDate);
+      await this.posting.resolvePeriod(tx, companyId, entry.entryDate, { draft: true });
       await tx
         .update(journalEntries)
         .set({ status: 'APPROVED', approvedBy: actor.id, approvedAt: new Date() })
@@ -445,7 +523,7 @@ export class JournalEntriesService {
         tx,
       );
       if (conflict) warnings.push(conflict);
-      await this.posting.postEntry(tx, id, actor.id);
+      await this.posting.postEntry(tx, id, actor);
       if (warnings.length) {
         await this.audit.record(
           {
@@ -472,6 +550,131 @@ export class JournalEntriesService {
   ): Promise<JournalEntryDetail> {
     const reversalId = await this.db.transaction(async (tx) => {
       const entry = await this.lock(tx, companyId, id);
+      return (await this.reverseInTx(tx, companyId, actor, entry, input)).id;
+    });
+    return this.get(companyId, reversalId);
+  }
+
+  /**
+   * Correction workflow: the posted original is reversed and a DRAFT entry
+   * pre-filled with the original lines is created, linked to the original, so
+   * the chain Original -> Reversal -> Correction is explicit and navigable.
+   * The draft goes through the normal submit / approve / post controls.
+   */
+  async correct(
+    companyId: string,
+    actor: AuthenticatedUser,
+    id: string,
+    input: CorrectJournalEntryInput,
+  ): Promise<{
+    original: JournalEntryDetail;
+    reversal: JournalEntryDetail;
+    correction: JournalEntryDetail;
+  }> {
+    const ids = await this.db.transaction(async (tx) => {
+      const entry = await this.lock(tx, companyId, id);
+      if (entry.journalType === 'CLOSING')
+        throw new BusinessRuleError(
+          ErrorCodes.JOURNAL_INVALID_STATE,
+          'Year-end closing entries are corrected by reopening the year, not by a correcting journal.',
+        );
+      let reversalId: string;
+      if (entry.status === 'REVERSED') {
+        if (!entry.reversedById)
+          throw new BusinessRuleError(
+            ErrorCodes.JOURNAL_INVALID_STATE,
+            'Entry is reversed but has no reversal.',
+          );
+        reversalId = entry.reversedById;
+      } else {
+        this.assertStatus(entry, ['POSTED', 'LOCKED'], 'corrected');
+        reversalId = (
+          await this.reverseInTx(tx, companyId, actor, entry, {
+            reversalDate: input.reversalDate,
+            description: `Reversal of ${entry.documentNumber} for correction: ${input.reason}`,
+          })
+        ).id;
+      }
+      const lines = await tx
+        .select()
+        .from(journalLines)
+        .where(eq(journalLines.journalEntryId, id))
+        .orderBy(asc(journalLines.lineNumber));
+      const correctionDate = input.correctionDate ?? input.reversalDate;
+      const period = await this.posting.resolvePeriod(tx, companyId, correctionDate, {
+        draft: true,
+      });
+      const documentNumber = await this.numbering.allocate(
+        companyId,
+        'JE',
+        Number(correctionDate.slice(0, 4)),
+        tx,
+      );
+      const [correction] = await tx
+        .insert(journalEntries)
+        .values({
+          companyId,
+          branchId: entry.branchId,
+          fiscalPeriodId: period.id,
+          documentNumber,
+          journalType: 'ADJUSTING',
+          status: 'DRAFT',
+          entryDate: correctionDate,
+          description: `Correction of ${entry.documentNumber}: ${input.reason}`,
+          reference: entry.documentNumber,
+          currency: entry.currency,
+          totalDebit: entry.totalDebit,
+          totalCredit: entry.totalCredit,
+          correctionOfId: entry.id,
+          createdBy: actor.id,
+        })
+        .returning();
+      if (!correction) throw new Error('Insert returned no row');
+      await this.writeLines(
+        tx,
+        correction,
+        lines.map((l) => ({
+          accountId: l.accountId,
+          description: l.description ?? undefined,
+          debit: l.debit,
+          credit: l.credit,
+          branchId: l.branchId,
+          departmentId: l.departmentId,
+          costCenterId: l.costCenterId,
+          projectId: l.projectId,
+        })),
+      );
+      await this.audit.record(
+        {
+          action: 'CORRECT',
+          module: MODULE,
+          entityType: 'JournalEntry',
+          entityId: entry.id,
+          newValue: { reversalId, correctionId: correction.id, correctionNumber: documentNumber },
+          metadata: { documentNumber: entry.documentNumber, reason: input.reason },
+          companyId,
+        },
+        tx,
+      );
+      return { reversalId, correctionId: correction.id };
+    });
+    const [original, reversal, correction] = await Promise.all([
+      this.get(companyId, id),
+      this.get(companyId, ids.reversalId),
+      this.get(companyId, ids.correctionId),
+    ]);
+    return { original, reversal, correction };
+  }
+
+  private async reverseInTx(
+    tx: DbExecutor,
+    companyId: string,
+    actor: AuthenticatedUser,
+    entry: JournalEntry,
+    input: ReverseJournalEntryInput,
+  ): Promise<JournalEntry> {
+    const id = entry.id;
+    {
       this.assertStatus(entry, ['POSTED', 'LOCKED'], 'reversed');
       if (input.reversalDate < entry.entryDate) {
         throw new BusinessRuleError(
@@ -485,29 +688,33 @@ export class JournalEntriesService {
         .where(eq(journalLines.journalEntryId, id))
         .orderBy(asc(journalLines.lineNumber));
 
-      const reversal = await this.posting.postEvent(tx, {
-        companyId,
-        entryDate: input.reversalDate,
-        description:
-          input.description ?? `Reversal of ${entry.documentNumber}: ${entry.description}`,
-        reference: entry.documentNumber,
-        journalType: 'REVERSAL',
-        branchId: entry.branchId,
-        lines: lines.map((l) => ({
-          accountId: l.accountId,
-          description: l.description,
-          debit: l.credit,
-          credit: l.debit,
-          branchId: l.branchId,
-          departmentId: l.departmentId,
-          costCenterId: l.costCenterId,
-          projectId: l.projectId,
-        })),
-        sourceType: 'JOURNAL_REVERSAL',
-        sourceId: entry.id,
-        reversalOfId: entry.id,
-        actorId: actor.id,
-      });
+      const reversal = await this.posting.postEvent(
+        tx,
+        {
+          companyId,
+          entryDate: input.reversalDate,
+          description:
+            input.description ?? `Reversal of ${entry.documentNumber}: ${entry.description}`,
+          reference: entry.documentNumber,
+          journalType: 'REVERSAL',
+          branchId: entry.branchId,
+          lines: lines.map((l) => ({
+            accountId: l.accountId,
+            description: l.description,
+            debit: l.credit,
+            credit: l.debit,
+            branchId: l.branchId,
+            departmentId: l.departmentId,
+            costCenterId: l.costCenterId,
+            projectId: l.projectId,
+          })),
+          sourceType: 'JOURNAL_REVERSAL',
+          sourceId: entry.id,
+          reversalOfId: entry.id,
+          actor,
+        },
+        { permission: P['journal.reverse'] },
+      );
 
       await tx
         .update(journalEntries)
@@ -529,9 +736,8 @@ export class JournalEntriesService {
         },
         tx,
       );
-      return reversal.id;
-    });
-    return this.get(companyId, reversalId);
+      return reversal;
+    }
   }
 
   // --------------------------------------------------------------- internals
@@ -558,6 +764,9 @@ export class JournalEntriesService {
         reversedByNumber: sql<
           string | null
         >`(select document_number from journal_entries r where r.id = ${journalEntries.reversedById})`,
+        correctionOfNumber: sql<
+          string | null
+        >`(select document_number from journal_entries r where r.id = ${journalEntries.correctionOfId})`,
       })
       .from(journalEntries)
       .innerJoin(fiscalPeriods, eq(fiscalPeriods.id, journalEntries.fiscalPeriodId))

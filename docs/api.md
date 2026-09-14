@@ -78,26 +78,28 @@ Base path: `/api/v1` (URI versioning). OpenAPI UI: `http://localhost:3001/api/do
 
 ### Accounting (all require `X-Company-Id`)
 
-| Method                | Path                                                                                                           | Permission                        |
-| --------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| GET                   | `/accounts` (`type`, `status`, `search`, `postableOnly`) - depth-first tree with `level`                       | `account.view`                    |
-| POST / PATCH / DELETE | `/accounts`, `/accounts/:id` (delete only when unused)                                                         | `account.manage`                  |
-| GET / PUT             | `/accounts/mappings` `{ key, accountId or null }`                                                              | `account.view` / `account.manage` |
-| GET                   | `/fiscal-years` (with periods)                                                                                 | `period.view`                     |
-| POST                  | `/fiscal-years` `{ startDate, name? }`                                                                         | `period.manage`                   |
-| POST                  | `/fiscal-years/:id/close` (year-end closing entry)                                                             | `period.close`                    |
-| POST                  | `/fiscal-periods/:id/close`, `/fiscal-periods/:id/reopen` `{ reason? }`                                        | `period.close` / `period.reopen`  |
-| GET                   | `/journal-entries` (paginated; `status`, `journalType`, `from`, `to`, `fiscalPeriodId`, `accountId`, `search`) | `journal.view`                    |
-| GET                   | `/journal-entries/:id` (lines, actors, reversal links)                                                         | `journal.view`                    |
-| POST / PATCH / DELETE | `/journal-entries`, `/journal-entries/:id` (drafts; `idempotencyKey` supported)                                | `journal.create`                  |
-| POST                  | `/journal-entries/:id/submit`                                                                                  | `journal.submit`                  |
-| POST                  | `/journal-entries/:id/approve`, `/reject` `{ reason }`                                                         | `journal.approve`                 |
-| POST                  | `/journal-entries/:id/post` (idempotent)                                                                       | `journal.post`                    |
-| POST                  | `/journal-entries/:id/reverse` `{ reversalDate, description? }`                                                | `journal.reverse`                 |
-| GET                   | `/general-ledger?accountId&from&to&branchId&page&pageSize`                                                     | `journal.view`                    |
-| GET                   | `/reports/trial-balance?from&to&includeZero`                                                                   | `reports.view`                    |
-| GET                   | `/reports/income-statement?from&to`                                                                            | `reports.view`                    |
-| GET                   | `/reports/balance-sheet?asOf`                                                                                  | `reports.view`                    |
+| Method                | Path                                                                                                                                                                                                                   | Permission                        |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| GET                   | `/accounts` (`type`, `status`, `search`, `postableOnly`) - depth-first tree with `level`                                                                                                                               | `account.view`                    |
+| POST / PATCH / DELETE | `/accounts`, `/accounts/:id` (delete only when unused)                                                                                                                                                                 | `account.manage`                  |
+| GET / PUT             | `/accounts/mappings` `{ key, accountId or null }`                                                                                                                                                                      | `account.view` / `account.manage` |
+| GET                   | `/fiscal-years` (with periods)                                                                                                                                                                                         | `period.view`                     |
+| POST                  | `/fiscal-years` `{ startDate, name? }`                                                                                                                                                                                 | `period.manage`                   |
+| POST                  | `/fiscal-years/:id/close` (year-end closing entry)                                                                                                                                                                     | `period.close`                    |
+| POST                  | `/fiscal-periods/:id/soft-close` `{ reason? }`, `/fiscal-periods/:id/close` `{ reason? }`                                                                                                                              | `period.close`                    |
+| POST                  | `/fiscal-periods/:id/reopen` `{ reason }` (reason mandatory, never from LOCKED), `/fiscal-periods/:id/lock`                                                                                                            | `period.reopen` / `period.lock`   |
+| GET                   | `/journal-entries` (paginated; `status`, `journalType`, `from`, `to`, `fiscalPeriodId`, `accountId`, `search`)                                                                                                         | `journal.view`                    |
+| GET                   | `/journal-entries/:id` (lines, actors, reversal links)                                                                                                                                                                 | `journal.view`                    |
+| POST / PATCH / DELETE | `/journal-entries`, `/journal-entries/:id` (drafts; `idempotencyKey` supported)                                                                                                                                        | `journal.create`                  |
+| POST                  | `/journal-entries/:id/submit`                                                                                                                                                                                          | `journal.submit`                  |
+| POST                  | `/journal-entries/:id/approve`, `/reject` `{ reason }`                                                                                                                                                                 | `journal.approve`                 |
+| POST                  | `/journal-entries/:id/post` (idempotent)                                                                                                                                                                               | `journal.post`                    |
+| POST                  | `/journal-entries/:id/reverse` `{ reversalDate, description? }`                                                                                                                                                        | `journal.reverse`                 |
+| POST                  | `/journal-entries/:id/correct` `{ reversalDate, correctionDate?, reason }` -> `{ original, reversal, correction }` (reversal posted, correcting DRAFT opened, linked via `correctionOfId`; detail carries `related[]`) | `journal.correct`                 |
+| GET                   | `/general-ledger?accountId&from&to&branchId&page&pageSize`                                                                                                                                                             | `journal.view`                    |
+| GET                   | `/reports/trial-balance?from&to&includeZero`                                                                                                                                                                           | `reports.view`                    |
+| GET                   | `/reports/income-statement?from&to`                                                                                                                                                                                    | `reports.view`                    |
+| GET                   | `/reports/balance-sheet?asOf`                                                                                                                                                                                          | `reports.view`                    |
 
 Amounts are decimal strings with up to 4 fractional digits; dates are `YYYY-MM-DD`.
 Accounting error codes (422): `JOURNAL_UNBALANCED` (`details.difference`), `JOURNAL_INVALID_STATE`,
@@ -284,6 +286,14 @@ No AI route posts, approves or edits a ledger entry. Drafts come from
 built from `ReportingService`, the AR / AP aging services and the ledger, and
 list every figure they used. `AI_PROVIDER=HEURISTIC` (default) works offline
 and is what the tests run; `ANTHROPIC` adds image reading and phrasing.
+
+### Integrity (all require `X-Company-Id`)
+
+| Method | Path                                                                                                                         | Permission        |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| GET    | `/integrity?asOf` - runs every accounting invariant read-only -> `{ status, findings[{ check, severity, count, samples }] }` | `integrity.check` |
+
+New error codes: `ACCOUNTING_PERIOD_SOFT_CLOSED`, `ACCOUNTING_PERIOD_LOCKED`, `SOURCE_DOCUMENT_INVALID` (all 422).
 
 ### Audit & health
 

@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, getTableColumns, ilike, or, sql, type SQL } from 'drizzle-orm';
 import { Money } from '@accounting/money';
-import type { PaginatedResult } from '@accounting/types';
+import { P, type PaginatedResult } from '@accounting/types';
 import type {
   CapitalizeAssetInput,
   CreateAssetCategoryInput,
@@ -87,29 +87,87 @@ export class FixedAssetsService {
       .orderBy(asc(assetCategories.code));
   }
 
-  async createCategory(companyId: string, actor: AuthenticatedUser, input: CreateAssetCategoryInput): Promise<AssetCategory> {
+  async createCategory(
+    companyId: string,
+    actor: AuthenticatedUser,
+    input: CreateAssetCategoryInput,
+  ): Promise<AssetCategory> {
     return this.db.transaction(async (tx) => {
-      await this.assertAccounts(companyId, [input.assetAccountId, input.accumulatedDepreciationAccountId, input.depreciationExpenseAccountId], tx);
+      await this.assertAccounts(
+        companyId,
+        [
+          input.assetAccountId,
+          input.accumulatedDepreciationAccountId,
+          input.depreciationExpenseAccountId,
+        ],
+        tx,
+      );
       let row: AssetCategory | undefined;
       try {
-        [row] = await tx.insert(assetCategories).values({ companyId, ...input, code: input.code.toUpperCase() }).returning();
+        [row] = await tx
+          .insert(assetCategories)
+          .values({ companyId, ...input, code: input.code.toUpperCase() })
+          .returning();
       } catch (err) {
-        if (isUniqueViolation(err, 'asset_categories_company_code_uq')) throw new DuplicateError('Asset category', 'code', input.code);
+        if (isUniqueViolation(err, 'asset_categories_company_code_uq'))
+          throw new DuplicateError('Asset category', 'code', input.code);
         throw err;
       }
-      await this.audit.record({ action: 'CREATE', module: MODULE, entityType: 'AssetCategory', entityId: row!.id, newValue: { code: row!.code }, metadata: { actor: actor.email }, companyId }, tx);
+      await this.audit.record(
+        {
+          action: 'CREATE',
+          module: MODULE,
+          entityType: 'AssetCategory',
+          entityId: row!.id,
+          newValue: { code: row!.code },
+          metadata: { actor: actor.email },
+          companyId,
+        },
+        tx,
+      );
       return row!;
     });
   }
 
-  async updateCategory(companyId: string, actor: AuthenticatedUser, id: string, input: UpdateAssetCategoryInput): Promise<AssetCategory> {
+  async updateCategory(
+    companyId: string,
+    actor: AuthenticatedUser,
+    id: string,
+    input: UpdateAssetCategoryInput,
+  ): Promise<AssetCategory> {
     return this.db.transaction(async (tx) => {
-      const [existing] = await tx.select().from(assetCategories).where(and(eq(assetCategories.id, id), eq(assetCategories.companyId, companyId)));
+      const [existing] = await tx
+        .select()
+        .from(assetCategories)
+        .where(and(eq(assetCategories.id, id), eq(assetCategories.companyId, companyId)));
       if (!existing) throw new NotFoundError('Asset category', id);
-      await this.assertAccounts(companyId, [input.assetAccountId, input.accumulatedDepreciationAccountId, input.depreciationExpenseAccountId], tx);
+      await this.assertAccounts(
+        companyId,
+        [
+          input.assetAccountId,
+          input.accumulatedDepreciationAccountId,
+          input.depreciationExpenseAccountId,
+        ],
+        tx,
+      );
       const { code, ...rest } = input;
-      const [row] = await tx.update(assetCategories).set({ ...rest, ...(code ? { code: code.toUpperCase() } : {}) }).where(eq(assetCategories.id, id)).returning();
-      await this.audit.record({ action: 'UPDATE', module: MODULE, entityType: 'AssetCategory', entityId: id, newValue: input, metadata: { actor: actor.email }, companyId }, tx);
+      const [row] = await tx
+        .update(assetCategories)
+        .set({ ...rest, ...(code ? { code: code.toUpperCase() } : {}) })
+        .where(eq(assetCategories.id, id))
+        .returning();
+      await this.audit.record(
+        {
+          action: 'UPDATE',
+          module: MODULE,
+          entityType: 'AssetCategory',
+          entityId: id,
+          newValue: input,
+          metadata: { actor: actor.email },
+          companyId,
+        },
+        tx,
+      );
       return row!;
     });
   }
@@ -122,20 +180,41 @@ export class FixedAssetsService {
     if (query.categoryId) filters.push(eq(fixedAssets.categoryId, query.categoryId));
     if (query.search) {
       const term = `%${query.search}%`;
-      filters.push(or(ilike(fixedAssets.assetNumber, term), ilike(fixedAssets.name, term), ilike(fixedAssets.serialNumber, term), ilike(fixedAssets.location, term))!);
+      filters.push(
+        or(
+          ilike(fixedAssets.assetNumber, term),
+          ilike(fixedAssets.name, term),
+          ilike(fixedAssets.serialNumber, term),
+          ilike(fixedAssets.location, term),
+        )!,
+      );
     }
     const where = and(...filters);
     const direction = query.sortDir === 'desc' ? desc : asc;
-    const sortColumn = query.sortBy === 'name' ? fixedAssets.name : query.sortBy === 'acquisitionDate' ? fixedAssets.acquisitionDate : fixedAssets.assetNumber;
+    const sortColumn =
+      query.sortBy === 'name'
+        ? fixedAssets.name
+        : query.sortBy === 'acquisitionDate'
+          ? fixedAssets.acquisitionDate
+          : fixedAssets.assetNumber;
     const [rows, countRows] = await Promise.all([
-      this.viewQuery(this.db).where(where).orderBy(direction(sortColumn)).limit(query.pageSize).offset(offsetFor(query)),
-      this.db.select({ total: sql<number>`count(*)` }).from(fixedAssets).where(where),
+      this.viewQuery(this.db)
+        .where(where)
+        .orderBy(direction(sortColumn))
+        .limit(query.pageSize)
+        .offset(offsetFor(query)),
+      this.db
+        .select({ total: sql<number>`count(*)` })
+        .from(fixedAssets)
+        .where(where),
     ]);
     return toPaginatedResult(rows, Number(countRows[0]?.total ?? 0), query);
   }
 
   async get(companyId: string, id: string): Promise<AssetDetail> {
-    const [row] = await this.viewQuery(this.db).where(and(eq(fixedAssets.id, id), eq(fixedAssets.companyId, companyId)));
+    const [row] = await this.viewQuery(this.db).where(
+      and(eq(fixedAssets.id, id), eq(fixedAssets.companyId, companyId)),
+    );
     if (!row) throw new NotFoundError('Fixed asset', id);
     const events = await this.db
       .select({ event: assetEvents, journalNumber: journalEntries.documentNumber })
@@ -152,20 +231,45 @@ export class FixedAssetsService {
     };
   }
 
-  async create(companyId: string, actor: AuthenticatedUser, input: CreateAssetInput): Promise<AssetDetail> {
+  async create(
+    companyId: string,
+    actor: AuthenticatedUser,
+    input: CreateAssetInput,
+  ): Promise<AssetDetail> {
     const id = await this.db.transaction(async (tx) => {
       if (input.idempotencyKey) {
-        const [existing] = await tx.select({ id: fixedAssets.id }).from(fixedAssets).where(and(eq(fixedAssets.companyId, companyId), eq(fixedAssets.idempotencyKey, input.idempotencyKey)));
+        const [existing] = await tx
+          .select({ id: fixedAssets.id })
+          .from(fixedAssets)
+          .where(
+            and(
+              eq(fixedAssets.companyId, companyId),
+              eq(fixedAssets.idempotencyKey, input.idempotencyKey),
+            ),
+          );
         if (existing) return existing.id;
       }
       const category = await this.category(companyId, input.categoryId, tx);
       const currency = await this.accounts.companyCurrency(companyId, tx);
       const cost = Money.parse(input.acquisitionCost, currency);
       const salvage = Money.parse(input.salvageValue, currency);
-      if (!salvage.lessThan(cost)) throw new BusinessRuleError(ErrorCodes.VALIDATION_FAILED, 'Salvage value must be below the acquisition cost.');
+      if (!salvage.lessThan(cost))
+        throw new BusinessRuleError(
+          ErrorCodes.VALIDATION_FAILED,
+          'Salvage value must be below the acquisition cost.',
+        );
       const inService = input.inServiceDate ?? input.acquisitionDate;
-      if (inService < input.acquisitionDate) throw new BusinessRuleError(ErrorCodes.VALIDATION_FAILED, 'In-service date cannot precede the acquisition date.');
-      const assetNumber = await this.numbering.allocate(companyId, 'FA', Number(input.acquisitionDate.slice(0, 4)), tx);
+      if (inService < input.acquisitionDate)
+        throw new BusinessRuleError(
+          ErrorCodes.VALIDATION_FAILED,
+          'In-service date cannot precede the acquisition date.',
+        );
+      const assetNumber = await this.numbering.allocate(
+        companyId,
+        'FA',
+        Number(input.acquisitionDate.slice(0, 4)),
+        tx,
+      );
       const [created] = await tx
         .insert(fixedAssets)
         .values({
@@ -180,7 +284,10 @@ export class FixedAssetsService {
           salvageValue: salvage.toString(),
           usefulLifeMonths: input.usefulLifeMonths ?? category.usefulLifeMonths,
           depreciationMethod: input.depreciationMethod ?? category.depreciationMethod,
-          decliningRatePercent: input.decliningRatePercent === undefined ? category.decliningRatePercent : input.decliningRatePercent,
+          decliningRatePercent:
+            input.decliningRatePercent === undefined
+              ? category.decliningRatePercent
+              : input.decliningRatePercent,
           cost: cost.toString(),
           location: input.location ?? null,
           branchId: input.branchId ?? null,
@@ -192,26 +299,66 @@ export class FixedAssetsService {
           createdBy: actor.id,
         })
         .returning();
-      await this.audit.record({ action: 'CREATE', module: MODULE, entityType: 'FixedAsset', entityId: created!.id, newValue: { assetNumber, name: input.name, cost: cost.toString() }, metadata: { actor: actor.email }, companyId }, tx);
+      await this.audit.record(
+        {
+          action: 'CREATE',
+          module: MODULE,
+          entityType: 'FixedAsset',
+          entityId: created!.id,
+          newValue: { assetNumber, name: input.name, cost: cost.toString() },
+          metadata: { actor: actor.email },
+          companyId,
+        },
+        tx,
+      );
       return created!.id;
     });
     return this.get(companyId, id);
   }
 
-  async update(companyId: string, actor: AuthenticatedUser, id: string, input: UpdateAssetInput): Promise<AssetDetail> {
+  async update(
+    companyId: string,
+    actor: AuthenticatedUser,
+    id: string,
+    input: UpdateAssetInput,
+  ): Promise<AssetDetail> {
     await this.db.transaction(async (tx) => {
       const existing = await this.lock(tx, companyId, id);
       const draft = existing.status === 'DRAFT';
       // Once capitalised only descriptive fields may change; cost and schedule are ledger facts.
       if (!draft) {
-        for (const field of ['acquisitionCost', 'salvageValue', 'usefulLifeMonths', 'depreciationMethod', 'decliningRatePercent', 'acquisitionDate', 'inServiceDate', 'categoryId'] as const) {
-          if (input[field] !== undefined) throw new BusinessRuleError(ErrorCodes.DOCUMENT_INVALID_STATE, `${field} cannot change after capitalisation.`);
+        for (const field of [
+          'acquisitionCost',
+          'salvageValue',
+          'usefulLifeMonths',
+          'depreciationMethod',
+          'decliningRatePercent',
+          'acquisitionDate',
+          'inServiceDate',
+          'categoryId',
+        ] as const) {
+          if (input[field] !== undefined)
+            throw new BusinessRuleError(
+              ErrorCodes.DOCUMENT_INVALID_STATE,
+              `${field} cannot change after capitalisation.`,
+            );
         }
       }
-      const category = input.categoryId ? await this.category(companyId, input.categoryId, tx) : null;
-      const cost = input.acquisitionCost ? Money.parse(input.acquisitionCost, existing.currency) : Money.of(existing.acquisitionCost, existing.currency);
-      const salvage = input.salvageValue !== undefined ? Money.parse(input.salvageValue, existing.currency) : Money.of(existing.salvageValue, existing.currency);
-      if (!salvage.lessThan(cost)) throw new BusinessRuleError(ErrorCodes.VALIDATION_FAILED, 'Salvage value must be below the acquisition cost.');
+      const category = input.categoryId
+        ? await this.category(companyId, input.categoryId, tx)
+        : null;
+      const cost = input.acquisitionCost
+        ? Money.parse(input.acquisitionCost, existing.currency)
+        : Money.of(existing.acquisitionCost, existing.currency);
+      const salvage =
+        input.salvageValue !== undefined
+          ? Money.parse(input.salvageValue, existing.currency)
+          : Money.of(existing.salvageValue, existing.currency);
+      if (!salvage.lessThan(cost))
+        throw new BusinessRuleError(
+          ErrorCodes.VALIDATION_FAILED,
+          'Salvage value must be below the acquisition cost.',
+        );
       await tx
         .update(fixedAssets)
         .set({
@@ -225,15 +372,30 @@ export class FixedAssetsService {
           salvageValue: salvage.toString(),
           usefulLifeMonths: input.usefulLifeMonths ?? existing.usefulLifeMonths,
           depreciationMethod: input.depreciationMethod ?? existing.depreciationMethod,
-          decliningRatePercent: input.decliningRatePercent === undefined ? existing.decliningRatePercent : input.decliningRatePercent,
+          decliningRatePercent:
+            input.decliningRatePercent === undefined
+              ? existing.decliningRatePercent
+              : input.decliningRatePercent,
           location: input.location === undefined ? existing.location : input.location,
           branchId: input.branchId === undefined ? existing.branchId : input.branchId,
-          serialNumber: input.serialNumber === undefined ? existing.serialNumber : input.serialNumber,
+          serialNumber:
+            input.serialNumber === undefined ? existing.serialNumber : input.serialNumber,
           vendorId: input.vendorId === undefined ? existing.vendorId : input.vendorId,
           reference: input.reference === undefined ? existing.reference : input.reference,
         })
         .where(eq(fixedAssets.id, id));
-      await this.audit.record({ action: 'UPDATE', module: MODULE, entityType: 'FixedAsset', entityId: id, newValue: input, metadata: { assetNumber: existing.assetNumber, actor: actor.email }, companyId }, tx);
+      await this.audit.record(
+        {
+          action: 'UPDATE',
+          module: MODULE,
+          entityType: 'FixedAsset',
+          entityId: id,
+          newValue: input,
+          metadata: { assetNumber: existing.assetNumber, actor: actor.email },
+          companyId,
+        },
+        tx,
+      );
     });
     return this.get(companyId, id);
   }
@@ -241,39 +403,89 @@ export class FixedAssetsService {
   async remove(companyId: string, id: string): Promise<void> {
     await this.db.transaction(async (tx) => {
       const existing = await this.lock(tx, companyId, id);
-      if (existing.status !== 'DRAFT') throw new BusinessRuleError(ErrorCodes.DOCUMENT_INVALID_STATE, `${existing.assetNumber} is capitalised and cannot be deleted; dispose of it instead.`);
+      if (existing.status !== 'DRAFT')
+        throw new BusinessRuleError(
+          ErrorCodes.DOCUMENT_INVALID_STATE,
+          `${existing.assetNumber} is capitalised and cannot be deleted; dispose of it instead.`,
+        );
       await tx.delete(fixedAssets).where(eq(fixedAssets.id, id));
-      await this.audit.record({ action: 'DELETE', module: MODULE, entityType: 'FixedAsset', entityId: id, previousValue: { assetNumber: existing.assetNumber }, companyId }, tx);
+      await this.audit.record(
+        {
+          action: 'DELETE',
+          module: MODULE,
+          entityType: 'FixedAsset',
+          entityId: id,
+          previousValue: { assetNumber: existing.assetNumber },
+          companyId,
+        },
+        tx,
+      );
     });
   }
 
   /** Dr asset cost / Cr clearing (or the account given). The asset becomes ACTIVE and starts depreciating. */
-  async capitalize(companyId: string, actor: AuthenticatedUser, id: string, input: CapitalizeAssetInput): Promise<AssetDetail> {
+  async capitalize(
+    companyId: string,
+    actor: AuthenticatedUser,
+    id: string,
+    input: CapitalizeAssetInput,
+  ): Promise<AssetDetail> {
     await this.db.transaction(async (tx) => {
       const existing = await this.lock(tx, companyId, id);
-      if (existing.status !== 'DRAFT') throw new BusinessRuleError(ErrorCodes.DOCUMENT_INVALID_STATE, `${existing.assetNumber} is already capitalised.`);
+      if (existing.status !== 'DRAFT')
+        throw new BusinessRuleError(
+          ErrorCodes.DOCUMENT_INVALID_STATE,
+          `${existing.assetNumber} is already capitalised.`,
+        );
       const accts = await this.resolveAccounts(companyId, existing.categoryId, tx);
-      const credit = input.creditAccountId ? (await this.accounts.findByIds(companyId, [input.creditAccountId], tx))[0] : await this.accounts.resolveMapped(companyId, 'FIXED_ASSET_CLEARING', tx);
-      if (!credit || credit.isHeader || credit.status !== 'ACTIVE') throw new BusinessRuleError(ErrorCodes.ACCOUNT_NOT_POSTABLE, 'The credit account is not postable.');
+      const credit = input.creditAccountId
+        ? (await this.accounts.findByIds(companyId, [input.creditAccountId], tx))[0]
+        : await this.accounts.resolveMapped(companyId, 'FIXED_ASSET_CLEARING', tx);
+      if (!credit || credit.isHeader || credit.status !== 'ACTIVE')
+        throw new BusinessRuleError(
+          ErrorCodes.ACCOUNT_NOT_POSTABLE,
+          'The credit account is not postable.',
+        );
       const postingDate = input.postingDate ?? existing.acquisitionDate;
-      const entry = await this.posting.postEvent(tx, {
-        companyId,
-        entryDate: postingDate,
-        description: `Capitalise ${existing.assetNumber} ${existing.name}`,
-        reference: existing.reference ?? existing.assetNumber,
-        journalType: 'GENERAL',
-        branchId: existing.branchId,
-        sourceType: 'FIXED_ASSET_CAPITALIZATION',
-        sourceId: existing.id,
-        actorId: actor.id,
-        lines: [
-          { accountId: accts.asset, debit: existing.acquisitionCost, credit: '0', description: `${existing.assetNumber} acquisition cost`, branchId: existing.branchId },
-          { accountId: credit.id, debit: '0', credit: existing.acquisitionCost, description: `${existing.assetNumber} capitalised`, branchId: existing.branchId },
-        ],
-      });
+      const entry = await this.posting.postEvent(
+        tx,
+        {
+          companyId,
+          entryDate: postingDate,
+          description: `Capitalise ${existing.assetNumber} ${existing.name}`,
+          reference: existing.reference ?? existing.assetNumber,
+          journalType: 'GENERAL',
+          branchId: existing.branchId,
+          sourceType: 'FIXED_ASSET_CAPITALIZATION',
+          sourceId: existing.id,
+          actor,
+          lines: [
+            {
+              accountId: accts.asset,
+              debit: existing.acquisitionCost,
+              credit: '0',
+              description: `${existing.assetNumber} acquisition cost`,
+              branchId: existing.branchId,
+            },
+            {
+              accountId: credit.id,
+              debit: '0',
+              credit: existing.acquisitionCost,
+              description: `${existing.assetNumber} capitalised`,
+              branchId: existing.branchId,
+            },
+          ],
+        },
+        { permission: P['fixed-asset.post'] },
+      );
       await tx
         .update(fixedAssets)
-        .set({ status: 'ACTIVE', cost: existing.acquisitionCost, capitalizationJournalEntryId: entry.id, capitalizedAt: new Date() })
+        .set({
+          status: 'ACTIVE',
+          cost: existing.acquisitionCost,
+          capitalizationJournalEntryId: entry.id,
+          capitalizedAt: new Date(),
+        })
         .where(eq(fixedAssets.id, id));
       await tx.insert(assetEvents).values({
         assetId: id,
@@ -285,19 +497,39 @@ export class FixedAssetsService {
         notes: `Credited to ${credit.code} ${credit.name}`,
         createdBy: actor.id,
       });
-      await this.audit.record({ action: 'POST', module: MODULE, entityType: 'FixedAsset', entityId: id, previousValue: { status: 'DRAFT' }, newValue: { status: 'ACTIVE', journalEntryId: entry.id }, metadata: { assetNumber: existing.assetNumber }, companyId }, tx);
+      await this.audit.record(
+        {
+          action: 'POST',
+          module: MODULE,
+          entityType: 'FixedAsset',
+          entityId: id,
+          previousValue: { status: 'DRAFT' },
+          newValue: { status: 'ACTIVE', journalEntryId: entry.id },
+          metadata: { assetNumber: existing.assetNumber },
+          companyId,
+        },
+        tx,
+      );
     });
     return this.get(companyId, id);
   }
 
   /** Location / branch change - recorded, no ledger effect. */
-  async transfer(companyId: string, actor: AuthenticatedUser, id: string, input: TransferAssetInput): Promise<AssetDetail> {
+  async transfer(
+    companyId: string,
+    actor: AuthenticatedUser,
+    id: string,
+    input: TransferAssetInput,
+  ): Promise<AssetDetail> {
     await this.db.transaction(async (tx) => {
       const existing = await this.lock(tx, companyId, id);
       this.assertCarried(existing);
       await tx
         .update(fixedAssets)
-        .set({ location: input.location === undefined ? existing.location : input.location, branchId: input.branchId === undefined ? existing.branchId : input.branchId })
+        .set({
+          location: input.location === undefined ? existing.location : input.location,
+          branchId: input.branchId === undefined ? existing.branchId : input.branchId,
+        })
         .where(eq(fixedAssets.id, id));
       await tx.insert(assetEvents).values({
         assetId: id,
@@ -308,13 +540,30 @@ export class FixedAssetsService {
         notes: `${existing.location ?? '-'} -> ${input.location ?? existing.location ?? '-'}${input.notes ? ` - ${input.notes}` : ''}`,
         createdBy: actor.id,
       });
-      await this.audit.record({ action: 'UPDATE', module: MODULE, entityType: 'FixedAsset', entityId: id, previousValue: { location: existing.location, branchId: existing.branchId }, newValue: { location: input.location, branchId: input.branchId }, metadata: { assetNumber: existing.assetNumber, event: 'TRANSFER' }, companyId }, tx);
+      await this.audit.record(
+        {
+          action: 'UPDATE',
+          module: MODULE,
+          entityType: 'FixedAsset',
+          entityId: id,
+          previousValue: { location: existing.location, branchId: existing.branchId },
+          newValue: { location: input.location, branchId: input.branchId },
+          metadata: { assetNumber: existing.assetNumber, event: 'TRANSFER' },
+          companyId,
+        },
+        tx,
+      );
     });
     return this.get(companyId, id);
   }
 
   /** Dr impairment loss / Cr accumulated depreciation. Future depreciation spreads the new book value over the remaining life. */
-  async impair(companyId: string, actor: AuthenticatedUser, id: string, input: ImpairAssetInput): Promise<AssetDetail> {
+  async impair(
+    companyId: string,
+    actor: AuthenticatedUser,
+    id: string,
+    input: ImpairAssetInput,
+  ): Promise<AssetDetail> {
     await this.db.transaction(async (tx) => {
       const existing = await this.lock(tx, companyId, id);
       this.assertCarried(existing);
@@ -323,67 +572,157 @@ export class FixedAssetsService {
       const bv = bookValue(existing, currency);
       const floor = Money.of(existing.salvageValue, currency);
       if (amount.greaterThan(bv.subtract(floor))) {
-        throw new BusinessRuleError(ErrorCodes.VALIDATION_FAILED, `Impairment cannot take the book value below the salvage value (max ${bv.subtract(floor).toString()}).`);
+        throw new BusinessRuleError(
+          ErrorCodes.VALIDATION_FAILED,
+          `Impairment cannot take the book value below the salvage value (max ${bv.subtract(floor).toString()}).`,
+        );
       }
       const accts = await this.resolveAccounts(companyId, existing.categoryId, tx);
       const loss = await this.accounts.resolveMapped(companyId, 'IMPAIRMENT_LOSS', tx);
-      const entry = await this.posting.postEvent(tx, {
-        companyId,
-        entryDate: input.eventDate,
-        description: `Impairment ${existing.assetNumber} ${existing.name}${input.notes ? ` - ${input.notes}` : ''}`,
-        reference: existing.assetNumber,
-        journalType: 'ADJUSTING',
-        branchId: existing.branchId,
-        sourceType: 'FIXED_ASSET_IMPAIRMENT',
-        sourceId: existing.id,
-        actorId: actor.id,
-        lines: [
-          { accountId: loss.id, debit: amount.toString(), credit: '0', description: `${existing.assetNumber} impairment loss`, branchId: existing.branchId },
-          { accountId: accts.accumulated, debit: '0', credit: amount.toString(), description: `${existing.assetNumber} accumulated impairment`, branchId: existing.branchId },
-        ],
-      });
+      const entry = await this.posting.postEvent(
+        tx,
+        {
+          companyId,
+          entryDate: input.eventDate,
+          description: `Impairment ${existing.assetNumber} ${existing.name}${input.notes ? ` - ${input.notes}` : ''}`,
+          reference: existing.assetNumber,
+          journalType: 'ADJUSTING',
+          branchId: existing.branchId,
+          sourceType: 'FIXED_ASSET_IMPAIRMENT',
+          sourceId: existing.id,
+          actor,
+          lines: [
+            {
+              accountId: loss.id,
+              debit: amount.toString(),
+              credit: '0',
+              description: `${existing.assetNumber} impairment loss`,
+              branchId: existing.branchId,
+            },
+            {
+              accountId: accts.accumulated,
+              debit: '0',
+              credit: amount.toString(),
+              description: `${existing.assetNumber} accumulated impairment`,
+              branchId: existing.branchId,
+            },
+          ],
+        },
+        { permission: P['fixed-asset.post'] },
+      );
       const accumulated = Money.of(existing.accumulatedDepreciation, currency).add(amount);
       const after = bv.subtract(amount);
       await tx
         .update(fixedAssets)
-        .set({ accumulatedDepreciation: accumulated.toString(), status: after.equals(floor) ? 'FULLY_DEPRECIATED' : existing.status })
+        .set({
+          accumulatedDepreciation: accumulated.toString(),
+          status: after.equals(floor) ? 'FULLY_DEPRECIATED' : existing.status,
+        })
         .where(eq(fixedAssets.id, id));
-      await tx.insert(assetEvents).values({ assetId: id, eventType: 'IMPAIRMENT', eventDate: input.eventDate, amount: amount.toString(), bookValueAfter: after.toString(), journalEntryId: entry.id, notes: input.notes ?? null, createdBy: actor.id });
-      await this.audit.record({ action: 'POST', module: MODULE, entityType: 'FixedAsset', entityId: id, newValue: { event: 'IMPAIRMENT', amount: amount.toString(), journalEntryId: entry.id }, metadata: { assetNumber: existing.assetNumber }, companyId }, tx);
+      await tx.insert(assetEvents).values({
+        assetId: id,
+        eventType: 'IMPAIRMENT',
+        eventDate: input.eventDate,
+        amount: amount.toString(),
+        bookValueAfter: after.toString(),
+        journalEntryId: entry.id,
+        notes: input.notes ?? null,
+        createdBy: actor.id,
+      });
+      await this.audit.record(
+        {
+          action: 'POST',
+          module: MODULE,
+          entityType: 'FixedAsset',
+          entityId: id,
+          newValue: { event: 'IMPAIRMENT', amount: amount.toString(), journalEntryId: entry.id },
+          metadata: { assetNumber: existing.assetNumber },
+          companyId,
+        },
+        tx,
+      );
     });
     return this.get(companyId, id);
   }
 
   /** Upward revaluation: Dr asset cost / Cr revaluation surplus (equity). */
-  async revalue(companyId: string, actor: AuthenticatedUser, id: string, input: RevalueAssetInput): Promise<AssetDetail> {
+  async revalue(
+    companyId: string,
+    actor: AuthenticatedUser,
+    id: string,
+    input: RevalueAssetInput,
+  ): Promise<AssetDetail> {
     await this.db.transaction(async (tx) => {
       const existing = await this.lock(tx, companyId, id);
       this.assertCarried(existing);
       const currency = existing.currency;
       const target = Money.parse(input.newBookValue, currency);
       const bv = bookValue(existing, currency);
-      if (!target.greaterThan(bv)) throw new BusinessRuleError(ErrorCodes.VALIDATION_FAILED, 'Revaluation must increase the book value; use impairment to reduce it.');
+      if (!target.greaterThan(bv))
+        throw new BusinessRuleError(
+          ErrorCodes.VALIDATION_FAILED,
+          'Revaluation must increase the book value; use impairment to reduce it.',
+        );
       const increase = target.subtract(bv);
       const accts = await this.resolveAccounts(companyId, existing.categoryId, tx);
       const surplus = await this.accounts.resolveMapped(companyId, 'REVALUATION_SURPLUS', tx);
-      const entry = await this.posting.postEvent(tx, {
-        companyId,
-        entryDate: input.eventDate,
-        description: `Revaluation ${existing.assetNumber} ${existing.name}${input.notes ? ` - ${input.notes}` : ''}`,
-        reference: existing.assetNumber,
-        journalType: 'ADJUSTING',
-        branchId: existing.branchId,
-        sourceType: 'FIXED_ASSET_REVALUATION',
-        sourceId: existing.id,
-        actorId: actor.id,
-        lines: [
-          { accountId: accts.asset, debit: increase.toString(), credit: '0', description: `${existing.assetNumber} revaluation`, branchId: existing.branchId },
-          { accountId: surplus.id, debit: '0', credit: increase.toString(), description: `${existing.assetNumber} revaluation surplus`, branchId: existing.branchId },
-        ],
+      const entry = await this.posting.postEvent(
+        tx,
+        {
+          companyId,
+          entryDate: input.eventDate,
+          description: `Revaluation ${existing.assetNumber} ${existing.name}${input.notes ? ` - ${input.notes}` : ''}`,
+          reference: existing.assetNumber,
+          journalType: 'ADJUSTING',
+          branchId: existing.branchId,
+          sourceType: 'FIXED_ASSET_REVALUATION',
+          sourceId: existing.id,
+          actor,
+          lines: [
+            {
+              accountId: accts.asset,
+              debit: increase.toString(),
+              credit: '0',
+              description: `${existing.assetNumber} revaluation`,
+              branchId: existing.branchId,
+            },
+            {
+              accountId: surplus.id,
+              debit: '0',
+              credit: increase.toString(),
+              description: `${existing.assetNumber} revaluation surplus`,
+              branchId: existing.branchId,
+            },
+          ],
+        },
+        { permission: P['fixed-asset.post'] },
+      );
+      await tx
+        .update(fixedAssets)
+        .set({ cost: Money.of(existing.cost, currency).add(increase).toString(), status: 'ACTIVE' })
+        .where(eq(fixedAssets.id, id));
+      await tx.insert(assetEvents).values({
+        assetId: id,
+        eventType: 'REVALUATION',
+        eventDate: input.eventDate,
+        amount: increase.toString(),
+        bookValueAfter: target.toString(),
+        journalEntryId: entry.id,
+        notes: input.notes ?? null,
+        createdBy: actor.id,
       });
-      await tx.update(fixedAssets).set({ cost: Money.of(existing.cost, currency).add(increase).toString(), status: 'ACTIVE' }).where(eq(fixedAssets.id, id));
-      await tx.insert(assetEvents).values({ assetId: id, eventType: 'REVALUATION', eventDate: input.eventDate, amount: increase.toString(), bookValueAfter: target.toString(), journalEntryId: entry.id, notes: input.notes ?? null, createdBy: actor.id });
-      await this.audit.record({ action: 'POST', module: MODULE, entityType: 'FixedAsset', entityId: id, newValue: { event: 'REVALUATION', amount: increase.toString(), journalEntryId: entry.id }, metadata: { assetNumber: existing.assetNumber }, companyId }, tx);
+      await this.audit.record(
+        {
+          action: 'POST',
+          module: MODULE,
+          entityType: 'FixedAsset',
+          entityId: id,
+          newValue: { event: 'REVALUATION', amount: increase.toString(), journalEntryId: entry.id },
+          metadata: { assetNumber: existing.assetNumber },
+          companyId,
+        },
+        tx,
+      );
     });
     return this.get(companyId, id);
   }
@@ -392,21 +731,49 @@ export class FixedAssetsService {
    * Disposal / write-off: Dr accumulated depreciation, Dr proceeds account,
    * Cr asset cost, gain or loss to the disposal account.
    */
-  async dispose(companyId: string, actor: AuthenticatedUser, id: string, input: DisposeAssetInput): Promise<AssetDetail> {
+  async dispose(
+    companyId: string,
+    actor: AuthenticatedUser,
+    id: string,
+    input: DisposeAssetInput,
+  ): Promise<AssetDetail> {
     await this.db.transaction(async (tx) => {
       const existing = await this.lock(tx, companyId, id);
       this.assertCarried(existing);
       const currency = existing.currency;
       const proceeds = Money.parse(input.proceeds, currency);
-      if (proceeds.isPositive() && !input.proceedsAccountId) throw new BusinessRuleError(ErrorCodes.VALIDATION_FAILED, 'Choose the account receiving the proceeds.');
+      if (proceeds.isPositive() && !input.proceedsAccountId)
+        throw new BusinessRuleError(
+          ErrorCodes.VALIDATION_FAILED,
+          'Choose the account receiving the proceeds.',
+        );
       const accts = await this.resolveAccounts(companyId, existing.categoryId, tx);
       const gainLoss = await this.accounts.resolveMapped(companyId, 'GAIN_LOSS_ON_DISPOSAL', tx);
       const result = disposalGainLoss(existing, proceeds.toString(), currency);
       const lines = [
-        { accountId: accts.accumulated, debit: existing.accumulatedDepreciation, credit: '0', description: `${existing.assetNumber} accumulated depreciation released`, branchId: existing.branchId },
-        { accountId: accts.asset, debit: '0', credit: existing.cost, description: `${existing.assetNumber} cost derecognised`, branchId: existing.branchId },
+        {
+          accountId: accts.accumulated,
+          debit: existing.accumulatedDepreciation,
+          credit: '0',
+          description: `${existing.assetNumber} accumulated depreciation released`,
+          branchId: existing.branchId,
+        },
+        {
+          accountId: accts.asset,
+          debit: '0',
+          credit: existing.cost,
+          description: `${existing.assetNumber} cost derecognised`,
+          branchId: existing.branchId,
+        },
       ];
-      if (proceeds.isPositive()) lines.push({ accountId: input.proceedsAccountId!, debit: proceeds.toString(), credit: '0', description: `${existing.assetNumber} disposal proceeds`, branchId: existing.branchId });
+      if (proceeds.isPositive())
+        lines.push({
+          accountId: input.proceedsAccountId!,
+          debit: proceeds.toString(),
+          credit: '0',
+          description: `${existing.assetNumber} disposal proceeds`,
+          branchId: existing.branchId,
+        });
       if (!result.isZero()) {
         lines.push({
           accountId: gainLoss.id,
@@ -416,25 +783,62 @@ export class FixedAssetsService {
           branchId: existing.branchId,
         });
       }
-      const entry = await this.posting.postEvent(tx, {
-        companyId,
-        entryDate: input.eventDate,
-        description: `${proceeds.isPositive() ? 'Disposal' : 'Write-off'} ${existing.assetNumber} ${existing.name}${input.notes ? ` - ${input.notes}` : ''}`,
-        reference: existing.assetNumber,
-        journalType: 'GENERAL',
-        branchId: existing.branchId,
-        sourceType: 'FIXED_ASSET_DISPOSAL',
-        sourceId: existing.id,
-        actorId: actor.id,
-        lines: lines.filter((l) => Number(l.debit) !== 0 || Number(l.credit) !== 0),
-      });
+      const entry = await this.posting.postEvent(
+        tx,
+        {
+          companyId,
+          entryDate: input.eventDate,
+          description: `${proceeds.isPositive() ? 'Disposal' : 'Write-off'} ${existing.assetNumber} ${existing.name}${input.notes ? ` - ${input.notes}` : ''}`,
+          reference: existing.assetNumber,
+          journalType: 'GENERAL',
+          branchId: existing.branchId,
+          sourceType: 'FIXED_ASSET_DISPOSAL',
+          sourceId: existing.id,
+          actor,
+          lines: lines.filter((l) => Number(l.debit) !== 0 || Number(l.credit) !== 0),
+        },
+        { permission: P['fixed-asset.post'] },
+      );
       const status = proceeds.isPositive() ? 'DISPOSED' : 'WRITTEN_OFF';
       await tx
         .update(fixedAssets)
-        .set({ status, disposalDate: input.eventDate, disposalProceeds: proceeds.toString(), disposalGainLoss: result.toString(), disposalJournalEntryId: entry.id })
+        .set({
+          status,
+          disposalDate: input.eventDate,
+          disposalProceeds: proceeds.toString(),
+          disposalGainLoss: result.toString(),
+          disposalJournalEntryId: entry.id,
+        })
         .where(eq(fixedAssets.id, id));
-      await tx.insert(assetEvents).values({ assetId: id, eventType: proceeds.isPositive() ? 'DISPOSAL' : 'WRITE_OFF', eventDate: input.eventDate, amount: Money.of(existing.cost, currency).negate().toString(), bookValueAfter: '0', journalEntryId: entry.id, notes: `${input.notes ?? ''} proceeds ${proceeds.toString()}, ${result.isNegative() ? 'loss' : 'gain'} ${result.abs().toString()}`.trim(), createdBy: actor.id });
-      await this.audit.record({ action: 'POST', module: MODULE, entityType: 'FixedAsset', entityId: id, previousValue: { status: existing.status }, newValue: { status, proceeds: proceeds.toString(), gainLoss: result.toString(), journalEntryId: entry.id }, metadata: { assetNumber: existing.assetNumber }, companyId }, tx);
+      await tx.insert(assetEvents).values({
+        assetId: id,
+        eventType: proceeds.isPositive() ? 'DISPOSAL' : 'WRITE_OFF',
+        eventDate: input.eventDate,
+        amount: Money.of(existing.cost, currency).negate().toString(),
+        bookValueAfter: '0',
+        journalEntryId: entry.id,
+        notes:
+          `${input.notes ?? ''} proceeds ${proceeds.toString()}, ${result.isNegative() ? 'loss' : 'gain'} ${result.abs().toString()}`.trim(),
+        createdBy: actor.id,
+      });
+      await this.audit.record(
+        {
+          action: 'POST',
+          module: MODULE,
+          entityType: 'FixedAsset',
+          entityId: id,
+          previousValue: { status: existing.status },
+          newValue: {
+            status,
+            proceeds: proceeds.toString(),
+            gainLoss: result.toString(),
+            journalEntryId: entry.id,
+          },
+          metadata: { assetNumber: existing.assetNumber },
+          companyId,
+        },
+        tx,
+      );
     });
     return this.get(companyId, id);
   }
@@ -442,14 +846,43 @@ export class FixedAssetsService {
   // ---------------------------------------------------------------- settings
 
   async settings(companyId: string, executor: DbExecutor = this.db) {
-    const [row] = await executor.select().from(fixedAssetSettings).where(eq(fixedAssetSettings.companyId, companyId));
-    return row ?? { companyId, autoPostDepreciation: false, createdAt: new Date(0), updatedAt: new Date(0) };
+    const [row] = await executor
+      .select()
+      .from(fixedAssetSettings)
+      .where(eq(fixedAssetSettings.companyId, companyId));
+    return (
+      row ?? {
+        companyId,
+        autoPostDepreciation: false,
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
+      }
+    );
   }
 
-  async updateSettings(companyId: string, actor: AuthenticatedUser, input: FixedAssetSettingsInput) {
+  async updateSettings(
+    companyId: string,
+    actor: AuthenticatedUser,
+    input: FixedAssetSettingsInput,
+  ) {
     return this.db.transaction(async (tx) => {
-      const [row] = await tx.insert(fixedAssetSettings).values({ companyId, ...input }).onConflictDoUpdate({ target: fixedAssetSettings.companyId, set: { ...input } }).returning();
-      await this.audit.record({ action: 'UPDATE', module: MODULE, entityType: 'FixedAssetSettings', entityId: companyId, newValue: input, metadata: { editor: actor.email }, companyId }, tx);
+      const [row] = await tx
+        .insert(fixedAssetSettings)
+        .values({ companyId, ...input })
+        .onConflictDoUpdate({ target: fixedAssetSettings.companyId, set: { ...input } })
+        .returning();
+      await this.audit.record(
+        {
+          action: 'UPDATE',
+          module: MODULE,
+          entityType: 'FixedAssetSettings',
+          entityId: companyId,
+          newValue: input,
+          metadata: { editor: actor.email },
+          companyId,
+        },
+        tx,
+      );
       return row!;
     });
   }
@@ -457,44 +890,72 @@ export class FixedAssetsService {
   // ----------------------------------------------------------------- helpers
 
   /** Category override -> company mapping for the three asset accounts. */
-  async resolveAccounts(companyId: string, categoryId: string, tx: DbExecutor): Promise<ResolvedAssetAccounts> {
+  async resolveAccounts(
+    companyId: string,
+    categoryId: string,
+    tx: DbExecutor,
+  ): Promise<ResolvedAssetAccounts> {
     const category = await this.category(companyId, categoryId, tx);
-    const mapped = async (key: 'FIXED_ASSET_COST' | 'ACCUMULATED_DEPRECIATION' | 'DEPRECIATION_EXPENSE') => (await this.accounts.resolveMapped(companyId, key, tx)).id;
+    const mapped = async (
+      key: 'FIXED_ASSET_COST' | 'ACCUMULATED_DEPRECIATION' | 'DEPRECIATION_EXPENSE',
+    ) => (await this.accounts.resolveMapped(companyId, key, tx)).id;
     return {
       asset: category.assetAccountId ?? (await mapped('FIXED_ASSET_COST')),
-      accumulated: category.accumulatedDepreciationAccountId ?? (await mapped('ACCUMULATED_DEPRECIATION')),
+      accumulated:
+        category.accumulatedDepreciationAccountId ?? (await mapped('ACCUMULATED_DEPRECIATION')),
       expense: category.depreciationExpenseAccountId ?? (await mapped('DEPRECIATION_EXPENSE')),
     };
   }
 
   async lock(tx: DbExecutor, companyId: string, id: string): Promise<FixedAsset> {
-    const [row] = await tx.select().from(fixedAssets).where(and(eq(fixedAssets.id, id), eq(fixedAssets.companyId, companyId))).for('update');
+    const [row] = await tx
+      .select()
+      .from(fixedAssets)
+      .where(and(eq(fixedAssets.id, id), eq(fixedAssets.companyId, companyId)))
+      .for('update');
     if (!row) throw new NotFoundError('Fixed asset', id);
     return row;
   }
 
   private assertCarried(asset: FixedAsset): void {
     if (asset.status !== 'ACTIVE' && asset.status !== 'FULLY_DEPRECIATED') {
-      throw new BusinessRuleError(ErrorCodes.DOCUMENT_INVALID_STATE, `${asset.assetNumber} is ${asset.status}; only capitalised assets can be changed.`, { status: asset.status });
+      throw new BusinessRuleError(
+        ErrorCodes.DOCUMENT_INVALID_STATE,
+        `${asset.assetNumber} is ${asset.status}; only capitalised assets can be changed.`,
+        { status: asset.status },
+      );
     }
   }
 
   private async category(companyId: string, id: string, tx: DbExecutor): Promise<AssetCategory> {
-    const [row] = await tx.select().from(assetCategories).where(and(eq(assetCategories.id, id), eq(assetCategories.companyId, companyId)));
+    const [row] = await tx
+      .select()
+      .from(assetCategories)
+      .where(and(eq(assetCategories.id, id), eq(assetCategories.companyId, companyId)));
     if (!row) throw new NotFoundError('Asset category', id);
-    if (row.status !== 'ACTIVE') throw new BusinessRuleError(ErrorCodes.PARTY_INACTIVE, `Category ${row.code} is inactive.`);
+    if (row.status !== 'ACTIVE')
+      throw new BusinessRuleError(ErrorCodes.PARTY_INACTIVE, `Category ${row.code} is inactive.`);
     return row;
   }
 
-  private async assertAccounts(companyId: string, ids: Array<string | null | undefined>, tx: DbExecutor): Promise<void> {
+  private async assertAccounts(
+    companyId: string,
+    ids: Array<string | null | undefined>,
+    tx: DbExecutor,
+  ): Promise<void> {
     const wanted = ids.filter((x): x is string => Boolean(x));
     if (wanted.length === 0) return;
     const rows = await this.accounts.findByIds(companyId, [...new Set(wanted)], tx);
     const byId = new Map(rows.map((a) => [a.id, a]));
     for (const id of wanted) {
       const account = byId.get(id);
-      if (!account) throw new BusinessRuleError(ErrorCodes.NOT_FOUND, 'An account override does not exist.');
-      if (account.isHeader || account.status !== 'ACTIVE') throw new BusinessRuleError(ErrorCodes.ACCOUNT_NOT_POSTABLE, `${account.code} ${account.name} cannot be used for postings.`);
+      if (!account)
+        throw new BusinessRuleError(ErrorCodes.NOT_FOUND, 'An account override does not exist.');
+      if (account.isHeader || account.status !== 'ACTIVE')
+        throw new BusinessRuleError(
+          ErrorCodes.ACCOUNT_NOT_POSTABLE,
+          `${account.code} ${account.name} cannot be used for postings.`,
+        );
     }
   }
 
@@ -505,12 +966,15 @@ export class FixedAssetsService {
         categoryCode: assetCategories.code,
         categoryName: assetCategories.name,
         bookValue: sql<string>`${fixedAssets.cost} - ${fixedAssets.accumulatedDepreciation}`,
-        capitalizationJournalNumber: sql<string | null>`(select je.document_number from journal_entries je where je.id = ${fixedAssets.capitalizationJournalEntryId})`,
-        disposalJournalNumber: sql<string | null>`(select je.document_number from journal_entries je where je.id = ${fixedAssets.disposalJournalEntryId})`,
+        capitalizationJournalNumber: sql<
+          string | null
+        >`(select je.document_number from journal_entries je where je.id = ${fixedAssets.capitalizationJournalEntryId})`,
+        disposalJournalNumber: sql<
+          string | null
+        >`(select je.document_number from journal_entries je where je.id = ${fixedAssets.disposalJournalEntryId})`,
       })
       .from(fixedAssets)
       .innerJoin(assetCategories, eq(assetCategories.id, fixedAssets.categoryId))
       .$dynamic();
   }
 }
-

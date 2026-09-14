@@ -62,7 +62,10 @@ export class TaxReportsService {
     private readonly accounts: AccountsService,
   ) {}
 
-  async transactions(companyId: string, query: ListTaxTransactionsQuery): Promise<PaginatedResult<TaxTransactionView>> {
+  async transactions(
+    companyId: string,
+    query: ListTaxTransactionsQuery,
+  ): Promise<PaginatedResult<TaxTransactionView>> {
     const filters: SQL[] = [eq(taxTransactions.companyId, companyId)];
     if (query.from) filters.push(gte(taxTransactions.transactionDate, query.from));
     if (query.to) filters.push(lte(taxTransactions.transactionDate, query.to));
@@ -87,10 +90,19 @@ export class TaxReportsService {
         .orderBy(desc(taxTransactions.transactionDate), desc(taxTransactions.createdAt))
         .limit(query.pageSize)
         .offset(offsetFor(query)),
-      this.db.select({ total: sql<number>`count(*)` }).from(taxTransactions).where(where),
+      this.db
+        .select({ total: sql<number>`count(*)` })
+        .from(taxTransactions)
+        .where(where),
     ]);
     return toPaginatedResult(
-      rows.map((r) => ({ ...r.tx, taxCode: r.taxCode, taxName: r.taxName, kind: r.kind, journalNumber: r.journalNumber })),
+      rows.map((r) => ({
+        ...r.tx,
+        taxCode: r.taxCode,
+        taxName: r.taxName,
+        kind: r.kind,
+        journalNumber: r.journalNumber,
+      })),
       Number(countRows[0]?.total ?? 0),
       query,
     );
@@ -120,10 +132,20 @@ export class TaxReportsService {
       .from(taxTransactions)
       .innerJoin(taxCodes, eq(taxCodes.id, taxTransactions.taxCodeId))
       .where(and(...filters))
-      .groupBy(taxTransactions.taxCodeId, taxCodes.code, taxCodes.name, taxCodes.kind, taxTransactions.side, taxCodes.reportingCategory)
+      .groupBy(
+        taxTransactions.taxCodeId,
+        taxCodes.code,
+        taxCodes.name,
+        taxCodes.kind,
+        taxTransactions.side,
+        taxCodes.reportingCategory,
+      )
       .orderBy(taxCodes.kind, taxTransactions.side, taxCodes.code);
     const sum = (pred: (r: (typeof rows)[number]) => boolean) =>
-      Money.sum(rows.filter(pred).map((r) => Money.of(r.taxAmount, currency)), currency);
+      Money.sum(
+        rows.filter(pred).map((r) => Money.of(r.taxAmount, currency)),
+        currency,
+      );
     const outputTax = sum((r) => r.kind === 'SALES_TAX' && r.side === 'SALES');
     const inputTax = sum((r) => r.kind === 'SALES_TAX' && r.side === 'PURCHASES');
     return {
@@ -139,14 +161,21 @@ export class TaxReportsService {
         outputTax: outputTax.toString(),
         inputTax: inputTax.toString(),
         netTaxPayable: outputTax.subtract(inputTax).toString(),
-        withholdingReceivable: sum((r) => r.kind === 'WITHHOLDING' && r.side === 'SALES').toString(),
-        withholdingPayable: sum((r) => r.kind === 'WITHHOLDING' && r.side === 'PURCHASES').toString(),
+        withholdingReceivable: sum(
+          (r) => r.kind === 'WITHHOLDING' && r.side === 'SALES',
+        ).toString(),
+        withholdingPayable: sum(
+          (r) => r.kind === 'WITHHOLDING' && r.side === 'PURCHASES',
+        ).toString(),
       },
     };
   }
 
   /** Withholding grouped by counterparty and rate - the shape certificates and alphalists need. */
-  async withholdingByParty(companyId: string, query: TaxReportQuery): Promise<WithholdingByPartyRow[]> {
+  async withholdingByParty(
+    companyId: string,
+    query: TaxReportQuery,
+  ): Promise<WithholdingByPartyRow[]> {
     const currency = await this.accounts.companyCurrency(companyId);
     const filters: SQL[] = [
       eq(taxTransactions.companyId, companyId),
@@ -170,7 +199,14 @@ export class TaxReportsService {
       .from(taxTransactions)
       .innerJoin(taxCodes, eq(taxCodes.id, taxTransactions.taxCodeId))
       .where(and(...filters))
-      .groupBy(taxTransactions.partyId, taxTransactions.partyName, taxTransactions.partyTaxNumber, taxTransactions.side, taxCodes.code, taxTransactions.ratePercent)
+      .groupBy(
+        taxTransactions.partyId,
+        taxTransactions.partyName,
+        taxTransactions.partyTaxNumber,
+        taxTransactions.side,
+        taxCodes.code,
+        taxTransactions.ratePercent,
+      )
       .orderBy(taxTransactions.side, taxTransactions.partyName, taxCodes.code);
     return rows.map((r) => ({
       ...r,

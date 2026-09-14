@@ -394,7 +394,15 @@ export class OrdersService {
         await this.approvals.cancelFor(tx, 'PURCHASE_ORDER', id);
       }
       if (type === 'PURCHASE_ORDER' && (action === 'submit' || action === 'approve')) {
-        const ref = { companyId, documentType: 'PURCHASE_ORDER' as const, documentId: id, documentNumber: existing.documentNumber, amount: existing.total, currency: existing.currency, requestedBy: existing.createdBy ?? actor.id };
+        const ref = {
+          companyId,
+          documentType: 'PURCHASE_ORDER' as const,
+          documentId: id,
+          documentNumber: existing.documentNumber,
+          amount: existing.total,
+          currency: existing.currency,
+          requestedBy: existing.createdBy ?? actor.id,
+        };
         if (action === 'submit') await this.approvals.open(tx, { ...ref, requestedBy: actor.id });
         else await this.approvals.assertApproved(tx, ref);
       }

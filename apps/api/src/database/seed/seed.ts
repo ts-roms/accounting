@@ -361,7 +361,12 @@ async function ensureUsers(
       email: SYSTEM_USER_EMAIL,
       firstName: 'System',
       lastName: 'Scheduler',
-      passwordHash: await argon2.hash(crypto.randomUUID(), { type: argon2.argon2id, memoryCost: 19 * 1024, timeCost: 2, parallelism: 1 }),
+      passwordHash: await argon2.hash(crypto.randomUUID(), {
+        type: argon2.argon2id,
+        memoryCost: 19 * 1024,
+        timeCost: 2,
+        parallelism: 1,
+      }),
       status: 'INACTIVE',
     });
     log('system scheduler user created');

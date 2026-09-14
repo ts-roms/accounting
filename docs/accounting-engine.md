@@ -350,6 +350,15 @@ subledger control accounts (`ACCOUNTS_RECEIVABLE`, `ACCOUNTS_PAYABLE`,
 `INVENTORY`, `EMPLOYEE_PAYABLE`) are flagged HIGH because they break the
 "control account moves only through its documents" invariant.
 
+## Controls (hardening phase 1)
+
+The gateway now also checks the actor's posting authority, branches, cost
+dimensions, the source document and the fiscal period _state_
+(`OPEN / SOFT_CLOSED / CLOSED / LOCKED`) before writing; corrections are a
+first-class workflow (reversal + linked draft) and `IntegrityService` runs the
+invariants over live data. Details and the invariant list:
+[accounting-controls.md](accounting-controls.md).
+
 ## Chart of accounts
 
 - Types `ASSET, LIABILITY, EQUITY, REVENUE, COST_OF_SALES, EXPENSE`; normal

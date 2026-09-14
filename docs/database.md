@@ -166,6 +166,14 @@ None of these tables reference `journal_entries` for writing; AI rows are
 metadata beside the books. Migration: `0010_ai.sql` (also adds `AI_DOCUMENT`
 to `attachment_entity_type`).
 
+## Hardening phase 1 (accounting controls)
+
+`fiscal_periods.status` gains `SOFT_CLOSED` and `LOCKED`, plus `reopen_reason`,
+`locked_at`, `locked_by`; `journal_entries.correction_of_id` links a correcting
+entry to the original it replaces. Migration `0011_accounting_controls.sql` also
+installs `journal_entries_guard_locked_period()`: no row may enter a ledger
+status while its period is `LOCKED`, whatever client writes it.
+
 ## Posted-journal immutability
 
 Migration `0003_posted_journal_immutability.sql` installs triggers that reject

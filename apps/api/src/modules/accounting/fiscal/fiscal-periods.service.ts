@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
-import { INCOME_STATEMENT_TYPES, LEDGER_STATUSES } from '@accounting/types';
+import { INCOME_STATEMENT_TYPES, LEDGER_STATUSES, P } from '@accounting/types';
+import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import type { CreateFiscalYearInput } from '@accounting/validation';
 import { Money } from '@accounting/money';
 import { AuditService } from '@/modules/audit/audit.service';
@@ -222,11 +223,11 @@ export class FiscalPeriodsService {
     reason?: string,
   ): Promise<FiscalPeriod> {
     return this.db.transaction(async (tx) => {
-      const period = await this.lockPeriod(companyId, periodId, tx);
-      if (period.status === 'CLOSED') {
+      const period = await this.lockPeriodRow(companyId, periodId, tx);
+      if (period.status === 'CLOSED' || period.status === 'LOCKED') {
         throw new BusinessRuleError(
           ErrorCodes.JOURNAL_INVALID_STATE,
-          `${period.name} is already closed.`,
+          `${period.name} is already ${period.status.toLowerCase()}.`,
         );
       }
       const year = await this.getYearOrThrow(companyId, period.fiscalYearId, tx);
@@ -241,7 +242,7 @@ export class FiscalPeriodsService {
           and(
             eq(fiscalPeriods.fiscalYearId, year.id),
             sql`${fiscalPeriods.periodNumber} < ${period.periodNumber}`,
-            eq(fiscalPeriods.status, 'OPEN'),
+            inArray(fiscalPeriods.status, ['OPEN', 'SOFT_CLOSED']),
           ),
         )
         .orderBy(asc(fiscalPeriods.periodNumber))
@@ -291,7 +292,7 @@ export class FiscalPeriodsService {
           module: MODULE,
           entityType: 'FiscalPeriod',
           entityId: period.id,
-          previousValue: { status: 'OPEN' },
+          previousValue: { status: period.status },
           newValue: { status: 'CLOSED' },
           metadata: { period: period.name, lockedEntries: locked.length, reason },
           companyId,
@@ -309,11 +310,21 @@ export class FiscalPeriodsService {
     reason?: string,
   ): Promise<FiscalPeriod> {
     return this.db.transaction(async (tx) => {
-      const period = await this.lockPeriod(companyId, periodId, tx);
-      if (period.status !== 'CLOSED')
+      const period = await this.lockPeriodRow(companyId, periodId, tx);
+      if (period.status === 'LOCKED')
+        throw new BusinessRuleError(
+          ErrorCodes.ACCOUNTING_PERIOD_LOCKED,
+          `${period.name} is locked and can never be reopened.`,
+        );
+      if (period.status === 'OPEN')
         throw new BusinessRuleError(
           ErrorCodes.JOURNAL_INVALID_STATE,
           `${period.name} is not closed.`,
+        );
+      if (!reason?.trim())
+        throw new BusinessRuleError(
+          ErrorCodes.VALIDATION_FAILED,
+          'Reopening a period requires a reason.',
         );
       const year = await this.getYearOrThrow(companyId, period.fiscalYearId, tx);
       if (year.status === 'CLOSED') {
@@ -329,7 +340,7 @@ export class FiscalPeriodsService {
           and(
             eq(fiscalPeriods.fiscalYearId, year.id),
             sql`${fiscalPeriods.periodNumber} > ${period.periodNumber}`,
-            eq(fiscalPeriods.status, 'CLOSED'),
+            inArray(fiscalPeriods.status, ['CLOSED', 'LOCKED']),
           ),
         )
         .orderBy(desc(fiscalPeriods.periodNumber))
@@ -343,7 +354,7 @@ export class FiscalPeriodsService {
 
       const [reopened] = await tx
         .update(fiscalPeriods)
-        .set({ status: 'OPEN', reopenedAt: new Date(), reopenedBy: actorId })
+        .set({ status: 'OPEN', reopenedAt: new Date(), reopenedBy: actorId, reopenReason: reason })
         .where(eq(fiscalPeriods.id, period.id))
         .returning();
       if (!reopened) throw new Error('Update returned no row');
@@ -361,7 +372,7 @@ export class FiscalPeriodsService {
           module: MODULE,
           entityType: 'FiscalPeriod',
           entityId: period.id,
-          previousValue: { status: 'CLOSED' },
+          previousValue: { status: period.status },
           newValue: { status: 'OPEN' },
           metadata: { period: period.name, reason },
           companyId,
@@ -373,6 +384,91 @@ export class FiscalPeriodsService {
   }
 
   /**
+   * Soft close: the books are provisionally shut. Only holders of
+   * `period.post-soft-closed` may still post (late adjustments); everyone else
+   * is refused by the posting gateway.
+   */
+  async softClosePeriod(
+    companyId: string,
+    periodId: string,
+    actorId: string,
+    reason?: string,
+  ): Promise<FiscalPeriod> {
+    return this.db.transaction(async (tx) => {
+      const period = await this.lockPeriodRow(companyId, periodId, tx);
+      if (period.status !== 'OPEN')
+        throw new BusinessRuleError(
+          ErrorCodes.JOURNAL_INVALID_STATE,
+          `${period.name} is ${period.status.toLowerCase().replace('_', '-')}; only open periods can be soft-closed.`,
+        );
+      const [updated] = await tx
+        .update(fiscalPeriods)
+        .set({ status: 'SOFT_CLOSED', closedAt: new Date(), closedBy: actorId })
+        .where(eq(fiscalPeriods.id, period.id))
+        .returning();
+      await this.audit.record(
+        {
+          action: 'PERIOD_SOFT_CLOSE',
+          module: MODULE,
+          entityType: 'FiscalPeriod',
+          entityId: period.id,
+          previousValue: { status: 'OPEN' },
+          newValue: { status: 'SOFT_CLOSED' },
+          metadata: { period: period.name, reason },
+          companyId,
+        },
+        tx,
+      );
+      return updated!;
+    });
+  }
+
+  /**
+   * Lock: final state of a closed period. Nothing can be posted into it and it
+   * can never be reopened; the database trigger enforces the same rule for
+   * any client. Reserved for periods whose statements have been issued.
+   */
+  async lockPeriod(
+    companyId: string,
+    periodId: string,
+    actorId: string,
+    reason?: string,
+  ): Promise<FiscalPeriod> {
+    return this.db.transaction(async (tx) => {
+      const period = await this.lockPeriodRow(companyId, periodId, tx);
+      if (period.status === 'LOCKED')
+        throw new BusinessRuleError(
+          ErrorCodes.JOURNAL_INVALID_STATE,
+          `${period.name} is already locked.`,
+        );
+      if (period.status !== 'CLOSED')
+        throw new BusinessRuleError(
+          ErrorCodes.JOURNAL_INVALID_STATE,
+          `${period.name} must be closed before it can be locked.`,
+        );
+      const [updated] = await tx
+        .update(fiscalPeriods)
+        .set({ status: 'LOCKED', lockedAt: new Date(), lockedBy: actorId })
+        .where(eq(fiscalPeriods.id, period.id))
+        .returning();
+      await this.audit.record(
+        {
+          action: 'PERIOD_LOCK',
+          module: MODULE,
+          entityType: 'FiscalPeriod',
+          entityId: period.id,
+          previousValue: { status: 'CLOSED' },
+          newValue: { status: 'LOCKED' },
+          metadata: { period: period.name, reason },
+          companyId,
+        },
+        tx,
+      );
+      return updated!;
+    });
+  }
+
+  /**
    * Year-end close: every period must be closed; the net result of all
    * income-statement accounts is transferred to retained earnings through a
    * CLOSING journal dated on the last day of the year.
@@ -380,8 +476,9 @@ export class FiscalPeriodsService {
   async closeYear(
     companyId: string,
     yearId: string,
-    actorId: string,
+    actor: AuthenticatedUser,
   ): Promise<FiscalYearWithPeriods> {
+    const actorId = actor.id;
     return this.db.transaction(async (tx) => {
       const [year] = await tx
         .select()
@@ -476,9 +573,9 @@ export class FiscalPeriodsService {
             lines: lines.filter((l) => l.debit !== '0' || l.credit !== '0'),
             sourceType: 'FISCAL_YEAR_CLOSE',
             sourceId: year.id,
-            actorId,
+            actor,
           },
-          { allowClosedPeriod: true },
+          { allowClosedPeriod: true, permission: P['period.close'] },
         );
         closingEntryId = entry.id;
         await tx
@@ -511,7 +608,7 @@ export class FiscalPeriodsService {
     });
   }
 
-  private async lockPeriod(
+  private async lockPeriodRow(
     companyId: string,
     periodId: string,
     tx: DbExecutor,
