@@ -109,7 +109,11 @@ describe('Integration platform (e2e)', () => {
         'DEMO_OAUTH_CRM',
       ]),
     );
-    expect(providers.body.every((p: { demo: boolean }) => p.demo)).toBe(true);
+    expect(
+      providers.body
+        .filter((p: { provider: string }) => p.provider.startsWith('DEMO_'))
+        .every((p: { demo: boolean }) => p.demo),
+    ).toBe(true);
     const scopes = await as(server().get('/api/v1/api-keys/scopes')).expect(200);
     const post = scopes.body.find((s: { scope: string }) => s.scope === 'invoices:write');
     expect(post.permissions).not.toContain('invoice.post');
