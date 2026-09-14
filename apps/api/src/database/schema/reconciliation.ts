@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
   check,
   date,
   index,
@@ -43,6 +44,20 @@ export const accountingPolicies = pgTable('accounting_policies', {
   /** Absolute variance up to which a reconciliation counts as reconciled. */
   reconciliationMateriality: money('reconciliation_materiality').notNull().default('0'),
   reconciliationStaleDays: integer('reconciliation_stale_days').notNull().default(35),
+  /** Close blockers: which automatic checks must pass before a close is approved / completed. */
+  closeRequireReconciliations: boolean('close_require_reconciliations').notNull().default(true),
+  closeRequireBankReconciliation: boolean('close_require_bank_reconciliation')
+    .notNull()
+    .default(true),
+  closeRequireDepreciation: boolean('close_require_depreciation').notNull().default(true),
+  closeRequireFxRevaluation: boolean('close_require_fx_revaluation').notNull().default(false),
+  closeBlockOnUnapprovedJournals: boolean('close_block_on_unapproved_journals')
+    .notNull()
+    .default(true),
+  closeBlockOnOpenExceptions: boolean('close_block_on_open_exceptions').notNull().default(true),
+  closeRequireIntegrityOk: boolean('close_require_integrity_ok').notNull().default(true),
+  /** Lock the period as the final step of a completed close. */
+  closeLockOnComplete: boolean('close_lock_on_complete').notNull().default(false),
   ...timestamps,
 });
 

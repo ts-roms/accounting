@@ -99,6 +99,13 @@
       "when": 1789362568579,
       "tag": "0013_bank_match_confidence",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1789363716718,
+      "tag": "0014_financial_close",
+      "breakpoints": true
     }
   ]
 }

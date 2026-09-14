@@ -36,6 +36,16 @@ async function postJournal(page: Page, description: string, amount: string, date
   return page.url();
 }
 
+/** Calls the API through the page's cookie jar with the active company header. */
+async function apiCall(page: Page, method: 'get' | 'post' | 'patch', path: string, data?: unknown) {
+  const me = await page.request.get('/api/v1/auth/me');
+  const companyId = (await me.json()).companies[0].id as string;
+  const headers = { 'x-requested-with': 'XMLHttpRequest', 'x-company-id': companyId };
+  const res = await page.request[method](`/api/v1${path}`, { data, headers });
+  expect(res.ok(), `${method.toUpperCase()} ${path}: ${await res.text()}`).toBeTruthy();
+  return res;
+}
+
 test.describe('accounting controls', () => {
   test.slow();
 
@@ -87,17 +97,37 @@ test.describe('accounting controls', () => {
     await expect(page.getByTestId('integrity-status')).toBeVisible();
     await expect(page.getByTestId('integrity-check')).toHaveCount(14);
     await expect(page.getByText('Posted journals balance')).toBeVisible();
-    await expect(page.getByRole('row').filter({ hasText: 'UNBALANCED_JOURNAL' })).toContainText('PASS');
-    await expect(page.getByRole('row').filter({ hasText: 'AR_CONTROL_VARIANCE' })).toContainText('PASS');
+    await expect(page.getByRole('row').filter({ hasText: 'UNBALANCED_JOURNAL' })).toContainText(
+      'PASS',
+    );
+    await expect(page.getByRole('row').filter({ hasText: 'AR_CONTROL_VARIANCE' })).toContainText(
+      'PASS',
+    );
   });
 });
 
 test.describe('reconciliation center', () => {
   test.slow();
 
-  test('runs an area, logs and resolves an exception, and a second user approves', async ({ page }) => {
+  test('runs an area, logs and resolves an exception, and a second user approves', async ({
+    page,
+  }) => {
     await login(page);
+    // An approved reconciliation is final, so pick a day that has none yet (re-runs).
+    const taken = new Set(
+      (
+        (
+          await (
+            await apiCall(page, 'get', '/reconciliations?area=AP&status=APPROVED&pageSize=200')
+          ).json()
+        ).items as { asOf: string }[]
+      ).map((r) => r.asOf),
+    );
+    const day = new Date();
+    while (taken.has(day.toISOString().slice(0, 10))) day.setDate(day.getDate() - 1);
+    const asOf = day.toISOString().slice(0, 10);
     await page.goto('/accounting/reconciliation');
+    await page.getByTestId('recon-asof').fill(asOf);
     await expect(page.getByTestId('recon-tile')).toHaveCount(5);
     await expect(page.getByTestId('bank-tile').first()).toBeVisible();
     // Run accounts payable as admin (the preparer).
@@ -126,5 +156,106 @@ test.describe('reconciliation center', () => {
     await page.getByRole('dialog').getByRole('button', { name: 'Approve' }).click();
     await expect(page.getByTestId('recon-status')).toHaveText('APPROVED');
     await expect(page.getByTestId('recon-recompute')).toHaveCount(0);
+  });
+});
+
+test.describe('financial close', () => {
+  test.slow();
+
+  test('a close is started, evaluated, worked, approved by finance and completed', async ({
+    page,
+  }) => {
+    // Periods close in sequence, so the earliest open period is the one to close.
+    await login(page);
+    const years = (await (await apiCall(page, 'get', '/fiscal-years')).json()) as Array<{
+      periods: Array<{ id: string; name: string; endDate: string; status: string }>;
+    }>;
+    const period = years
+      .flatMap((y) => y.periods)
+      .filter((p) => p.status === 'OPEN')
+      .sort((a, b) => a.endDate.localeCompare(b.endDate))[0];
+    const asOf = period.endDate;
+    // A live close left behind by an interrupted run would make the start a duplicate.
+    const closes = await apiCall(page, 'get', '/financial-closes?pageSize=100');
+    for (const c of (await closes.json()).items as {
+      id: string;
+      fiscalPeriodId: string;
+      status: string;
+    }[]) {
+      if (c.fiscalPeriodId === period.id && !['COMPLETED', 'CANCELLED'].includes(c.status))
+        await apiCall(page, 'post', `/financial-closes/${c.id}/cancel`, {
+          reason: 'Playwright reset',
+        });
+    }
+    // Prepare as admin, approve as finance (four-eyes) every subledger reconciliation for the period
+    // (an approved one from an earlier run is final and already satisfies the check).
+    const existing = await apiCall(
+      page,
+      'get',
+      `/reconciliations?from=${asOf}&to=${asOf}&pageSize=50`,
+    );
+    const approved = new Set(
+      ((await existing.json()).items as { area: string; status: string }[])
+        .filter((r) => r.status === 'APPROVED')
+        .map((r) => r.area),
+    );
+    for (const area of ['AR', 'AP', 'INVENTORY', 'FIXED_ASSETS', 'TAX']) {
+      if (!approved.has(area)) await apiCall(page, 'post', '/reconciliations', { area, asOf });
+    }
+    await apiCall(page, 'patch', '/accounting-policies', {
+      closeRequireBankReconciliation: false,
+      closeRequireDepreciation: false,
+    });
+    await login(page, FINANCE);
+    const list = await apiCall(page, 'get', `/reconciliations?from=${asOf}&to=${asOf}&pageSize=50`);
+    for (const r of (await list.json()).items as { id: string; status: string }[]) {
+      if (r.status !== 'APPROVED')
+        await apiCall(page, 'post', `/reconciliations/${r.id}/approve`, {});
+    }
+    await login(page);
+
+    await page.goto('/accounting/financial-close');
+    await page.getByTestId('close-start').click();
+    await page.getByTestId('close-period').click();
+    await page.getByRole('option', { name: period.name }).click();
+    await page.getByTestId('close-start-confirm').click();
+    await expect(page).toHaveURL(/\/accounting\/financial-close\/[0-9a-f-]+$/);
+    await expect(page.getByTestId('close-status')).toHaveText('IN PROGRESS');
+    await expect(page.getByTestId('close-task')).toHaveCount(17);
+
+    // Work every required manual task.
+    for (const key of [
+      'MANUAL_ACCRUALS',
+      'MANUAL_PREPAYMENTS',
+      'MANUAL_SUSPENSE',
+      'MANUAL_STATEMENT_REVIEW',
+    ]) {
+      await page
+        .locator(`[data-testid="close-task"][data-key="${key}"]`)
+        .getByTestId('close-task-edit')
+        .click();
+      await page.getByTestId('task-status').click();
+      await page.getByRole('option', { name: 'DONE', exact: true }).click();
+      await page.getByTestId('task-notes').fill('Reviewed');
+      await page.getByTestId('task-save').click();
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+    }
+    await expect(page.getByTestId('close-status')).toHaveText('READY');
+
+    const url = page.url();
+    await login(page, FINANCE);
+    await page.goto(url);
+    await page.getByTestId('close-approve').click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Approve' }).click();
+    await expect(page.getByTestId('close-status')).toHaveText('APPROVED');
+    await page.getByTestId('close-complete').click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Close period' }).click();
+    await expect(page.getByTestId('close-status')).toHaveText('COMPLETED');
+
+    // Leave the period open for the rest of the suite (and re-runs).
+    await login(page);
+    await apiCall(page, 'post', `/fiscal-periods/${period.id}/reopen`, {
+      reason: 'Playwright suite cleanup',
+    });
   });
 });

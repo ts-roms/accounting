@@ -34,7 +34,12 @@ test.describe('fixed assets & banking', () => {
     await page.goto('/fixed-assets/depreciation');
     await page.getByTestId('new-run').click();
     // On a fresh database no run exists yet, so the dialog defaults to January; pick the acquisition month.
-    if (!(await page.getByTestId('run-line').first().isVisible().catch(() => false))) {
+    const preview = page.getByTestId('run-line').first();
+    const hasPreview = await preview
+      .waitFor({ state: 'visible', timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!hasPreview) {
       await page.getByTestId('run-period').click();
       await page.getByRole('option', { name: /March 2026/ }).click();
     }

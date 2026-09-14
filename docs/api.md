@@ -307,6 +307,23 @@ New error codes: `ACCOUNTING_PERIOD_SOFT_CLOSED`, `ACCOUNTING_PERIOD_LOCKED`, `S
 | GET         | `/reconciliations/summary` also returns `banks[]` (ledger balance, latest statement state, unmatched / possible / exception counts)                                            | `reconciliation.view`                            |
 | GET / PATCH | `/accounting-policies` `{ reconciliationMateriality?, reconciliationStaleDays? }`                                                                                              | `reconciliation.view` / `policy.manage`          |
 
+`PATCH /accounting-policies` also accepts the close policy flags (`closeRequireReconciliations`,
+`closeRequireBankReconciliation`, `closeRequireDepreciation`, `closeRequireFxRevaluation`,
+`closeBlockOnUnapprovedJournals`, `closeBlockOnOpenExceptions`, `closeRequireIntegrityOk`,
+`closeLockOnComplete`).
+
+### Financial close (all require `X-Company-Id`; see `docs/financial-close.md`)
+
+| Method     | Path                                                                                                                                                       | Permission                    |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| GET / POST | `/financial-closes` (paginated; `status`, `fiscalYearId`), `POST { fiscalPeriodId, closeType? }` (409 `DUPLICATE` while a live close exists)               | `close.view` / `close.manage` |
+| GET        | `/financial-closes/blockers?fiscalPeriodId` - evaluate the checks without starting a close                                                                 | `close.view`                  |
+| GET / POST | `/financial-closes/:id` (tasks, blockers, progress), `/:id/refresh`                                                                                        | `close.view` / `close.manage` |
+| PATCH      | `/financial-closes/:id/tasks/:taskId { status?, ownerId?, reviewerId?, notes?, reason? }` (AUTO tasks refuse; `SKIPPED` on a required task needs `reason`) | `close.manage`                |
+| POST       | `/financial-closes/:id/tasks { title, required?, ownerId? }`, `/:id/cancel { reason }`                                                                     | `close.manage`                |
+| POST       | `/financial-closes/:id/approve { notes? }` - refuses with `CLOSE_BLOCKED` (422; `details.blockers`, `details.pendingTasks`)                                | `close.approve`               |
+| POST       | `/financial-closes/:id/complete { notes? }` - closes (and per policy locks) the period in the same transaction                                             | `period.close`                |
+
 ### Audit & health
 
 | Method | Path                                                                                                                 | Notes                         |

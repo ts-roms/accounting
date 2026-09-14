@@ -281,10 +281,21 @@ A second programme strengthens the delivered system along the lines of
   control rule, new `POSSIBLE_MATCH` line status (suggested, not consumed)
 - Tests: matching unit (+2), Playwright (+1)
 
-### H4-H9 (planned)
+### H4 - Financial close (COMPLETE)
 
-Financial close,
-enterprise controls (SoD/approvals/suspense/history), data infrastructure
+- Close checklist per period (17 / 18 template tasks): automatic checks
+  evaluated from ledger data (reconciliations, bank, depreciation, FX,
+  unposted journals, open exceptions, trial balance, integrity) and manual
+  tasks with owner / reviewer / notes / skip reason; custom tasks
+- Policy-driven blockers (`closeRequire*`, `closeBlockOn*`,
+  `closeLockOnComplete`), `CLOSE_BLOCKED` refusal with details, approval
+  withdrawn on regression, completion closes / locks the period in one
+  transaction; Accounting → Financial Close list + detail screens
+- Tests: API integration 119 (+4 close scenarios), Playwright (+1)
+
+### H5-H9 (planned)
+
+Enterprise controls (SoD/approvals/suspense/history), data infrastructure
 (imports, opening balances, numbering), reporting engine, reliability,
 consolidation readiness.
 

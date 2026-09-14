@@ -72,6 +72,9 @@ export const PERMISSION_DEFINITIONS = [
   define('reconciliation.prepare', 'ACCOUNTING', 'Run subledger reconciliations, log and resolve exceptions'),
   define('reconciliation.approve', 'ACCOUNTING', 'Review and approve subledger reconciliations'),
   define('policy.manage', 'ACCOUNTING', 'Manage accounting policies (materiality, close blockers)'),
+  define('close.view', 'ACCOUNTING', 'View financial close checklists'),
+  define('close.manage', 'ACCOUNTING', 'Start closes, work checklist tasks'),
+  define('close.approve', 'ACCOUNTING', 'Give management approval to a financial close'),
 
   // Sales / AR
   define('customer.view', 'SALES', 'View customers'),

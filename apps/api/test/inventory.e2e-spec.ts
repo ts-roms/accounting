@@ -172,6 +172,13 @@ describe('Inventory (e2e)', () => {
     expect((await journalLine(posted.body.journalEntryId, '5200'))[0].credit).toBe('1000.0000');
     expect((await onHand(fifoId)).totals).toEqual({ quantity: '10.0000', value: '1000.0000' });
     await valuation();
+    // The valuation is as-of on both sides: the day before, only the opening stock exists.
+    const before = await as(http().get('/api/v1/inventory/valuation?asOf=2026-08-31')).expect(200);
+    expect(before.body.totalSubledger).toBe('40000.0000');
+    expect(before.body.totalLedger).toBe('40000.0000');
+    expect(before.body.reconciled).toBe(true);
+    const main = before.body.byWarehouse.find((w: { code: string }) => w.code === 'MAIN');
+    expect(main.quantity).toBe('200.0000');
   });
 
   it('goods receipt of a stocked PO line accrues Dr inventory / Cr GRNI at the PO net price', async () => {

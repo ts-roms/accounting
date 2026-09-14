@@ -101,6 +101,5 @@ corrected so the sample company reconciles from day one.
 
 ## Known limitations (next phases)
 
-- Reconciliation Center UI and bank-reconciliation confidence rules (phase 3).
-- No close checklist or close blockers (phase 4).
+- Close checklists have no due dates or reminders, and the template is fixed in code (see `docs/financial-close.md`).
 - Suspense monitoring, field-level history and the control dashboard (phase 5).

@@ -130,6 +130,20 @@ export class ReconciliationsService {
           reconciliationMateriality:
             input.reconciliationMateriality ?? before.reconciliationMateriality,
           reconciliationStaleDays: input.reconciliationStaleDays ?? before.reconciliationStaleDays,
+          closeRequireReconciliations:
+            input.closeRequireReconciliations ?? before.closeRequireReconciliations,
+          closeRequireBankReconciliation:
+            input.closeRequireBankReconciliation ?? before.closeRequireBankReconciliation,
+          closeRequireDepreciation:
+            input.closeRequireDepreciation ?? before.closeRequireDepreciation,
+          closeRequireFxRevaluation:
+            input.closeRequireFxRevaluation ?? before.closeRequireFxRevaluation,
+          closeBlockOnUnapprovedJournals:
+            input.closeBlockOnUnapprovedJournals ?? before.closeBlockOnUnapprovedJournals,
+          closeBlockOnOpenExceptions:
+            input.closeBlockOnOpenExceptions ?? before.closeBlockOnOpenExceptions,
+          closeRequireIntegrityOk: input.closeRequireIntegrityOk ?? before.closeRequireIntegrityOk,
+          closeLockOnComplete: input.closeLockOnComplete ?? before.closeLockOnComplete,
         })
         .where(eq(accountingPolicies.companyId, companyId))
         .returning();
@@ -139,14 +153,8 @@ export class ReconciliationsService {
           module: MODULE,
           entityType: 'AccountingPolicy',
           entityId: companyId,
-          previousValue: {
-            materiality: before.reconciliationMateriality,
-            staleDays: before.reconciliationStaleDays,
-          },
-          newValue: {
-            materiality: after!.reconciliationMateriality,
-            staleDays: after!.reconciliationStaleDays,
-          },
+          previousValue: { ...before, createdAt: undefined, updatedAt: undefined },
+          newValue: { ...after!, createdAt: undefined, updatedAt: undefined },
           metadata: { actor: actor.email },
           companyId,
         },
@@ -219,7 +227,12 @@ export class ReconciliationsService {
   async summary(
     companyId: string,
     asOf: string,
-  ): Promise<{ asOf: string; materiality: string; areas: AreaSummary[]; banks: BankAccountSummary[] }> {
+  ): Promise<{
+    asOf: string;
+    materiality: string;
+    areas: AreaSummary[];
+    banks: BankAccountSummary[];
+  }> {
     const policy = await this.policy(companyId);
     const currency = await this.balances.currency(companyId);
     const materiality = Money.of(policy.reconciliationMateriality, currency);
@@ -254,7 +267,12 @@ export class ReconciliationsService {
     const accountsList = await this.banking.listAccounts(companyId);
     const out: BankAccountSummary[] = [];
     for (const a of accountsList) {
-      const statements = await this.statements.list(companyId, { bankAccountId: a.id, page: 1, pageSize: 1, sortDir: 'desc' });
+      const statements = await this.statements.list(companyId, {
+        bankAccountId: a.id,
+        page: 1,
+        pageSize: 1,
+        sortDir: 'desc',
+      });
       const latest = statements.items[0];
       let reconciliationStatus: BankAccountSummary['reconciliationStatus'] = 'NONE';
       if (latest) {

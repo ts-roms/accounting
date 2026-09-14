@@ -9,6 +9,8 @@ import {
   WORKFLOW_DOCUMENT_TYPES,
   RECONCILIATION_AREAS,
   SUBLEDGER_RECONCILIATION_STATUSES,
+  CLOSE_STATUSES,
+  CLOSE_TYPES,
 } from '@accounting/types';
 import { amountSchema, isoDateSchema } from './accounting';
 import {
@@ -229,11 +231,63 @@ export const resolveReconciliationExceptionSchema = z.object({
 });
 export type ResolveReconciliationExceptionInput = z.infer<typeof resolveReconciliationExceptionSchema>;
 
-/** Company accounting policies: what counts as material, and later what blocks a close. */
-export const updateAccountingPolicySchema = z.object({
+/** Close-blocker policy: which automatic checks must pass before approval / completion. */
+export const closePolicySchema = z.object({
+  closeRequireReconciliations: z.boolean().optional(),
+  closeRequireBankReconciliation: z.boolean().optional(),
+  closeRequireDepreciation: z.boolean().optional(),
+  closeRequireFxRevaluation: z.boolean().optional(),
+  closeBlockOnUnapprovedJournals: z.boolean().optional(),
+  closeBlockOnOpenExceptions: z.boolean().optional(),
+  closeRequireIntegrityOk: z.boolean().optional(),
+  closeLockOnComplete: z.boolean().optional(),
+});
+export type ClosePolicyInput = z.infer<typeof closePolicySchema>;
+
+/** Company accounting policies: what counts as material and what blocks a close. */
+export const updateAccountingPolicySchema = closePolicySchema.extend({
   /** Absolute variance (base currency) up to which a reconciliation counts as reconciled. */
   reconciliationMateriality: amountSchema.optional(),
   /** A reconciliation older than this many days is considered stale. */
   reconciliationStaleDays: z.coerce.number().int().min(1).max(365).optional(),
 });
 export type UpdateAccountingPolicyInput = z.infer<typeof updateAccountingPolicySchema>;
+
+// ------------------------------------------------ hardening: financial close
+
+export const startCloseSchema = z.object({
+  fiscalPeriodId: uuidSchema,
+  closeType: z.enum(CLOSE_TYPES).default('MONTH'),
+});
+export type StartCloseInput = z.infer<typeof startCloseSchema>;
+
+export const listClosesQuerySchema = paginationQuerySchema.extend({
+  status: z.enum(CLOSE_STATUSES).optional(),
+  closeType: z.enum(CLOSE_TYPES).optional(),
+});
+export type ListClosesQuery = z.infer<typeof listClosesQuerySchema>;
+
+/** Manual tasks are worked by people; AUTO tasks only accept owner / reviewer / notes. */
+export const updateCloseTaskSchema = z.object({
+  status: z.enum(['PENDING', 'IN_PROGRESS', 'DONE', 'SKIPPED']).optional(),
+  ownerId: uuidSchema.nullable().optional(),
+  reviewerId: uuidSchema.nullable().optional(),
+  notes: optionalText(2000),
+  /** Required when skipping a required task. */
+  reason: optionalText(500),
+});
+export type UpdateCloseTaskInput = z.infer<typeof updateCloseTaskSchema>;
+
+export const addCloseTaskSchema = z.object({
+  title: nameSchema,
+  required: z.boolean().default(true),
+  ownerId: uuidSchema.optional(),
+});
+export type AddCloseTaskInput = z.infer<typeof addCloseTaskSchema>;
+
+export const closeDecisionSchema = z.object({
+  notes: optionalText(1000),
+});
+export type CloseDecisionInput = z.infer<typeof closeDecisionSchema>;
+
+

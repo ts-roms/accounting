@@ -207,23 +207,30 @@ export class InventoryReportsService {
   }
 
   /**
-   * Inventory subledger vs. the general ledger, per inventory account. The
-   * subledger value is the sum of balance values of products posting to that
-   * account; the ledger side is the account's balance at `asOf`.
+   * Inventory subledger vs. the general ledger, per inventory account, both as
+   * of `asOf`. The subledger value is the signed sum of movement costs up to the
+   * date for products posting to that account (running balances only know
+   * "now"); the ledger side is the account's balance at `asOf`.
    */
   async valuation(companyId: string, query: ValuationQuery): Promise<ValuationReport> {
     const currency = await this.accounts.companyCurrency(companyId);
     const inventoryDefault = await this.accounts.resolveMapped(companyId, 'INVENTORY');
+    const signedCost = sql<string>`coalesce(sum(case when ${inventoryMovements.movementType} in ('RECEIPT', 'TRANSFER_IN', 'ADJUSTMENT_IN', 'RETURN_IN') then ${inventoryMovements.totalCost} else -${inventoryMovements.totalCost} end), 0)`;
+    const signedQuantity = sql<string>`coalesce(sum(case when ${inventoryMovements.movementType} in ('RECEIPT', 'TRANSFER_IN', 'ADJUSTMENT_IN', 'RETURN_IN') then ${inventoryMovements.quantity} else -${inventoryMovements.quantity} end), 0)`;
+    const upToDate = and(
+      eq(inventoryMovements.companyId, companyId),
+      lte(inventoryMovements.movementDate, query.asOf),
+    );
     // Effective inventory account per product: product override -> category override -> mapping.
     const rows = await this.db
       .select({
         accountId: sql<string>`coalesce(${products.inventoryAccountId}, ${productCategories.inventoryAccountId}, ${sql.raw(`'${inventoryDefault.id}'::uuid`)})`,
-        value: sql<string>`coalesce(sum(${inventoryBalances.totalCost}), 0)`,
+        value: signedCost,
       })
-      .from(inventoryBalances)
-      .innerJoin(products, eq(products.id, inventoryBalances.productId))
+      .from(inventoryMovements)
+      .innerJoin(products, eq(products.id, inventoryMovements.productId))
       .leftJoin(productCategories, eq(productCategories.id, products.categoryId))
-      .where(eq(inventoryBalances.companyId, companyId))
+      .where(upToDate)
       .groupBy(sql`1`);
     const accountIds = [...new Set([inventoryDefault.id, ...rows.map((r) => r.accountId)])];
     const accountRows = await this.db
@@ -257,11 +264,14 @@ export class InventoryReportsService {
         warehouseId: warehouses.id,
         code: warehouses.code,
         name: warehouses.name,
-        value: sql<string>`coalesce(sum(${inventoryBalances.totalCost}), 0)`,
-        quantity: sql<string>`coalesce(sum(${inventoryBalances.quantityOnHand}), 0)`,
+        value: signedCost,
+        quantity: signedQuantity,
       })
       .from(warehouses)
-      .leftJoin(inventoryBalances, eq(inventoryBalances.warehouseId, warehouses.id))
+      .leftJoin(
+        inventoryMovements,
+        and(eq(inventoryMovements.warehouseId, warehouses.id), upToDate),
+      )
       .where(eq(warehouses.companyId, companyId))
       .groupBy(warehouses.id, warehouses.code, warehouses.name)
       .orderBy(asc(warehouses.code));

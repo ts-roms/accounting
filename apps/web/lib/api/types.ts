@@ -1914,6 +1914,14 @@ export interface AccountingPolicy {
   companyId: string;
   reconciliationMateriality: string;
   reconciliationStaleDays: number;
+  closeRequireReconciliations: boolean;
+  closeRequireBankReconciliation: boolean;
+  closeRequireDepreciation: boolean;
+  closeRequireFxRevaluation: boolean;
+  closeBlockOnUnapprovedJournals: boolean;
+  closeBlockOnOpenExceptions: boolean;
+  closeRequireIntegrityOk: boolean;
+  closeLockOnComplete: boolean;
 }
 
 export interface ReconciliationLine {
@@ -2001,4 +2009,67 @@ export interface ReconciliationSummary {
   materiality: string;
   areas: ReconciliationAreaSummary[];
   banks: BankAccountSummary[];
+}
+
+// ------------------------------------------------- Hardening: financial close
+
+import type { CloseStatus, CloseTaskKind, CloseTaskStatus, CloseType } from '@accounting/types';
+
+export interface CloseBlocker {
+  key: string;
+  message: string;
+  blocking: boolean;
+  detail?: Record<string, unknown>;
+}
+
+export interface CloseTaskView {
+  id: string;
+  closeId: string;
+  sequence: number;
+  key: string;
+  title: string;
+  kind: CloseTaskKind;
+  required: boolean;
+  status: CloseTaskStatus;
+  detail: Record<string, unknown>;
+  ownerId: string | null;
+  ownerName: string | null;
+  reviewerId: string | null;
+  reviewerName: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  completedBy: string | null;
+  completedByName: string | null;
+  notes: string | null;
+  skipReason: string | null;
+}
+
+export interface CloseView {
+  id: string;
+  fiscalPeriodId: string;
+  closeType: CloseType;
+  status: CloseStatus;
+  periodName: string;
+  periodStatus: FiscalPeriodStatus;
+  periodStart: string;
+  periodEnd: string;
+  evaluatedAt: string | null;
+  startedBy: string | null;
+  startedByName: string | null;
+  approvedBy: string | null;
+  approvedByName: string | null;
+  approvedAt: string | null;
+  approvalNotes: string | null;
+  completedByName: string | null;
+  completedAt: string | null;
+  cancelReason: string | null;
+  taskCount: number;
+  doneCount: number;
+  progress: number;
+  createdAt: string;
+}
+
+export interface CloseDetail extends CloseView {
+  tasks: CloseTaskView[];
+  blockers: CloseBlocker[];
 }

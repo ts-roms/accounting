@@ -14,3 +14,4 @@ export * from './budgeting';
 export * from './enterprise';
 export * from './ai';
 export * from './reconciliation';
+export * from './financial-close';

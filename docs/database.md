@@ -185,6 +185,16 @@ status while its period is `LOCKED`, whatever client writes it.
 Migration: `0012_reconciliation.sql` (also adds `RECONCILIATION` to `attachment_entity_type`).
 `0013_bank_match_confidence.sql` adds `banking_settings.auto_match_min_confidence` and the `POSSIBLE_MATCH` statement-line status.
 
+## Hardening phase 4 (financial close)
+
+| Table              | Purpose                                                        | Notable constraints                                                                    |
+| ------------------ | -------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `financial_closes` | One close per period: status, blocker snapshot, approval trail | partial unique `(fiscal_period_id) WHERE status IN ('IN_PROGRESS','READY','APPROVED')` |
+| `close_tasks`      | Checklist rows (AUTO evaluated / MANUAL worked)                | `(close_id, key)` unique; cascade with the close                                       |
+
+`accounting_policies` gains the close policy booleans (`close_require_*`,
+`close_block_on_*`, `close_lock_on_complete`). Migration: `0014_financial_close.sql`.
+
 ## Posted-journal immutability
 
 Migration `0003_posted_journal_immutability.sql` installs triggers that reject

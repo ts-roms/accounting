@@ -14,7 +14,10 @@ const switched = new WeakSet<BrowserContext>();
  *
  * Never sign the shared admin session out through the UI: every test reuses
  * its refresh token, and a revoked token trips the reuse detector, which
- * revokes every session of the user. Switching users only clears cookies.
+ * revokes every session of the user. Switching users only clears cookies -
+ * after leaving the app page, so that no in-flight request of the previous
+ * user can fail its refresh and clear the freshly set cookies (a 401 refresh
+ * response carries cookie-clearing headers).
  */
 export async function login(page: Page, creds = ADMIN) {
   const context = page.context();
@@ -22,6 +25,7 @@ export async function login(page: Page, creds = ADMIN) {
     await page.goto('/dashboard');
     if (/\/dashboard/.test(page.url())) return;
   }
+  await page.goto('about:blank');
   await context.clearCookies();
   if (creds === ADMIN) switched.delete(context);
   else switched.add(context);

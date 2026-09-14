@@ -14,6 +14,7 @@ import { AccountingModule } from './modules/accounting/accounting.module';
 import { AiModule } from './modules/ai/ai.module';
 import { IntegrityModule } from './modules/accounting/integrity/integrity.module';
 import { ReconciliationModule } from './modules/reconciliation/reconciliation.module';
+import { FinancialCloseModule } from './modules/financial-close/financial-close.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AttachmentsModule } from './modules/attachments/attachments.module';
@@ -99,6 +100,7 @@ import { UsersModule } from './modules/users/users.module';
     AiModule,
     ReconciliationModule,
     IntegrityModule,
+    FinancialCloseModule,
     WorkflowsModule,
     AttachmentsModule,
     BudgetingModule,

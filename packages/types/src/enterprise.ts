@@ -89,3 +89,35 @@ export type SubledgerReconciliationStatus = (typeof SUBLEDGER_RECONCILIATION_STA
 
 export const RECONCILIATION_EXCEPTION_STATUSES = ['OPEN', 'RESOLVED'] as const;
 export type ReconciliationExceptionStatus = (typeof RECONCILIATION_EXCEPTION_STATUSES)[number];
+
+// ------------------------------------------------ hardening: financial close
+
+export const CLOSE_TYPES = ['MONTH', 'QUARTER', 'YEAR'] as const;
+export type CloseType = (typeof CLOSE_TYPES)[number];
+
+/** IN_PROGRESS -> READY (all required tasks done, no blockers) -> APPROVED -> COMPLETED (period closed / locked). */
+export const CLOSE_STATUSES = ['IN_PROGRESS', 'READY', 'APPROVED', 'COMPLETED', 'CANCELLED'] as const;
+export type CloseStatus = (typeof CLOSE_STATUSES)[number];
+
+export const CLOSE_TASK_KINDS = ['AUTO', 'MANUAL'] as const;
+export type CloseTaskKind = (typeof CLOSE_TASK_KINDS)[number];
+
+export const CLOSE_TASK_STATUSES = ['PENDING', 'IN_PROGRESS', 'DONE', 'SKIPPED', 'BLOCKED'] as const;
+export type CloseTaskStatus = (typeof CLOSE_TASK_STATUSES)[number];
+
+/** Checks the system evaluates itself; manual tasks are whatever the template says. */
+export const CLOSE_AUTO_CHECKS = [
+  'BANK_RECONCILIATION',
+  'AR_RECONCILIATION',
+  'AP_RECONCILIATION',
+  'INVENTORY_RECONCILIATION',
+  'FIXED_ASSET_RECONCILIATION',
+  'TAX_RECONCILIATION',
+  'DEPRECIATION',
+  'FX_REVALUATION',
+  'UNAPPROVED_JOURNALS',
+  'OPEN_RECONCILIATION_EXCEPTIONS',
+  'TRIAL_BALANCE',
+  'INTEGRITY',
+] as const;
+export type CloseAutoCheck = (typeof CLOSE_AUTO_CHECKS)[number];
