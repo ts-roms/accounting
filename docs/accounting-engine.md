@@ -235,7 +235,10 @@ Bank transactions post Dr / Cr the bank GL account against the counterparty
 (`modules/banking/matching.logic.ts`) is pure: a line matches exactly one
 posted ledger line with the same signed amount inside the date tolerance
 (reference breaks ties), several candidates are an exception, an identical
-earlier line is a duplicate. Reconciliation difference:
+earlier line is a duplicate. Each automatic match carries a confidence (HIGH
+with reference evidence, MEDIUM otherwise); below the company's
+`autoMatchMinConfidence` bar the line becomes `POSSIBLE_MATCH` with the
+suggested ledger line for a person to confirm. Reconciliation difference:
 `(statement + deposits in transit - outstanding payments) - (ledger + unrecorded
 credits - unrecorded debits)`; completion requires zero and every line
 explained. A voided transaction and its reversal are excluded from reconciling

@@ -25,6 +25,7 @@ import { DRIZZLE, type Database, type DbExecutor } from '@/database/database.typ
 import {
   accountingPolicies,
   accounts,
+  bankReconciliations,
   reconciliationExceptions,
   reconciliations,
   users,
@@ -33,6 +34,8 @@ import {
   type ReconciliationException,
 } from '@/database/schema';
 import { AuditService } from '@/modules/audit/audit.service';
+import { BankingService } from '@/modules/banking/banking.service';
+import { StatementsService } from '@/modules/banking/statements.service';
 import { SubledgerBalancesService, type BalanceLine } from './subledger-balances.service';
 
 const MODULE = 'RECONCILIATION';
@@ -57,6 +60,21 @@ export interface ReconciliationDetail extends ReconciliationView {
   unexplained: string;
 }
 
+export interface BankAccountSummary {
+  bankAccountId: string;
+  code: string;
+  name: string;
+  currency: string;
+  ledgerBalance: string;
+  lastStatementDate: string | null;
+  /** Latest statement's reconciliation state and what is still unexplained on it. */
+  latestStatementId: string | null;
+  reconciliationStatus: 'NONE' | 'IN_PROGRESS' | 'COMPLETED';
+  unmatched: number;
+  possible: number;
+  exceptions: number;
+}
+
 export interface AreaSummary {
   area: ReconciliationArea;
   /** Latest recorded reconciliation for the area, if any. */
@@ -79,6 +97,8 @@ export class ReconciliationsService {
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly audit: AuditService,
     private readonly balances: SubledgerBalancesService,
+    private readonly banking: BankingService,
+    private readonly statements: StatementsService,
   ) {}
 
   // ---------------------------------------------------------------- policies
@@ -199,7 +219,7 @@ export class ReconciliationsService {
   async summary(
     companyId: string,
     asOf: string,
-  ): Promise<{ asOf: string; materiality: string; areas: AreaSummary[] }> {
+  ): Promise<{ asOf: string; materiality: string; areas: AreaSummary[]; banks: BankAccountSummary[] }> {
     const policy = await this.policy(companyId);
     const currency = await this.balances.currency(companyId);
     const materiality = Money.of(policy.reconciliationMateriality, currency);
@@ -225,7 +245,40 @@ export class ReconciliationsService {
       }
       areas.push({ area, latest, live, stale: !latest || latest.computedAt < staleBefore });
     }
-    return { asOf, materiality: materiality.toString(), areas };
+    const banks = await this.bankSummary(companyId);
+    return { asOf, materiality: materiality.toString(), areas, banks };
+  }
+
+  /** Bank accounts: ledger balance plus the state of the latest statement's reconciliation. */
+  private async bankSummary(companyId: string): Promise<BankAccountSummary[]> {
+    const accountsList = await this.banking.listAccounts(companyId);
+    const out: BankAccountSummary[] = [];
+    for (const a of accountsList) {
+      const statements = await this.statements.list(companyId, { bankAccountId: a.id, page: 1, pageSize: 1, sortDir: 'desc' });
+      const latest = statements.items[0];
+      let reconciliationStatus: BankAccountSummary['reconciliationStatus'] = 'NONE';
+      if (latest) {
+        const [rec] = await this.db
+          .select({ status: bankReconciliations.status })
+          .from(bankReconciliations)
+          .where(eq(bankReconciliations.statementId, latest.id));
+        reconciliationStatus = rec?.status ?? 'IN_PROGRESS';
+      }
+      out.push({
+        bankAccountId: a.id,
+        code: a.code,
+        name: a.name,
+        currency: a.currency,
+        ledgerBalance: a.ledgerBalance,
+        lastStatementDate: a.lastStatementDate,
+        latestStatementId: latest?.id ?? null,
+        reconciliationStatus,
+        unmatched: latest?.unmatchedCount ?? 0,
+        possible: latest?.possibleCount ?? 0,
+        exceptions: latest?.exceptionCount ?? 0,
+      });
+    }
+    return out;
   }
 
   // --------------------------------------------------------------- commands

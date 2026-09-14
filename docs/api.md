@@ -304,6 +304,7 @@ New error codes: `ACCOUNTING_PERIOD_SOFT_CLOSED`, `ACCOUNTING_PERIOD_LOCKED`, `S
 | GET         | `/reconciliations/:id` (lines, exceptions, `unexplained`)                                                                                                                      | `reconciliation.view`                            |
 | POST        | `/reconciliations/:id/assign { reviewerId, notes? }`, `/notes { notes }`, `/exceptions { description, amount, reference? }`, `/exceptions/:exceptionId/resolve { resolution }` | `reconciliation.prepare`                         |
 | POST        | `/reconciliations/:id/approve { notes? }` - four-eyes; open exceptions or an unexplained variance above materiality refuse (`RECONCILIATION_UNRESOLVED`)                       | `reconciliation.approve`                         |
+| GET         | `/reconciliations/summary` also returns `banks[]` (ledger balance, latest statement state, unmatched / possible / exception counts)                                            | `reconciliation.view`                            |
 | GET / PATCH | `/accounting-policies` `{ reconciliationMateriality?, reconciliationStaleDays? }`                                                                                              | `reconciliation.view` / `policy.manage`          |
 
 ### Audit & health

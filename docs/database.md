@@ -183,6 +183,7 @@ status while its period is `LOCKED`, whatever client writes it.
 | `reconciliation_exceptions` | Explained parts of a variance with resolution                      | cascade with their reconciliation                                                      |
 
 Migration: `0012_reconciliation.sql` (also adds `RECONCILIATION` to `attachment_entity_type`).
+`0013_bank_match_confidence.sql` adds `banking_settings.auto_match_min_confidence` and the `POSSIBLE_MATCH` statement-line status.
 
 ## Posted-journal immutability
 

@@ -63,6 +63,7 @@ export interface StatementView extends BankStatement {
   matchedCount: number;
   unmatchedCount: number;
   exceptionCount: number;
+  possibleCount: number;
 }
 
 export interface StatementLineView extends BankStatementLine {
@@ -319,7 +320,7 @@ export class StatementsService {
         .where(
           and(
             eq(bankStatementLines.statementId, statementId),
-            inArray(bankStatementLines.status, ['UNMATCHED', 'EXCEPTION']),
+            inArray(bankStatementLines.status, ['UNMATCHED', 'POSSIBLE_MATCH', 'EXCEPTION']),
           ),
         );
       await this.runMatching(
@@ -490,7 +491,7 @@ export class StatementsService {
           and(
             eq(bankStatementLines.id, lineId),
             eq(bankStatementLines.statementId, statementId),
-            inArray(bankStatementLines.status, ['UNMATCHED', 'EXCEPTION']),
+            inArray(bankStatementLines.status, ['UNMATCHED', 'POSSIBLE_MATCH', 'EXCEPTION']),
           ),
         );
       await this.audit.record(
@@ -544,7 +545,9 @@ export class StatementsService {
       currency,
     );
     const lines = await this.lines(companyId, statementId, {});
-    const unexplained = lines.filter((l) => l.status === 'UNMATCHED' || l.status === 'EXCEPTION');
+    const unexplained = lines.filter(
+      (l) => l.status === 'UNMATCHED' || l.status === 'POSSIBLE_MATCH' || l.status === 'EXCEPTION',
+    );
     const unrecordedCredits = Money.sum(
       unexplained.filter((l) => Number(l.amount) > 0).map((l) => Money.of(l.amount, currency)),
       currency,
@@ -701,6 +704,7 @@ export class StatementsService {
       candidates,
       currency,
       settings.matchDateToleranceDays,
+      settings.autoMatchMinConfidence,
     );
     for (const o of outcomes) {
       if (o.status === 'MATCHED' && o.journalLineId) {
@@ -716,7 +720,9 @@ export class StatementsService {
         .set({
           status: o.status,
           matchNote:
-            o.status === 'EXCEPTION' ? `${o.note} candidates:${o.candidates.join(',')}` : o.note,
+            o.status === 'EXCEPTION' || o.status === 'POSSIBLE_MATCH'
+              ? `${o.note} candidates:${o.candidates.join(',')}`
+              : o.note,
         })
         .where(eq(bankStatementLines.id, o.statementLineId));
     }
@@ -822,6 +828,7 @@ export class StatementsService {
         matchedCount: sql<number>`(select count(*)::int from bank_statement_lines l where l.statement_id = ${bankStatements.id} and l.status in ('MATCHED','RECONCILED'))`,
         unmatchedCount: count('UNMATCHED'),
         exceptionCount: count('EXCEPTION'),
+        possibleCount: count('POSSIBLE_MATCH'),
       })
       .from(bankStatements)
       .innerJoin(bankAccounts, eq(bankAccounts.id, bankStatements.bankAccountId))

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { login } from './helpers';
+import { FINANCE, login } from './helpers';
 
 async function pickAccount(page: Page, rowIndex: number, search: string) {
   await page.getByTestId('account-combobox').nth(rowIndex).click();
@@ -89,5 +89,42 @@ test.describe('accounting controls', () => {
     await expect(page.getByText('Posted journals balance')).toBeVisible();
     await expect(page.getByRole('row').filter({ hasText: 'UNBALANCED_JOURNAL' })).toContainText('PASS');
     await expect(page.getByRole('row').filter({ hasText: 'AR_CONTROL_VARIANCE' })).toContainText('PASS');
+  });
+});
+
+test.describe('reconciliation center', () => {
+  test.slow();
+
+  test('runs an area, logs and resolves an exception, and a second user approves', async ({ page }) => {
+    await login(page);
+    await page.goto('/accounting/reconciliation');
+    await expect(page.getByTestId('recon-tile')).toHaveCount(5);
+    await expect(page.getByTestId('bank-tile').first()).toBeVisible();
+    // Run accounts payable as admin (the preparer).
+    const ap = page.getByTestId('recon-tile').filter({ hasText: 'Accounts payable' });
+    await ap.getByTestId('recon-run').click();
+    await expect(page).toHaveURL(/\/accounting\/reconciliation\/[0-9a-f-]+$/);
+    await expect(page.getByTestId('recon-status')).toHaveText('RECONCILED');
+    await expect(page.getByTestId('recon-line').first()).toBeVisible();
+    // The preparer never sees Approve.
+    await expect(page.getByTestId('recon-approve')).toHaveCount(0);
+    // Log an exception and resolve it.
+    await page.getByTestId('recon-add-exception').click();
+    await page.getByTestId('exc-description').fill('Timing: payment cleared next day');
+    await page.getByTestId('exc-amount').fill('0');
+    await page.getByTestId('exc-save').click();
+    await expect(page.getByTestId('recon-exception')).toHaveCount(1);
+    await page.getByTestId('recon-resolve').click();
+    await page.getByTestId('exc-resolution').fill('Cleared on the following statement');
+    await page.getByTestId('exc-resolve-confirm').click();
+    await expect(page.getByTestId('recon-exception')).toContainText('RESOLVED');
+    const url = page.url();
+    // Finance approves.
+    await login(page, FINANCE);
+    await page.goto(url);
+    await page.getByTestId('recon-approve').click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Approve' }).click();
+    await expect(page.getByTestId('recon-status')).toHaveText('APPROVED');
+    await expect(page.getByTestId('recon-recompute')).toHaveCount(0);
   });
 });

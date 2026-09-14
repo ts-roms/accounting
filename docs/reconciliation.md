@@ -65,6 +65,48 @@ added to a reconciliation (`attachments/RECONCILIATION/:id`).
 - `reconciliationStaleDays` — after this many days a recorded reconciliation
   counts as stale in the summary (default 35).
 
+## Reconciliation Center
+
+Accounting → Reconciliation Center renders the summary: one tile per area
+(live subledger / ledger / variance, latest recorded status, stale flag,
+Run / Open latest), one tile per bank account (ledger balance, latest statement
+state, unmatched / possible / exception counts, link to the statement
+workspace), the policy dialog and the list of recorded reconciliations. The
+detail page shows the account lines with drill-down to the general ledger,
+the review panel (preparer, reviewer, approver, notes), exceptions with
+resolve, attachments and the Approve action - which only appears for someone
+other than the preparer.
+
+## Bank matching confidence
+
+The bank matching engine scores every automatic match: **HIGH** when amount,
+date window and a reference agree, **MEDIUM** for a unique amount / date hit.
+(default MEDIUM) is the control
+rule: below the bar a statement line becomes with the
+suggested ledger line for a person to confirm, and the candidate is not
+consumed. Nothing uncertain is reconciled automatically.
+
+## Reconciliation Center
+
+Accounting → Reconciliation Center renders the summary: one tile per area
+(live subledger / ledger / variance, latest recorded status, stale flag,
+Run / Open latest), one tile per bank account (ledger balance, latest
+statement state, unmatched / possible / exception counts, link to the
+statement workspace), the policy dialog and the list of recorded
+reconciliations. The detail page shows the account lines with drill-down to
+the general ledger, the review panel (preparer, reviewer, approver, notes),
+exceptions with resolve, attachments and the Approve action - which only
+appears for someone other than the preparer.
+
+## Bank matching confidence
+
+The bank matching engine scores every automatic match: **HIGH** when amount,
+date window and a reference agree, **MEDIUM** for a unique amount / date hit.
+`banking_settings.autoMatchMinConfidence` (default MEDIUM) is the control
+rule: below the bar a statement line becomes `POSSIBLE_MATCH` with the
+suggested ledger line for a person to confirm, and the candidate is not
+consumed. Nothing uncertain is reconciled automatically.
+
 ## The summary
 
 `GET /reconciliations/summary?asOf` returns one row per area with the latest

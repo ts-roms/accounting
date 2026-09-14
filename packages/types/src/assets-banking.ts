@@ -47,6 +47,8 @@ export type StatementStatus = (typeof STATEMENT_STATUSES)[number];
 /** Outcome of the matching engine for one imported statement line. */
 export const STATEMENT_LINE_STATUSES = [
   'UNMATCHED',
+  /** Exactly one ledger candidate but not enough evidence for the configured auto-match confidence; a person confirms. */
+  'POSSIBLE_MATCH',
   'MATCHED',
   'DUPLICATE',
   'EXCEPTION',
@@ -55,6 +57,10 @@ export const STATEMENT_LINE_STATUSES = [
 export type StatementLineStatus = (typeof STATEMENT_LINE_STATUSES)[number];
 
 export const MATCH_KINDS = ['AUTO', 'MANUAL'] as const;
+
+/** How sure the matching engine is about an automatic match. */
+export const MATCH_CONFIDENCES = ['HIGH', 'MEDIUM'] as const;
+export type MatchConfidence = (typeof MATCH_CONFIDENCES)[number];
 export type MatchKind = (typeof MATCH_KINDS)[number];
 
 export const RECONCILIATION_STATUSES = ['IN_PROGRESS', 'COMPLETED'] as const;

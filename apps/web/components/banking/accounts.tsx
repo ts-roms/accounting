@@ -37,6 +37,11 @@ import {
   Input,
   Skeleton,
   Textarea,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@accounting/ui';
 import { describeError } from '@/lib/api/client';
 import {
@@ -181,10 +186,14 @@ function BankingSettingsCard() {
   const update = useUpdateBankingSettings();
   const form = useForm<z.input<typeof bankingSettingsSchema>, unknown, BankingSettingsInput>({
     resolver: zodResolver(bankingSettingsSchema),
-    defaultValues: { matchDateToleranceDays: 3 },
+    defaultValues: { matchDateToleranceDays: 3, autoMatchMinConfidence: 'MEDIUM' },
   });
   React.useEffect(() => {
-    if (settings.data) form.reset({ matchDateToleranceDays: settings.data.matchDateToleranceDays });
+    if (settings.data)
+      form.reset({
+        matchDateToleranceDays: settings.data.matchDateToleranceDays,
+        autoMatchMinConfidence: settings.data.autoMatchMinConfidence,
+      });
   }, [settings.data, form]);
   const canManage = hasPermission(P['bank-account.manage']);
   return (
@@ -225,6 +234,36 @@ function BankingSettingsCard() {
                     />
                   </FormControl>
                   <FormDescription>Also applies when re-running the matcher.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="autoMatchMinConfidence"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Auto-match confidence</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange} disabled={!canManage}>
+                    <FormControl>
+                      <SelectTrigger data-testid="match-confidence">
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="MEDIUM">
+                        Medium - a unique amount / date hit is matched
+                      </SelectItem>
+                      <SelectItem value="HIGH">
+                        High - a reference must also agree; otherwise suggest only
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    Below the bar a line becomes &quot;possible match&quot; with the suggested
+                    ledger line for a person to confirm - nothing uncertain is reconciled
+                    automatically.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

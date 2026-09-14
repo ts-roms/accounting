@@ -111,3 +111,63 @@ describe('bank matching', () => {
     ).toBe('350.0000');
   });
 });
+
+describe('bank matching confidence rule', () => {
+  const lines = [
+    {
+      id: 'ref',
+      lineDate: '2026-09-02',
+      amount: '5000.0000',
+      reference: 'DEP-1',
+      description: 'Deposit DEP-1',
+    },
+    {
+      id: 'noref',
+      lineDate: '2026-09-03',
+      amount: '-1200.0000',
+      reference: null,
+      description: 'Check',
+    },
+  ];
+  const candidates = [
+    cand('j1', '2026-09-02', '5000', '0', 'DEP-1'),
+    cand('j2', '2026-09-03', '0', '1200'),
+  ];
+
+  it('MEDIUM (default) auto-matches a unique amount / date hit and reports the confidence', () => {
+    const out = matchStatementLines(lines, candidates, PHP, 3);
+    expect(out.map((o) => [o.status, o.confidence])).toEqual([
+      ['MATCHED', 'HIGH'],
+      ['MATCHED', 'MEDIUM'],
+    ]);
+  });
+
+  it('HIGH leaves a reference-less hit as POSSIBLE_MATCH with the suggested line, and does not consume it', () => {
+    const out = matchStatementLines(lines, candidates, PHP, 3, 'HIGH');
+    expect(out[0]).toMatchObject({ status: 'MATCHED', journalLineId: 'j1', confidence: 'HIGH' });
+    expect(out[1]).toMatchObject({
+      status: 'POSSIBLE_MATCH',
+      journalLineId: null,
+      candidates: ['j2'],
+      confidence: 'MEDIUM',
+    });
+    // A later line with the same amount can still claim the unconsumed candidate.
+    const again = matchStatementLines(
+      [
+        ...lines,
+        {
+          id: 'later',
+          lineDate: '2026-09-04',
+          amount: '-1200.0000',
+          reference: null,
+          description: 'x',
+        },
+      ],
+      candidates,
+      PHP,
+      3,
+      'HIGH',
+    );
+    expect(again[2]!.status).toBe('POSSIBLE_MATCH');
+  });
+});

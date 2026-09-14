@@ -1,5 +1,5 @@
 import { Money } from '@accounting/money';
-import type { StatementLineStatus } from '@accounting/types';
+import type { MatchConfidence, StatementLineStatus } from '@accounting/types';
 import { daysBetween } from '@/modules/subledger/subledger.logic';
 
 /**
@@ -31,6 +31,8 @@ export interface MatchOutcome {
   journalLineId: string | null;
   candidates: string[];
   note: string;
+  /** Set on MATCHED / POSSIBLE_MATCH: what the evidence supports. */
+  confidence?: MatchConfidence;
 }
 
 export function signedLedgerAmount(c: LedgerCandidate, currency: string): Money {
@@ -49,6 +51,7 @@ export function matchStatementLines(
   candidates: readonly LedgerCandidate[],
   currency: string,
   toleranceDays: number,
+  minConfidence: MatchConfidence = 'MEDIUM',
 ): MatchOutcome[] {
   const used = new Set<string>();
   const seenKeys = new Set<string>();
@@ -94,16 +97,27 @@ export function matchStatementLines(
       : [];
     const chosen = hits.length === 1 ? hits[0]! : byRef.length === 1 ? byRef[0]! : null;
     if (chosen) {
-      used.add(chosen.journalLineId);
+      // Reference evidence makes a HIGH-confidence match; a lone amount / date hit is MEDIUM.
+      const confidence: MatchConfidence = byRef.some(
+        (c) => c.journalLineId === chosen.journalLineId,
+      )
+        ? 'HIGH'
+        : 'MEDIUM';
+      const accepted = minConfidence === 'MEDIUM' || confidence === 'HIGH';
+      if (accepted) used.add(chosen.journalLineId);
       outcomes.push({
         statementLineId: line.id,
-        status: 'MATCHED',
-        journalLineId: chosen.journalLineId,
+        status: accepted ? 'MATCHED' : 'POSSIBLE_MATCH',
+        journalLineId: accepted ? chosen.journalLineId : null,
         candidates: [chosen.journalLineId],
-        note:
-          hits.length === 1
-            ? 'Single amount / date match.'
-            : 'Reference match among several candidates.',
+        confidence,
+        note: accepted
+          ? hits.length === 1
+            ? confidence === 'HIGH'
+              ? 'Single amount / date match confirmed by reference.'
+              : 'Single amount / date match.'
+            : 'Reference match among several candidates.'
+          : 'Amount and date match but no reference evidence - confirm the suggested line.',
       });
     } else {
       outcomes.push({

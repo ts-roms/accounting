@@ -35,6 +35,7 @@ const LINE_VARIANT: Record<
   'secondary' | 'success' | 'warning' | 'destructive' | 'outline'
 > = {
   UNMATCHED: 'warning',
+  POSSIBLE_MATCH: 'secondary',
   MATCHED: 'success',
   DUPLICATE: 'outline',
   EXCEPTION: 'destructive',

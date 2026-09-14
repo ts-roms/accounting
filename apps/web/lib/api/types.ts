@@ -1284,6 +1284,7 @@ export interface ReconciliationView {
 export interface BankingSettings {
   companyId: string;
   matchDateToleranceDays: number;
+  autoMatchMinConfidence: 'HIGH' | 'MEDIUM';
 }
 
 // ---------------------------------------------------------------- Phase 7: dimensions
@@ -1899,4 +1900,105 @@ export interface IntegrityReport {
   ranAt: string;
   status: 'OK' | 'WARNING' | 'CRITICAL';
   findings: IntegrityFinding[];
+}
+
+// -------------------------------------------------- Hardening: reconciliation
+
+import type {
+  ReconciliationArea,
+  ReconciliationExceptionStatus,
+  SubledgerReconciliationStatus,
+} from '@accounting/types';
+
+export interface AccountingPolicy {
+  companyId: string;
+  reconciliationMateriality: string;
+  reconciliationStaleDays: number;
+}
+
+export interface ReconciliationLine {
+  accountId: string;
+  code: string;
+  name: string;
+  expected: string;
+  actual: string;
+  difference: string;
+  note?: string;
+}
+
+export interface ReconciliationView {
+  id: string;
+  area: ReconciliationArea;
+  asOf: string;
+  controlAccountId: string;
+  controlAccountCode: string;
+  controlAccountName: string;
+  status: SubledgerReconciliationStatus;
+  expectedBalance: string;
+  actualBalance: string;
+  variance: string;
+  materiality: string;
+  computedAt: string;
+  preparedBy: string | null;
+  preparedByName: string | null;
+  reviewerId: string | null;
+  reviewerName: string | null;
+  reviewedAt: string | null;
+  approvedBy: string | null;
+  approvedByName: string | null;
+  approvedAt: string | null;
+  notes: string | null;
+  openExceptions: number;
+  explained: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReconciliationExceptionView {
+  id: string;
+  status: ReconciliationExceptionStatus;
+  description: string;
+  amount: string;
+  reference: string | null;
+  raisedBy: string | null;
+  raisedByName: string | null;
+  resolvedBy: string | null;
+  resolvedByName: string | null;
+  resolvedAt: string | null;
+  resolution: string | null;
+  createdAt: string;
+}
+
+export interface ReconciliationDetail extends ReconciliationView {
+  lines: ReconciliationLine[];
+  exceptions: ReconciliationExceptionView[];
+  unexplained: string;
+}
+
+export interface ReconciliationAreaSummary {
+  area: ReconciliationArea;
+  latest: ReconciliationView | null;
+  live: { expected: string; actual: string; variance: string; withinMateriality: boolean };
+  stale: boolean;
+}
+
+export interface BankAccountSummary {
+  bankAccountId: string;
+  code: string;
+  name: string;
+  currency: string;
+  ledgerBalance: string;
+  lastStatementDate: string | null;
+  latestStatementId: string | null;
+  reconciliationStatus: 'NONE' | 'IN_PROGRESS' | 'COMPLETED';
+  unmatched: number;
+  possible: number;
+  exceptions: number;
+}
+
+export interface ReconciliationSummary {
+  asOf: string;
+  materiality: string;
+  areas: ReconciliationAreaSummary[];
+  banks: BankAccountSummary[];
 }

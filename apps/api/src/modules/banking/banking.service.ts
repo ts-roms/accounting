@@ -637,6 +637,7 @@ export class BankingService {
       row ?? {
         companyId,
         matchDateToleranceDays: 3,
+        autoMatchMinConfidence: 'MEDIUM' as const,
         createdAt: new Date(0),
         updatedAt: new Date(0),
       }

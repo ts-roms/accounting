@@ -20,6 +20,7 @@ import {
   BANK_TRANSACTION_TYPES,
   DEPRECIATION_METHODS,
   DEPRECIATION_RUN_STATUSES,
+  MATCH_CONFIDENCES,
   MATCH_KINDS,
   RECONCILIATION_STATUSES,
   STATEMENT_LINE_STATUSES,
@@ -40,6 +41,7 @@ export const bankTransactionStatusEnum = pgEnum('bank_transaction_status', BANK_
 export const statementStatusEnum = pgEnum('statement_status', STATEMENT_STATUSES);
 export const statementLineStatusEnum = pgEnum('statement_line_status', STATEMENT_LINE_STATUSES);
 export const matchKindEnum = pgEnum('match_kind', MATCH_KINDS);
+export const matchConfidenceEnum = pgEnum('match_confidence', MATCH_CONFIDENCES);
 export const reconciliationStatusEnum = pgEnum('reconciliation_status', RECONCILIATION_STATUSES);
 
 // ================================================================ fixed assets
@@ -404,6 +406,7 @@ export const bankingSettings = pgTable('banking_settings', {
     .primaryKey()
     .references(() => companies.id, { onDelete: 'cascade' }),
   matchDateToleranceDays: integer('match_date_tolerance_days').notNull().default(3),
+  autoMatchMinConfidence: matchConfidenceEnum('auto_match_min_confidence').notNull().default('MEDIUM'),
   ...timestamps,
 });
 

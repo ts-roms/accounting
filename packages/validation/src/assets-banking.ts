@@ -7,6 +7,7 @@ import {
   DEPRECIATION_RUN_STATUSES,
   ENTITY_STATUSES,
   STATEMENT_LINE_STATUSES,
+  MATCH_CONFIDENCES,
 } from '@accounting/types';
 import { amountSchema, isoDateSchema, signedAmountSchema } from './accounting';
 import { codeSchema, nameSchema, optionalText, paginationQuerySchema, uuidSchema } from './primitives';
@@ -213,5 +214,11 @@ export type MatchStatementLineInput = z.infer<typeof matchStatementLineSchema>;
 export const bankingSettingsSchema = z.object({
   /** Days either side of the statement date a ledger line may fall to auto-match. */
   matchDateToleranceDays: z.coerce.number().int().min(0).max(60).default(3),
+  /**
+   * Control rule: HIGH auto-matches only when amount, date window and a
+   * reference agree; MEDIUM also accepts a unique amount / date hit. Anything
+   * below the bar becomes POSSIBLE_MATCH for a person to confirm.
+   */
+  autoMatchMinConfidence: z.enum(MATCH_CONFIDENCES).default('MEDIUM'),
 });
 export type BankingSettingsInput = z.infer<typeof bankingSettingsSchema>;

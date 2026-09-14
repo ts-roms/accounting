@@ -271,9 +271,19 @@ A second programme strengthens the delivered system along the lines of
   reconciles in every area from day one
 - Tests: API integration 115 (+5 reconciliation scenarios)
 
-### H3-H9 (planned)
+### H3 - Reconciliation Center (COMPLETE)
 
-Reconciliation center, financial close,
+- Accounting → Reconciliation Center: area tiles with live variance and
+  recorded status, bank account tiles from the statement workspace, policy
+  dialog, recorded-reconciliation list; detail page with lines, review panel,
+  exceptions (log / resolve), notes, attachments and four-eyes approval
+- Bank matching confidence: HIGH / MEDIUM scoring, `autoMatchMinConfidence`
+  control rule, new `POSSIBLE_MATCH` line status (suggested, not consumed)
+- Tests: matching unit (+2), Playwright (+1)
+
+### H4-H9 (planned)
+
+Financial close,
 enterprise controls (SoD/approvals/suspense/history), data infrastructure
 (imports, opening balances, numbering), reporting engine, reliability,
 consolidation readiness.

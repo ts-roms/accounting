@@ -117,6 +117,12 @@ export const NAVIGATION: NavSection[] = [
         permissions: [P['intercompany.view']],
       },
       {
+        title: 'Reconciliation Center',
+        href: '/accounting/reconciliation',
+        icon: Scale,
+        permissions: [P['reconciliation.view']],
+      },
+      {
         title: 'Integrity',
         href: '/accounting/integrity',
         icon: ShieldCheck,
