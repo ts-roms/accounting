@@ -164,7 +164,10 @@ export const expenseClaims = pgTable(
     uniqueIndex('expense_claims_idempotency_uq').on(t.companyId, t.idempotencyKey),
     index('expense_claims_company_status_idx').on(t.companyId, t.status),
     index('expense_claims_claimant_idx').on(t.claimantUserId),
-    check('expense_claims_total_chk', sql`${t.total} >= 0 AND ${t.taxTotal} >= 0 AND ${t.taxTotal} <= ${t.total}`),
+    check(
+      'expense_claims_total_chk',
+      sql`${t.total} >= 0 AND ${t.taxTotal} >= 0 AND ${t.taxTotal} <= ${t.total}`,
+    ),
   ],
 );
 
@@ -193,7 +196,10 @@ export const expenseClaimLines = pgTable(
   },
   (t) => [
     uniqueIndex('expense_claim_lines_number_uq').on(t.claimId, t.lineNumber),
-    check('expense_claim_lines_amount_chk', sql`${t.amount} > 0 AND ${t.taxAmount} >= 0 AND ${t.taxAmount} < ${t.amount}`),
+    check(
+      'expense_claim_lines_amount_chk',
+      sql`${t.amount} > 0 AND ${t.taxAmount} >= 0 AND ${t.taxAmount} < ${t.amount}`,
+    ),
   ],
 );
 

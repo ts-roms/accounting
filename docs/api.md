@@ -129,6 +129,28 @@ Accounting error codes (422): `JOURNAL_UNBALANCED` (`details.difference`), `JOUR
 | POST                  | `/customer-payments/:id/allocate` `{ allocations }` (on-account remainder), `/customer-payments/:id/void` `{ reason, reversalDate? }` | `customer-payment.post`   |
 | GET                   | `/reports/ar-aging?asOf&partyId`, `/reports/ar-reconciliation?asOf`                                                                   | `reports.view`            |
 
+### Accounts receivable platform (Prompt #6; all require `X-Company-Id`; see `docs/accounts-receivable/`)
+
+| Method                      | Path                                                                                                                                               | Permission                                                                        |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| GET / PATCH                 | `/ar-settings` (aging buckets, DSO window, thresholds, approval / allowance flags, defaults)                                                       | `customer.view` / `ar-settings.manage`                                            |
+| GET / POST / PATCH          | `/payment-terms`, `/customer-groups`, `/credit-rules`, `/dunning-policies`                                                                         | `customer.view` (`collection.view`) / `ar-settings.manage`                        |
+| GET / PATCH / POST          | `/customers/:id/credit`, `/customers/:id/credit-hold` `{ hold, reason }`                                                                           | `customer.view` / `customer.credit-manage`                                        |
+| POST / PATCH / DELETE       | `/customers/:id/contacts[/:contactId]`, `/customers/:id/addresses[/:addressId]`                                                                    | `customer.manage`                                                                 |
+| POST                        | `/sales-orders/:id/submit` (credit check + workflow), `/sales-orders/:id/confirm`                                                                  | `sales-order.create`                                                              |
+| GET / POST / PATCH / DELETE | `/deliveries`, `/deliveries/:id`; POST `/:id/pick`, `/ready`, `/deliver` (stock + COGS), `/cancel`, `/invoice`                                     | `delivery.view` / `delivery.manage` (`invoice.create` to invoice)                 |
+| POST                        | `/invoices/:id/submit` (credit policy + workflow)                                                                                                  | `invoice.create`                                                                  |
+| GET / POST                  | `/credit-notes`, `/debit-notes` (typed aliases of `/invoices`)                                                                                     | `invoice.view` / `invoice.create`                                                 |
+| POST                        | `/customer-payments/:id/submit`, `/customer-payments/:id/approve`, `/customer-payments/:id/refund` `{ amount?, reason }`                           | `customer-payment.create` / `customer-payment.approve` / `customer-refund.create` |
+| GET / POST                  | `/refunds`; POST `/refunds/:id/submit`, `/approve`, `/reject`, `/cancel`, `/pay` `{ paymentDate }`                                                 | `customer-refund.create` / `.approve` / `.pay`                                    |
+| GET / POST / PATCH          | `/collections`, `/collections/:id`; POST `/:id/activities`, `/:id/credit-hold`, `/collections/run-sweep`                                           | `collection.view` / `collection.manage` / `customer.credit-manage`                |
+| GET / POST / PATCH          | `/promises-to-pay`, `/promises-to-pay/:id`                                                                                                         | `collection.view` / `collection.manage`                                           |
+| GET / POST / PATCH          | `/disputes`, `/disputes/:id`                                                                                                                       | `collection.view` / `dispute.manage`                                              |
+| GET / POST                  | `/write-offs`; POST `/write-offs/:id/submit`, `/approve`, `/reject`, `/post`, `/recover`                                                           | `write-off.view` / `.create` / `.approve` / `.post`                               |
+| GET / POST                  | `/bad-debt-provisions`; POST `/bad-debt-provisions/:id/post`, `/reverse`                                                                           | `write-off.view` / `write-off.post`                                               |
+| GET                         | `/ar-dashboard?asOf`, `/ar-aging?asOf&partyId&customerGroupId&branchId&collectorId`, `/ar-reconciliation?asOf` (+ integrity), `/ar-integrity?asOf` | `reports.view`                                                                    |
+| GET                         | `/unapplied-cash?asOf`, `/customer-statements?customerId&from&to&save`, `/customer-statements/history[/:id]`                                       | `invoice.view` / `customer.view`                                                  |
+
 ### Payables (all require `X-Company-Id`)
 
 Mirror of the receivables routes: `/vendors` (`vendor.view` / `vendor.manage`),

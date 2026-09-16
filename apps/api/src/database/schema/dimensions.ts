@@ -45,7 +45,10 @@ export const dimensions = pgTable(
   (t) => [
     uniqueIndex('dimensions_company_type_code_uq').on(t.companyId, t.dimensionType, t.code),
     index('dimensions_company_type_idx').on(t.companyId, t.dimensionType, t.status),
-    check('dimensions_dates_chk', sql`${t.endDate} IS NULL OR ${t.startDate} IS NULL OR ${t.endDate} >= ${t.startDate}`),
+    check(
+      'dimensions_dates_chk',
+      sql`${t.endDate} IS NULL OR ${t.startDate} IS NULL OR ${t.endDate} >= ${t.startDate}`,
+    ),
   ],
 );
 

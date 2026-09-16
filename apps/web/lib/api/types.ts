@@ -431,7 +431,6 @@ export interface BalanceSheetReport {
 
 import type {
   AccountingStatus,
-  AgingBucketKey,
   PaymentMethod,
   PaymentStatus,
   PaymentType,
@@ -471,6 +470,39 @@ export interface Party {
   defaultExpenseAccountId?: string | null;
   balance: PartyBalance;
   createdAt: string;
+  /** Customer master (Prompt #6). */
+  customerType?: 'INDIVIDUAL' | 'BUSINESS' | 'GOVERNMENT' | 'OTHER';
+  displayName?: string | null;
+  customerGroupId?: string | null;
+  customerGroupName?: string | null;
+  paymentTermId?: string | null;
+  paymentTermName?: string | null;
+  salespersonId?: string | null;
+  salespersonName?: string | null;
+  industry?: string | null;
+  region?: string | null;
+  branchId?: string | null;
+  taxExempt?: boolean;
+  creditHold?: boolean;
+  riskRating?: 'LOW' | 'MEDIUM' | 'HIGH';
+  contacts?: Array<{
+    id: string;
+    name: string;
+    title: string | null;
+    email: string | null;
+    phone: string | null;
+    isPrimary: boolean;
+  }>;
+  addresses?: Array<{
+    id: string;
+    addressType: 'BILLING' | 'SHIPPING';
+    label: string | null;
+    addressLine1: string | null;
+    city: string | null;
+    province: string | null;
+    country: string;
+    isDefault: boolean;
+  }>;
 }
 
 export interface DocumentLine {
@@ -570,6 +602,13 @@ export interface SubledgerDocument {
   journalNumber: string | null;
   balance: string;
   daysOverdue: number;
+  /** AR platform (Prompt #6). */
+  deliveryId?: string | null;
+  deliveryNumber?: string | null;
+  salesOrderNumber?: string | null;
+  openDisputes?: number;
+  writtenOffAmount?: string;
+  submittedAt?: string | null;
 }
 
 export interface SubledgerDocumentDetail extends SubledgerDocument {
@@ -592,11 +631,14 @@ export interface SubledgerPayment {
   cashAccountCode: string;
   cashAccountName: string;
   reference: string | null;
+  externalReference?: string | null;
   memo: string | null;
   currency: string;
   exchangeRate: string;
   baseAmount: string;
   controlBaseAmount: string;
+  allocationStatus?: 'UNALLOCATED' | 'PARTIALLY_ALLOCATED' | 'ALLOCATED' | null;
+  approvedAt?: string | null;
   journalEntryId: string | null;
   journalNumber: string | null;
   reversalJournalEntryId: string | null;
@@ -619,7 +661,7 @@ export interface AgingRow {
   partyId: string;
   code: string;
   name: string;
-  buckets: Record<AgingBucketKey, string>;
+  buckets: Record<string, string>;
   outstanding: string;
   unappliedCredit: string;
   net: string;
@@ -630,9 +672,9 @@ export interface AgingRow {
 export interface AgingReport {
   asOf: string;
   currency: string;
-  buckets: Array<{ key: AgingBucketKey; label: string }>;
+  buckets: Array<{ key: string; label: string }>;
   rows: AgingRow[];
-  totals: Record<AgingBucketKey, string> & {
+  totals: Record<string, string> & {
     outstanding: string;
     unappliedCredit: string;
     net: string;
@@ -641,7 +683,14 @@ export interface AgingReport {
 
 export interface StatementLine {
   date: string;
-  kind: 'INVOICE' | 'CREDIT_NOTE' | 'DEBIT_NOTE' | 'PAYMENT' | 'REFUND';
+  kind:
+    | 'INVOICE'
+    | 'CREDIT_NOTE'
+    | 'DEBIT_NOTE'
+    | 'PAYMENT'
+    | 'REFUND'
+    | 'WRITE_OFF'
+    | 'WRITE_OFF_RECOVERY';
   documentId: string;
   documentNumber: string;
   reference: string | null;

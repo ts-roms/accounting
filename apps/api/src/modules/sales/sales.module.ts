@@ -32,7 +32,10 @@ export const SalesOrdersController = createOrderController({
     approve: P['sales-order.approve'],
   },
   actions: {
+    submit: P['sales-order.create'],
     approve: P['sales-order.approve'],
+    reject: P['sales-order.approve'],
+    confirm: P['sales-order.create'],
     close: P['sales-order.create'],
     cancel: P['sales-order.create'],
   },

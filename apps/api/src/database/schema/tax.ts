@@ -45,7 +45,9 @@ export const taxCodes = pgTable(
     appliesTo: taxAppliesToEnum('applies_to').notNull(),
     reportingCategory: taxReportingCategoryEnum('reporting_category').notNull(),
     /** Sales side: output tax payable (sales tax) or creditable withholding receivable (withholding). */
-    salesAccountId: uuid('sales_account_id').references(() => accounts.id, { onDelete: 'restrict' }),
+    salesAccountId: uuid('sales_account_id').references(() => accounts.id, {
+      onDelete: 'restrict',
+    }),
     /** Purchase side: input tax receivable (sales tax) or withholding tax payable (withholding). */
     purchaseAccountId: uuid('purchase_account_id').references(() => accounts.id, {
       onDelete: 'restrict',
@@ -80,7 +82,10 @@ export const taxRates = pgTable(
   (t) => [
     uniqueIndex('tax_rates_code_from_uq').on(t.taxCodeId, t.effectiveFrom),
     check('tax_rates_rate_chk', sql`${t.ratePercent} >= 0 AND ${t.ratePercent} <= 100`),
-    check('tax_rates_range_chk', sql`${t.effectiveTo} IS NULL OR ${t.effectiveTo} >= ${t.effectiveFrom}`),
+    check(
+      'tax_rates_range_chk',
+      sql`${t.effectiveTo} IS NULL OR ${t.effectiveTo} >= ${t.effectiveFrom}`,
+    ),
   ],
 );
 

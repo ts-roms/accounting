@@ -23,6 +23,8 @@ export const ORDER_STATUSES = [
   'ACCEPTED',
   /** Sales / purchase order approved (open for invoicing, receiving, billing). */
   'APPROVED',
+  /** Sales order confirmed with the customer (still open for delivery and invoicing). */
+  'CONFIRMED',
   /** Quotation or purchase request turned into an order. */
   'CONVERTED',
   'REJECTED',
@@ -75,4 +77,4 @@ export interface MatchException {
 }
 
 /** Order statuses that still allow fulfilment (invoicing, receiving, billing). */
-export const OPEN_ORDER_STATUSES: readonly OrderStatus[] = ['APPROVED'];
+export const OPEN_ORDER_STATUSES: readonly OrderStatus[] = ['APPROVED', 'CONFIRMED'];

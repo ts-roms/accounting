@@ -1,21 +1,24 @@
 import { Injectable } from '@nestjs/common';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { Money } from '@accounting/money';
-import type { OrderStatus, OrderType } from '@accounting/types';
+import { OPEN_ORDER_STATUSES, type OrderStatus, type OrderType } from '@accounting/types';
 import { BusinessRuleError, NotFoundError } from '@/common/errors/app-error';
 import { ErrorCodes } from '@/common/errors/error-codes';
 import type { DbExecutor } from '@/database/database.types';
 import { orderLines, orders, type Order, type OrderLine } from '@/database/schema';
 import { assertWithinRemaining, deriveFulfillment, labelForType } from './orders.logic';
 
-export type FulfillmentKind = 'RECEIPT' | 'BILLING' | 'RETURN';
+export type FulfillmentKind = 'RECEIPT' | 'BILLING' | 'RETURN' | 'DELIVERY';
 
-const COUNTER: Record<FulfillmentKind, 'receivedQuantity' | 'billedQuantity' | 'returnedQuantity'> =
-  {
-    RECEIPT: 'receivedQuantity',
-    BILLING: 'billedQuantity',
-    RETURN: 'returnedQuantity',
-  };
+const COUNTER: Record<
+  FulfillmentKind,
+  'receivedQuantity' | 'billedQuantity' | 'returnedQuantity' | 'deliveredQuantity'
+> = {
+  RECEIPT: 'receivedQuantity',
+  BILLING: 'billedQuantity',
+  RETURN: 'returnedQuantity',
+  DELIVERY: 'deliveredQuantity',
+};
 
 export interface FulfillmentLine {
   orderLineId: string;
@@ -37,7 +40,7 @@ export class OrderFulfillmentService {
     orderId: string,
     expectedType: OrderType,
     partyId?: string,
-    allowedStatuses: readonly OrderStatus[] = ['APPROVED'],
+    allowedStatuses: readonly OrderStatus[] = OPEN_ORDER_STATUSES,
   ): Promise<{ order: Order; lines: OrderLine[] }> {
     const [order] = await tx
       .select()
@@ -93,7 +96,7 @@ export class OrderFulfillmentService {
       orderId,
       options.expectedType,
       options.partyId,
-      kind === 'RETURN' ? ['APPROVED', 'CLOSED'] : ['APPROVED'],
+      kind === 'RETURN' ? [...OPEN_ORDER_STATUSES, 'CLOSED'] : OPEN_ORDER_STATUSES,
     );
     const byId = new Map(orderRows.map((l) => [l.id, l]));
     const seen = new Set<string>();
@@ -121,7 +124,13 @@ export class OrderFulfillmentService {
         { lineNumber: target.lineNumber, quantity: cap, fulfilled: target[counter] },
         line.quantity,
         order.currency,
-        kind === 'RECEIPT' ? 'receiving' : kind === 'BILLING' ? 'billing' : 'returning',
+        kind === 'RECEIPT'
+          ? 'receiving'
+          : kind === 'BILLING'
+            ? 'billing'
+            : kind === 'DELIVERY'
+              ? 'delivering'
+              : 'returning',
         kind === 'RECEIPT' ? (options.tolerancePercent ?? '0') : '0',
       );
       await tx
@@ -164,12 +173,16 @@ export class OrderFulfillmentService {
       lines.map((l) => ({ quantity: l.quantity, fulfilled: l.billedQuantity })),
       currency,
     );
+    const deliveryStatus = deriveFulfillment(
+      lines.map((l) => ({ quantity: l.quantity, fulfilled: l.deliveredQuantity })),
+      currency,
+    );
     const fullyDone =
       order.orderType === 'PURCHASE_ORDER'
         ? receiptStatus === 'FULL' && billingStatus === 'FULL'
         : billingStatus === 'FULL';
     const status =
-      order.status === 'APPROVED' && fullyDone
+      OPEN_ORDER_STATUSES.includes(order.status) && fullyDone
         ? 'CLOSED'
         : order.status === 'CLOSED' && !fullyDone && order.closedAt === null
           ? 'APPROVED' // auto-closed order re-opened by a void / cancellation
@@ -179,6 +192,7 @@ export class OrderFulfillmentService {
       .set({
         receiptStatus,
         billingStatus,
+        deliveryStatus,
         status,
       })
       .where(eq(orders.id, orderId));

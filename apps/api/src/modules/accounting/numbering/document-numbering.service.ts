@@ -31,6 +31,13 @@ const DEFAULT_PREFIX: Record<DocumentType, string> = {
   EXP: 'EXP',
   ICT: 'ICT',
   FXR: 'FXR',
+  DLV: 'DLV',
+  WO: 'WO',
+  COL: 'COL',
+  DSP: 'DSP',
+  RFD: 'RFD',
+  PRV: 'PRV',
+  STMT: 'STMT',
 };
 
 /**

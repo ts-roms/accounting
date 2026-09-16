@@ -137,6 +137,13 @@ export function createOrderController(options: OrderControllerOptions): Type<unk
       return this.run(user, id, 'reject', body);
     }
 
+    @Post(':id/confirm')
+    @RequirePermissions(actions.confirm ?? options.permissions.create)
+    @ApiOperation({ summary: 'Confirm an approved sales order with the customer' })
+    confirm(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
+      return this.run(user, id, 'confirm');
+    }
+
     @Post(':id/close')
     @RequirePermissions(actions.close ?? options.permissions.create)
     close(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {

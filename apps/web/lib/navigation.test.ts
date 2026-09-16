@@ -99,6 +99,19 @@ describe('navigation', () => {
         'notifications',
       ].map((p) => `/admin/${p}`),
       ...['assistant', 'intake', 'anomalies', 'forecast'].map((p) => `/ai/${p}`),
+      ...[
+        'dashboard',
+        'deliveries',
+        'credit-notes',
+        'debit-notes',
+        'refunds',
+        'statements',
+        'collections',
+        'disputes',
+        'write-offs',
+        'reconciliation',
+        'settings',
+      ].map((p) => `/receivables/${p}`),
     ]);
     for (const section of NAVIGATION) {
       for (const item of section.items) {

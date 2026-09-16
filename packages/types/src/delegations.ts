@@ -44,6 +44,9 @@ export const DELEGABLE_PERMISSION_DEFINITIONS = [
   ['purchase-return.approve', 'Approve purchase returns / vendor credit notes', 'Purchasing'],
   ['sales-order.approve', 'Approve sales orders', 'Sales'],
   ['sales-return.approve', 'Approve sales returns / customer credit notes', 'Sales'],
+  ['customer-payment.approve', 'Approve customer payments', 'Accounts Receivable'],
+  ['customer-refund.approve', 'Approve customer refunds', 'Accounts Receivable'],
+  ['write-off.approve', 'Approve receivable write-offs', 'Accounts Receivable'],
   ['journal.approve', 'Approve journal entries', 'General Ledger'],
   ['budget.approve', 'Approve budget versions', 'Budgeting'],
   ['approval.decide', 'Decide workflow approval requests', 'Workflows'],
@@ -71,6 +74,9 @@ export const DELEGATION_DOCUMENT_TYPES = [
   'JOURNAL_ENTRY',
   'BUDGET_VERSION',
   'APPROVAL_REQUEST',
+  'CUSTOMER_PAYMENT',
+  'CUSTOMER_REFUND',
+  'WRITE_OFF',
 ] as const;
 export type DelegationDocumentType = (typeof DELEGATION_DOCUMENT_TYPES)[number];
 

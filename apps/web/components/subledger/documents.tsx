@@ -49,14 +49,16 @@ export function partyOf(
 export function DocumentsPage({
   cfg,
   initialStatus,
+  initialType,
 }: {
   cfg: SubledgerConfig;
   initialStatus?: string;
+  initialType?: SubledgerDocumentType;
 }) {
   const router = useRouter();
   const table = useTableState({ sortBy: 'documentDate', sortDir: 'desc' });
   const [status, setStatus] = React.useState(initialStatus ?? 'ALL');
-  const [type, setType] = React.useState('ALL');
+  const [type, setType] = React.useState<string>(initialType ?? 'ALL');
   const [openOnly, setOpenOnly] = React.useState(false);
   const [overdueOnly, setOverdueOnly] = React.useState(false);
   const documents = useDocuments(cfg, {

@@ -2,8 +2,10 @@ import { z } from 'zod';
 import { dimensionRefsSchema, lineTaxSchema } from './dimensions';
 import { exchangeRateValueSchema } from './enterprise';
 import {
+  CUSTOMER_TYPES,
   ENTITY_STATUSES,
   PAYMENT_METHODS,
+  PAYMENT_STATUSES,
   PAYMENT_TYPES,
   SUBLEDGER_DOCUMENT_STATUSES,
   SUBLEDGER_DOCUMENT_TYPES,
@@ -38,8 +40,22 @@ const partyBase = addressSchema.extend({
 });
 
 export const createCustomerSchema = partyBase.extend({
+  /** Explicit net days; when omitted the named payment term (customer / group / company default) decides. */
+  paymentTermsDays: z.coerce.number().int().min(0).max(365).optional(),
   creditLimit: amountSchema.nullable().optional(),
   defaultRevenueAccountId: uuidSchema.nullable().optional(),
+  /** Enterprise customer master (Prompt #6). */
+  customerType: z.enum(CUSTOMER_TYPES).default('BUSINESS'),
+  displayName: optionalText(150),
+  customerGroupId: uuidSchema.nullable().optional(),
+  /** Named payment term; when set it drives the due date instead of paymentTermsDays. */
+  paymentTermId: uuidSchema.nullable().optional(),
+  salespersonId: uuidSchema.nullable().optional(),
+  industry: optionalText(80),
+  region: optionalText(80),
+  branchId: uuidSchema.nullable().optional(),
+  taxExempt: z.boolean().default(false),
+  taxRegistrationType: optionalText(40),
 });
 export type CreateCustomerInput = z.infer<typeof createCustomerSchema>;
 export const updateCustomerSchema = createCustomerSchema
@@ -58,6 +74,12 @@ export type UpdateVendorInput = z.infer<typeof updateVendorSchema>;
 
 export const listPartiesQuerySchema = paginationQuerySchema.extend({
   status: z.enum(ENTITY_STATUSES).optional(),
+  customerGroupId: uuidSchema.optional(),
+  customerType: z.enum(CUSTOMER_TYPES).optional(),
+  salespersonId: uuidSchema.optional(),
+  creditHold: queryBooleanSchema.optional(),
+  /** Only customers with an overdue balance. */
+  overdueOnly: queryBooleanSchema.optional(),
 });
 export type ListPartiesQuery = z.infer<typeof listPartiesQuerySchema>;
 
@@ -113,6 +135,10 @@ export const createInvoiceSchema = documentBase.extend({
   customerId: uuidSchema,
   /** Sales order being invoiced (lines must reference its lines). */
   salesOrderId: uuidSchema.optional(),
+  /** Delivery being invoiced (must belong to the sales order). */
+  deliveryId: uuidSchema.nullable().optional(),
+  /** Overrides the customer's payment term for this document. */
+  paymentTermId: uuidSchema.nullable().optional(),
 });
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;
 export const updateInvoiceSchema = createInvoiceSchema
@@ -163,6 +189,10 @@ export const listDocumentsQuerySchema = paginationQuerySchema.extend({
   to: isoDateSchema.optional(),
   openOnly: queryBooleanSchema.optional(),
   overdueOnly: queryBooleanSchema.optional(),
+  /** Only documents with an open dispute (AR). */
+  disputedOnly: queryBooleanSchema.optional(),
+  branchId: uuidSchema.optional(),
+  salesOrderId: uuidSchema.optional(),
 });
 export type ListDocumentsQuery = z.infer<typeof listDocumentsQuerySchema>;
 
@@ -184,6 +214,8 @@ export const createPaymentSchema = z.object({
   cashAccountId: uuidSchema,
   reference: optionalText(100),
   memo: optionalText(500),
+  /** Gateway / bank transaction id, cheque number, etc. */
+  externalReference: optionalText(120),
   branchId: uuidSchema.nullable().optional(),
   /** Override of the payment-currency -> base-currency rate (defaults to the rate table on the payment date). */
   exchangeRate: exchangeRateValueSchema.optional(),
@@ -196,9 +228,12 @@ export type UpdatePaymentInput = z.infer<typeof updatePaymentSchema>;
 
 export const listPaymentsQuerySchema = paginationQuerySchema.extend({
   partyId: uuidSchema.optional(),
-  status: z.enum(['DRAFT', 'POSTED', 'VOID']).optional(),
+  status: z.enum(PAYMENT_STATUSES).optional(),
+  paymentType: z.enum(PAYMENT_TYPES).optional(),
   from: isoDateSchema.optional(),
   to: isoDateSchema.optional(),
+  /** Only posted receipts with an unallocated remainder (unapplied cash). */
+  unappliedOnly: queryBooleanSchema.optional(),
 });
 export type ListPaymentsQuery = z.infer<typeof listPaymentsQuerySchema>;
 
@@ -215,6 +250,9 @@ export type AllocateInput = z.infer<typeof allocateSchema>;
 export const agingQuerySchema = z.object({
   asOf: isoDateSchema,
   partyId: uuidSchema.optional(),
+  customerGroupId: uuidSchema.optional(),
+  branchId: uuidSchema.optional(),
+  collectorId: uuidSchema.optional(),
 });
 export type AgingQuery = z.infer<typeof agingQuerySchema>;
 

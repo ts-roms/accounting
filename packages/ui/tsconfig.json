@@ -1,5 +1,9 @@
 {
   "extends": "@accounting/tsconfig/library.json",
-  "compilerOptions": { "noEmit": true, "jsx": "react-jsx", "lib": ["dom", "dom.iterable", "ES2022"] },
+  "compilerOptions": {
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "lib": ["dom", "dom.iterable", "ES2022"]
+  },
   "include": ["src"]
 }

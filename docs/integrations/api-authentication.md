@@ -3,11 +3,11 @@
 The REST API (`/api/v1/...`) accepts three credentials, resolved by
 `JwtAuthGuard`:
 
-| Credential      | Who                     | How                                                        |
-| --------------- | ----------------------- | ---------------------------------------------------------- |
+| Credential      | Who                     | How                                                           |
+| --------------- | ----------------------- | ------------------------------------------------------------- |
 | Session cookies | Browser users           | `acct_access` / `acct_refresh` httpOnly cookies + CSRF header |
-| Bearer JWT      | Non-browser first-party | `Authorization: Bearer <access token>`                     |
-| Bearer API key  | External systems        | `Authorization: Bearer ak_...` (see `api-keys.md`)         |
+| Bearer JWT      | Non-browser first-party | `Authorization: Bearer <access token>`                        |
+| Bearer API key  | External systems        | `Authorization: Bearer ak_...` (see `api-keys.md`)            |
 
 Common to all:
 
@@ -21,7 +21,7 @@ Common to all:
   `/api/docs` outside production.
 
 Authorization is enforced only by NestJS guards (`@RequirePermissions`). API
-keys receive *permissions derived from scopes*, intersected with the owner's
+keys receive _permissions derived from scopes_, intersected with the owner's
 permissions, so the same guards apply unchanged. Delegated authority attaches
 `delegations` to the principal; the permission guard accepts a delegated
 permission and services then call `AuthorityService.assert` for scope, amount

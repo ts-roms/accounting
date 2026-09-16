@@ -7,9 +7,13 @@ export type SubledgerDocumentType = (typeof SUBLEDGER_DOCUMENT_TYPES)[number];
 /** Business status - independent of the accounting status. */
 export const SUBLEDGER_DOCUMENT_STATUSES = [
   'DRAFT',
+  /** Submitted for workflow approval (AR). */
+  'SUBMITTED',
   'APPROVED',
   'PARTIALLY_PAID',
   'PAID',
+  /** Balance removed by an approved write-off (AR). */
+  'WRITTEN_OFF',
   'VOID',
 ] as const;
 export type SubledgerDocumentStatus = (typeof SUBLEDGER_DOCUMENT_STATUSES)[number];
@@ -18,7 +22,8 @@ export type SubledgerDocumentStatus = (typeof SUBLEDGER_DOCUMENT_STATUSES)[numbe
 export const ACCOUNTING_STATUSES = ['UNPOSTED', 'POSTED', 'REVERSED'] as const;
 export type AccountingStatus = (typeof ACCOUNTING_STATUSES)[number];
 
-export const PAYMENT_STATUSES = ['DRAFT', 'POSTED', 'VOID'] as const;
+/** DRAFT -> (SUBMITTED -> APPROVED ->) POSTED; VOID reverses. Approval steps apply when a workflow / policy requires them. */
+export const PAYMENT_STATUSES = ['DRAFT', 'SUBMITTED', 'APPROVED', 'POSTED', 'VOID'] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
 /** PAYMENT = money in (AR receipt) / money out (AP disbursement); REFUND is the opposite direction. */
@@ -30,7 +35,9 @@ export const PAYMENT_METHODS = [
   'BANK_TRANSFER',
   'CHECK',
   'CARD',
+  'DEBIT_CARD',
   'ONLINE',
+  'PAYMENT_GATEWAY',
   'OTHER',
 ] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];

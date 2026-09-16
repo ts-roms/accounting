@@ -31,10 +31,10 @@ through `CustomerPaymentsService`; nothing posts unless the integration holds
 
 ## What is synchronised
 
-| Entity      | Stripe resource         | Notes                                                                                 |
-| ----------- | ----------------------- | ------------------------------------------------------------------------------------- |
-| `customers` | `GET /v1/customers`     | Code `STRIPE-<id>`; display name falls back to e-mail, then id; address / currency mapped |
-| `payments`  | `GET /v1/charges`       | Only `succeeded`, paid, unrefunded charges; partial refunds are excluded entirely     |
+| Entity      | Stripe resource     | Notes                                                                                     |
+| ----------- | ------------------- | ----------------------------------------------------------------------------------------- |
+| `customers` | `GET /v1/customers` | Code `STRIPE-<id>`; display name falls back to e-mail, then id; address / currency mapped |
+| `payments`  | `GET /v1/charges`   | Only `succeeded`, paid, unrefunded charges; partial refunds are excluded entirely         |
 
 Amounts are converted from Stripe's integer minor units to exact decimal
 strings per currency (zero-decimal currencies such as JPY, three-decimal such
@@ -56,13 +56,13 @@ does not match the key's mode are rejected (`LIVEMODE_MISMATCH`). Event ids
 (`evt_…`) are unique per integration, so Stripe's retries and replays are
 acknowledged without a second receipt.
 
-| Event                        | Effect                                                                   |
-| ---------------------------- | ------------------------------------------------------------------------ |
-| `charge.succeeded`           | Receipt for the charge (external id = charge id)                          |
-| `payment_intent.succeeded`   | Receipt keyed by `latest_charge`, so it dedupes against `charge.succeeded` |
+| Event                        | Effect                                                                                                     |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `charge.succeeded`           | Receipt for the charge (external id = charge id)                                                           |
+| `payment_intent.succeeded`   | Receipt keyed by `latest_charge`, so it dedupes against `charge.succeeded`                                 |
 | `checkout.session.completed` | Receipt only when the session has no payment intent; otherwise ignored (the intent's own event settles it) |
-| `customer.created / updated` | Customer created or updated                                               |
-| anything else                | Acknowledged and ignored with a note in the integration log               |
+| `customer.created / updated` | Customer created or updated                                                                                |
+| anything else                | Acknowledged and ignored with a note in the integration log                                                |
 
 ## Not imported (by design)
 
