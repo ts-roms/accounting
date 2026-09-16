@@ -66,3 +66,48 @@ Importers enforce the integration's scopes explicitly (`assertScope`) because
 jobs do not pass through the HTTP guards, and they run inside a
 `RequestContext` carrying the integration principal so audit rows attribute
 the change to the integration's owner with the job's correlation id.
+
+## Outbound push (`sync/push-engine.ts`, pure)
+
+The mirror of the pull loop, for providers with the `PUSH` capability
+(e-invoicing authorities, CRMs, supplier portals). Same job rows, cursors,
+retries, cancel / resume, audit and logs - `integration_sync_jobs.direction`
+and `integration_sync_cursors.direction` say which way a run went.
+
+```
+POST /integrations/:id/push { entity?, mode?, resumeJobId? }   -> job (202)
+
+for entity of (job.entity ?? connector.entities):
+  position = FULL ? null : stored outbound cursor            # keyset {updatedAt, id}
+  loop:
+    page     = exporter.select(ctx, { after: position, limit })   # domain views, (updatedAt, id) order
+    prior    = external references of the page (by internal id)
+    batch    = for each record:
+                 INCREMENTAL and prior.pushedAt >= updatedAt -> skipped (unchanged)
+                 outbound mapping (connector default / integration / pass-through)
+                 mapping error -> failed (record level)
+    answers  = connector.push(ctx, { entity, records: batch })   # externalId of an earlier push is passed back
+    per answer: ok -> linkByInternal(externalId, { pushedAt, label, ...metadata })  created / updated
+                !ok -> failed (VALIDATION_ERROR, provider message)
+    checkpoint(position of last record)                            # resume point
+```
+
+- **Exporters** (`sync/exporters/`) only read: `customers`, `vendors`,
+  `products` (every record, with status) and `invoices`, `bills` (only
+  documents that left `UNPOSTED`, with lines, tax and allocations - drafts never
+  leave the books). Payload = the API view, so a provider only ever receives what
+  the ledger says. Each exporter asserts the matching read scope
+  (`invoice.view`, ...); without it the run fails with `AUTHORIZATION_ERROR`.
+- **Mapping direction**: `OUTBOUND` mappings turn the view into the provider's
+  payload (`descriptor.defaultOutboundMappings`, overridable per integration);
+  with no rules at all the view is passed through unchanged.
+- **Idempotency**: the external reference is keyed by internal id
+  (`linkByInternal`) and remembers `pushedAt`; an incremental push re-sends a
+  record only when it changed since, a `FULL` push re-sends everything and
+  hands the provider the earlier `externalId` so it can update instead of
+  create. Transport errors abort the run at the last checkpoint and are retried
+  like a pull; a provider rejection is a per-record failure listed on the job.
+- **Schedules** pull when the connector can and push otherwise, so a push-only
+  provider runs on its cron like any other.
+- Nothing here writes to the domain: a push cannot post, approve or change a
+  document - it can only tell a provider what already happened.

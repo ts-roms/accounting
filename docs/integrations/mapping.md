@@ -84,10 +84,10 @@ API (`createInvoiceSchema`) - mapping can only produce what a user could type.
 
 ## Endpoints
 
-- `GET /integrations/:id/mappings` - stored mappings and connector defaults
+- `GET /integrations/:id/mappings` - stored mappings and connector defaults (`defaults` inbound, `outboundDefaults` for pushes)
 - `POST /integrations/:id/mappings` - upsert (versioned, audited)
 - `DELETE /integrations/:id/mappings/:mappingId`
-- `POST /integrations/:id/mappings/preview` - dry-run a sample record
+- `POST /integrations/:id/mappings/preview` - dry-run a sample record (`direction: OUTBOUND` previews a push payload from a domain view)
 - `GET /integrations/:id/external-references` - internal <-> external ids
 
 ## External references

@@ -181,6 +181,15 @@ export const useTriggerSync = () => {
   });
 };
 
+export const useTriggerPush = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...input }: Partial<TriggerSyncInput> & { id: string }) =>
+      api.post<SyncJobView>(`/integrations/${id}/push`, input),
+    onSuccess: () => invalidate(qc),
+  });
+};
+
 export const useCancelSync = () => {
   const qc = useQueryClient();
   return useMutation({

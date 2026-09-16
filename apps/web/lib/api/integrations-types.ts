@@ -71,6 +71,7 @@ export interface SyncJobView {
   id: string;
   integrationId: string;
   entity: string | null;
+  direction: IntegrationDirection;
   mode: SyncMode;
   trigger: SyncTrigger;
   status: SyncJobStatus;
@@ -141,6 +142,7 @@ export interface IntegrationMappingView {
 export interface MappingsResponse {
   mappings: IntegrationMappingView[];
   defaults: Record<string, MappingFieldRuleInput[]>;
+  outboundDefaults: Record<string, MappingFieldRuleInput[]>;
 }
 
 export interface MappingPreview {

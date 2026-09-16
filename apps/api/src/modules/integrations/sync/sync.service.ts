@@ -2,7 +2,12 @@ import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import { and, desc, eq, inArray, isNull, lte, sql, type SQL } from 'drizzle-orm';
 import { PinoLogger } from 'nestjs-pino';
 import { parseExpression } from 'cron-parser';
-import type { PaginatedResult, SyncEntity, SyncTrigger } from '@accounting/types';
+import type {
+  IntegrationDirection,
+  PaginatedResult,
+  SyncEntity,
+  SyncTrigger,
+} from '@accounting/types';
 import type { ListSyncJobsQuery, TriggerSyncInput } from '@accounting/validation';
 import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { RequestContext } from '@/common/context/request-context';
@@ -25,6 +30,7 @@ import { CredentialsService } from '../core/credentials.service';
 import { IntegrationsService } from '../core/integrations.service';
 import { IntegrationLogsService } from '../logs/integration-logs.service';
 import { JobRunnerService } from '@/modules/jobs/job-runner.service';
+import { ExternalReferencesService } from '../mapping/external-references.service';
 import { MappingsService } from '../mapping/mappings.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { decideRetry } from '../retries/retry-policy';
@@ -37,7 +43,11 @@ import type { Importer } from './importers/importer';
 import { InvoicesImporter } from './importers/invoices.importer';
 import { PaymentsImporter } from './importers/payments.importer';
 import { SalesOrdersImporter } from './importers/sales-orders.importer';
-import { syncEntity, type SyncCounters } from './sync-engine';
+import { BillsExporter, InvoicesExporter } from './exporters/documents.exporter';
+import { EXPORT_BATCH_SIZE, type Exporter } from './exporters/exporter';
+import { CustomersExporter, ProductsExporter, VendorsExporter } from './exporters/parties.exporter';
+import { pushEntity } from './push-engine';
+import { syncEntity, type EntitySyncResult, type SyncCounters } from './sync-engine';
 
 const MODULE = 'INTEGRATIONS';
 const JOB_RUN = 'run-sync';
@@ -50,11 +60,14 @@ const MAX_AUTO_RETRIES = 3;
  * `integration-sync` queue (pull -> map -> import per entity, checkpointed
  * per batch), keeps per-entity cursors for incremental runs and schedules
  * cron-driven syncs. Failures are classified; retryable ones are re-queued
- * with backoff as new RETRY jobs so every attempt is visible.
+ * with backoff as new RETRY jobs so every attempt is visible. OUTBOUND jobs
+ * run the mirror loop (export -> map -> push, see push-engine.ts) with the
+ * same job rows, cursors, retries and audit trail.
  */
 @Injectable()
 export class SyncService implements OnModuleInit {
   private readonly importers: Map<SyncEntity, Importer>;
+  private readonly exporters: Map<SyncEntity, Exporter>;
 
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
@@ -66,6 +79,7 @@ export class SyncService implements OnModuleInit {
     private readonly notifications: NotificationsService,
     private readonly logs: IntegrationLogsService,
     private readonly credentials: CredentialsService,
+    private readonly refs: ExternalReferencesService,
     private readonly logger: PinoLogger,
     customers: CustomersImporter,
     invoices: InvoicesImporter,
@@ -75,6 +89,11 @@ export class SyncService implements OnModuleInit {
     bills: BillsImporter,
     products: ProductsImporter,
     salesOrders: SalesOrdersImporter,
+    customersOut: CustomersExporter,
+    vendorsOut: VendorsExporter,
+    productsOut: ProductsExporter,
+    invoicesOut: InvoicesExporter,
+    billsOut: BillsExporter,
   ) {
     this.logger.setContext(SyncService.name);
     this.importers = new Map<SyncEntity, Importer>(
@@ -88,6 +107,9 @@ export class SyncService implements OnModuleInit {
         products,
         salesOrders,
       ].map((i) => [i.entity, i]),
+    );
+    this.exporters = new Map<SyncEntity, Exporter>(
+      [customersOut, vendorsOut, productsOut, invoicesOut, billsOut].map((e) => [e.entity, e]),
     );
   }
 
@@ -113,6 +135,7 @@ export class SyncService implements OnModuleInit {
     const filters: SQL[] = [eq(integrationSyncJobs.integrationId, integrationId)];
     if (query.status) filters.push(eq(integrationSyncJobs.status, query.status));
     if (query.entity) filters.push(eq(integrationSyncJobs.entity, query.entity));
+    if (query.direction) filters.push(eq(integrationSyncJobs.direction, query.direction));
     const where = and(...filters);
     const [items, total] = await Promise.all([
       this.db
@@ -156,13 +179,22 @@ export class SyncService implements OnModuleInit {
     integrationId: string,
     input: TriggerSyncInput,
     trigger: SyncTrigger = 'MANUAL',
+    direction: IntegrationDirection = 'INBOUND',
   ): Promise<IntegrationSyncJob> {
     const integration = await this.integrations.getRow(organizationId, integrationId);
     const connector = this.integrations.connector(integration.provider);
-    if (!connector.descriptor.capabilities.includes('PULL'))
+    if (direction === 'INBOUND' && !connector.descriptor.capabilities.includes('PULL'))
       throw new BusinessRuleError(
         ErrorCodes.INTEGRATION_INVALID_STATE,
         `${connector.descriptor.name} does not support pull synchronisation.`,
+      );
+    if (
+      direction === 'OUTBOUND' &&
+      (!connector.descriptor.capabilities.includes('PUSH') || !connector.push)
+    )
+      throw new BusinessRuleError(
+        ErrorCodes.INTEGRATION_INVALID_STATE,
+        `${connector.descriptor.name} does not support pushing records.`,
       );
     if (integration.status === 'DISABLED' || integration.status === 'DISCONNECTED')
       throw new BusinessRuleError(
@@ -199,6 +231,11 @@ export class SyncService implements OnModuleInit {
           ErrorCodes.INTEGRATION_INVALID_STATE,
           `Only failed, paused or cancelled jobs can be resumed (job is ${previous.status}).`,
         );
+      if (previous.direction !== direction)
+        throw new BusinessRuleError(
+          ErrorCodes.INTEGRATION_INVALID_STATE,
+          `Job ${previous.id} is ${previous.direction.toLowerCase()}; it cannot resume a ${direction.toLowerCase()} run.`,
+        );
       startCursor = previous.lastCursor;
       resumedFromJobId = previous.id;
       trigger = trigger === 'MANUAL' ? 'RESUME' : trigger;
@@ -211,6 +248,7 @@ export class SyncService implements OnModuleInit {
           organizationId,
           integrationId,
           entity: input.entity ?? null,
+          direction,
           mode: input.mode,
           trigger,
           status: 'QUEUED',
@@ -225,7 +263,13 @@ export class SyncService implements OnModuleInit {
           module: MODULE,
           entityType: 'IntegrationSyncJob',
           entityId: row!.id,
-          newValue: { integrationId, entity: input.entity ?? 'ALL', mode: input.mode, trigger },
+          newValue: {
+            integrationId,
+            entity: input.entity ?? 'ALL',
+            direction,
+            mode: input.mode,
+            trigger,
+          },
           companyId: integration.companyId,
           organizationId,
           userId: actor?.id ?? null,
@@ -331,19 +375,12 @@ export class SyncService implements OnModuleInit {
         },
         async () => {
           for (const entity of entities) {
-            const importer = this.importers.get(entity);
-            if (!importer) {
-              totals.failures.push({
-                externalId: null,
-                code: 'MAPPING_ERROR',
-                message: `No importer for ${entity}`,
-              });
-              continue;
-            }
             const stored =
-              job.mode === 'FULL' ? null : await this.cursorFor(integration.id, entity);
+              job.mode === 'FULL'
+                ? null
+                : await this.cursorFor(integration.id, entity, job.direction);
             const startCursor = job.startCursor ?? stored;
-            const result = await syncEntity({
+            const shared = {
               connector,
               ctx,
               integration,
@@ -351,18 +388,7 @@ export class SyncService implements OnModuleInit {
               entity,
               mode: job.mode,
               startCursor,
-              batchSize: BATCH_SIZE,
-              importer,
-              map: async (record) => {
-                const r = await this.mappings.apply(
-                  integration.id,
-                  integration.provider,
-                  entity,
-                  record.data,
-                );
-                return { output: r.output, errors: r.errors };
-              },
-              checkpoint: async (cursor, counters) => {
+              checkpoint: async (cursor: string | null, counters: SyncCounters) => {
                 await this.db
                   .update(integrationSyncJobs)
                   .set({
@@ -374,7 +400,7 @@ export class SyncService implements OnModuleInit {
                     recordsFailed: totals.failed + counters.failed,
                   })
                   .where(eq(integrationSyncJobs.id, jobId));
-                await this.saveCursor(integration.id, entity, cursor);
+                await this.saveCursor(integration.id, entity, job.direction, cursor);
               },
               cancelled: async () => {
                 const [current] = await this.db
@@ -383,7 +409,90 @@ export class SyncService implements OnModuleInit {
                   .where(eq(integrationSyncJobs.id, jobId));
                 return current?.status === 'PAUSED';
               },
-            });
+            };
+            let result: EntitySyncResult;
+            if (job.direction === 'OUTBOUND') {
+              const exporter = this.exporters.get(entity);
+              if (!exporter) {
+                totals.failures.push({
+                  externalId: null,
+                  code: 'MAPPING_ERROR',
+                  message: `No exporter for ${entity}`,
+                });
+                continue;
+              }
+              result = await pushEntity({
+                ...shared,
+                batchSize: EXPORT_BATCH_SIZE,
+                exporter,
+                map: async (record) => {
+                  const r = await this.mappings.apply(
+                    integration.id,
+                    integration.provider,
+                    entity,
+                    record.data,
+                    {},
+                    this.db,
+                    'OUTBOUND',
+                  );
+                  return { output: r.output, errors: r.errors };
+                },
+                existing: async (ids) => {
+                  const rows = await this.refs.findByInternalIds(integration.id, entity, ids);
+                  return new Map(
+                    rows.map((r) => [
+                      r.internalId,
+                      {
+                        externalId: r.externalId,
+                        pushedAt:
+                          typeof r.metadata.pushedAt === 'string' ? r.metadata.pushedAt : null,
+                      },
+                    ]),
+                  );
+                },
+                link: async (record, answer) => {
+                  await this.db.transaction((tx) =>
+                    this.refs.linkByInternal(tx, {
+                      integrationId: integration.id,
+                      provider: integration.provider,
+                      entityType: entity,
+                      externalId: answer.externalId ?? `internal:${record.internalId}`,
+                      internalId: record.internalId,
+                      metadata: {
+                        ...answer.metadata,
+                        label: record.label,
+                        pushedAt: new Date().toISOString(),
+                        jobId,
+                      },
+                    }),
+                  );
+                },
+              });
+            } else {
+              const importer = this.importers.get(entity);
+              if (!importer) {
+                totals.failures.push({
+                  externalId: null,
+                  code: 'MAPPING_ERROR',
+                  message: `No importer for ${entity}`,
+                });
+                continue;
+              }
+              result = await syncEntity({
+                ...shared,
+                batchSize: BATCH_SIZE,
+                importer,
+                map: async (record) => {
+                  const r = await this.mappings.apply(
+                    integration.id,
+                    integration.provider,
+                    entity,
+                    record.data,
+                  );
+                  return { output: r.output, errors: r.errors };
+                },
+              });
+            }
             for (const k of ['processed', 'created', 'updated', 'skipped', 'failed'] as const)
               totals[k] += result.counters[k];
             totals.failures.push(
@@ -448,8 +557,8 @@ export class SyncService implements OnModuleInit {
       await this.logs.record({
         organizationId: integration.organizationId,
         integrationId: integration.id,
-        direction: 'INBOUND',
-        operation: `sync:${job.entity ?? 'all'}`,
+        direction: job.direction,
+        operation: `${job.direction === 'OUTBOUND' ? 'push' : 'sync'}:${job.entity ?? 'all'}`,
         status: 'SUCCESS',
         durationMs: finished.getTime() - started.getTime(),
         message: `${totals.processed} processed, ${totals.created} created, ${totals.updated} updated, ${totals.skipped} skipped, ${totals.failed} failed`,
@@ -507,7 +616,7 @@ export class SyncService implements OnModuleInit {
     });
     await this.integrations.recordFailure(
       integration,
-      `sync:${job.entity ?? 'all'}`,
+      `${job.direction === 'OUTBOUND' ? 'push' : 'sync'}:${job.entity ?? 'all'}`,
       error,
       finished.getTime() - started.getTime(),
       'ERROR',
@@ -516,7 +625,7 @@ export class SyncService implements OnModuleInit {
       organizationId: integration.organizationId,
       eventType: 'SYNC_FAILED',
       severity: 'ERROR',
-      title: `Sync failed for "${integration.name}"`,
+      title: `${job.direction === 'OUTBOUND' ? 'Push' : 'Sync'} failed for "${integration.name}"`,
       body: `${error.code}: ${error.message}`,
       link: `/admin/integrations/${integration.id}`,
       entityType: 'IntegrationSyncJob',
@@ -541,6 +650,7 @@ export class SyncService implements OnModuleInit {
           organizationId: job.organizationId,
           integrationId: job.integrationId,
           entity: job.entity,
+          direction: job.direction,
           mode: job.mode,
           trigger: 'RETRY',
           status: 'QUEUED',
@@ -598,7 +708,11 @@ export class SyncService implements OnModuleInit {
 
   // ---------------------------------------------------------------- cursors
 
-  private async cursorFor(integrationId: string, entity: string): Promise<string | null> {
+  private async cursorFor(
+    integrationId: string,
+    entity: string,
+    direction: IntegrationDirection,
+  ): Promise<string | null> {
     const [row] = await this.db
       .select({ cursor: integrationSyncCursors.cursor })
       .from(integrationSyncCursors)
@@ -606,6 +720,7 @@ export class SyncService implements OnModuleInit {
         and(
           eq(integrationSyncCursors.integrationId, integrationId),
           eq(integrationSyncCursors.entity, entity),
+          eq(integrationSyncCursors.direction, direction),
         ),
       );
     return row?.cursor ?? null;
@@ -614,13 +729,18 @@ export class SyncService implements OnModuleInit {
   private async saveCursor(
     integrationId: string,
     entity: string,
+    direction: IntegrationDirection,
     cursor: string | null,
   ): Promise<void> {
     await this.db
       .insert(integrationSyncCursors)
-      .values({ integrationId, entity, cursor, lastSyncedAt: new Date() })
+      .values({ integrationId, entity, direction, cursor, lastSyncedAt: new Date() })
       .onConflictDoUpdate({
-        target: [integrationSyncCursors.integrationId, integrationSyncCursors.entity],
+        target: [
+          integrationSyncCursors.integrationId,
+          integrationSyncCursors.entity,
+          integrationSyncCursors.direction,
+        ],
         set: { cursor, lastSyncedAt: new Date() },
       });
   }
@@ -659,12 +779,19 @@ export class SyncService implements OnModuleInit {
         .where(eq(integrations.id, integration.id));
       if (integration.nextSyncAt === null) continue; // first tick only computes the schedule
       try {
+        // A schedule pulls when the connector can; push-only providers push instead.
+        const capabilities = this.integrations.connector(integration.provider).descriptor
+          .capabilities;
+        const direction: IntegrationDirection = capabilities.includes('PULL')
+          ? 'INBOUND'
+          : 'OUTBOUND';
         await this.trigger(
           null,
           integration.organizationId,
           integration.id,
           { mode: 'INCREMENTAL' },
           'SCHEDULED',
+          direction,
         );
         started += 1;
       } catch (err) {

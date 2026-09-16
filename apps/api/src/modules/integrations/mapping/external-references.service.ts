@@ -87,6 +87,66 @@ export class ExternalReferencesService {
     return row!;
   }
 
+  /**
+   * Outbound counterpart of link(): the internal record is the identity and
+   * the provider id may change between pushes (a new acknowledgement number).
+   */
+  async linkByInternal(
+    tx: DbExecutor,
+    input: {
+      integrationId: string;
+      provider: string;
+      entityType: string;
+      externalId: string;
+      internalId: string;
+      metadata?: Record<string, unknown>;
+    },
+  ): Promise<IntegrationExternalReference> {
+    const [row] = await tx
+      .insert(integrationExternalReferences)
+      .values({
+        integrationId: input.integrationId,
+        provider: input.provider,
+        entityType: input.entityType,
+        externalId: input.externalId,
+        internalId: input.internalId,
+        metadata: input.metadata ?? {},
+      })
+      .onConflictDoUpdate({
+        target: [
+          integrationExternalReferences.integrationId,
+          integrationExternalReferences.entityType,
+          integrationExternalReferences.internalId,
+        ],
+        set: {
+          externalId: input.externalId,
+          lastSeenAt: new Date(),
+          metadata: input.metadata ?? {},
+        },
+      })
+      .returning();
+    return row!;
+  }
+
+  async findByInternalIds(
+    integrationId: string,
+    entityType: string,
+    internalIds: string[],
+    executor: DbExecutor = this.db,
+  ): Promise<IntegrationExternalReference[]> {
+    if (!internalIds.length) return [];
+    return executor
+      .select()
+      .from(integrationExternalReferences)
+      .where(
+        and(
+          eq(integrationExternalReferences.integrationId, integrationId),
+          eq(integrationExternalReferences.entityType, entityType),
+          inArray(integrationExternalReferences.internalId, internalIds),
+        ),
+      );
+  }
+
   async list(integrationId: string, entityType?: string, limit = 200) {
     return this.db
       .select()
