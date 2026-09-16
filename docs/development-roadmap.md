@@ -367,9 +367,24 @@ A second programme strengthens the delivered system along the lines of
   job runs, queue depths); Administration → Operations console
 - Tests: API integration +9, API unit +2, Playwright +3
 
-### H9 (planned)
+### H9 - Consolidation readiness (COMPLETE)
 
-Consolidation readiness.
+- Consolidation groups: parent, presentation currency, members with
+  ownership share and method (FULL with NCI, PROPORTIONATE scaling)
+- Group chart of accounts with member-account mappings (auto-map by code,
+  create-missing from the parent's chart, type-checked hand mapping)
+- Current-rate translation (closing for balance sheet, month-end average for
+  the period's P&L) with the cumulative translation adjustment plug;
+  automatic intercompany eliminations; balanced group-level adjustments
+  (one-off or recurring); non-controlling interest in net assets and result
+- Readiness checklist (members, rates, closed periods, intercompany posted /
+  mirrored, mappings, adjustments, balance sheet closes) and stored runs
+  finalised only when every check passes (audited FINALIZE)
+- Web: Reporting → Consolidation (report / readiness / adjustments / runs +
+  the quick trial balance), Administration → Consolidation groups
+- Tests: API integration +8, API unit +5, Playwright +2
+
+All nine hardening phases (H1-H9) are delivered.
 
 ## Beyond the roadmap
 

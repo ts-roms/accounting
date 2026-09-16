@@ -239,6 +239,19 @@ Concurrency control uses `pg_try_advisory_xact_lock(hashtext('job:<name>'))`,
 not a table. Enum additions: `audit_action` += `JOB_RUN`, `QUEUE_RETRY`,
 `QUEUE_DISCARD`. Migration: `0024_operations.sql`.
 
+## Hardening phase 9 (consolidation readiness)
+
+| Table                                    | Purpose                                                                                                           |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `consolidation_groups`                   | Parent, presentation currency, status; `code` unique per organization                                             |
+| `consolidation_group_members`            | Member company, `ownership_pct` NUMERIC(7,4), method (`consolidation_method`: FULL / PROPORTIONATE)               |
+| `group_accounts`                         | Group chart of accounts (code unique per group, `account_type`, intercompany flag, sort order)                    |
+| `group_account_mappings`                 | Member account -> group account, one per account per group                                                        |
+| `consolidation_adjustments` (+ `_lines`) | Balanced group-level adjustments in the presentation currency, effective date + optional recurring end            |
+| `consolidation_runs`                     | Stored report + readiness snapshot per window; status `consolidation_run_status` DRAFT / FINAL, finalised by / at |
+
+Enum additions: `audit_action` += `FINALIZE`. Migration: `0025_consolidation_groups.sql`.
+
 ## Posted-journal immutability
 
 Migration `0003_posted_journal_immutability.sql` installs triggers that reject

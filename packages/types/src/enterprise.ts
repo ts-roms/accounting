@@ -229,3 +229,15 @@ export type JobTrigger = (typeof JOB_TRIGGERS)[number];
 
 export const INTEGRITY_RUN_STATUSES = ['OK', 'WARNING', 'CRITICAL', 'FAILED'] as const;
 export type IntegrityRunStatus = (typeof INTEGRITY_RUN_STATUSES)[number];
+
+// ------------------------------------------------- consolidation readiness (H9)
+
+/** FULL includes 100% of a member (NCI reported separately); PROPORTIONATE scales every balance by the ownership share. */
+export const CONSOLIDATION_METHODS = ['FULL', 'PROPORTIONATE'] as const;
+export type ConsolidationMethod = (typeof CONSOLIDATION_METHODS)[number];
+
+export const CONSOLIDATION_RUN_STATUSES = ['DRAFT', 'FINAL'] as const;
+export type ConsolidationRunStatus = (typeof CONSOLIDATION_RUN_STATUSES)[number];
+
+export const READINESS_STATUSES = ['PASS', 'WARN', 'FAIL'] as const;
+export type ReadinessStatus = (typeof READINESS_STATUSES)[number];

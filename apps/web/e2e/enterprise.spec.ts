@@ -29,6 +29,8 @@ test.describe('enterprise: FX, intercompany, workflows, attachments', () => {
     await expect(page.getByTestId('rate-row').filter({ hasText: 'GBP → PHP' })).toBeVisible();
 
     await page.goto('/reports/consolidation');
+    // H9 made the group consolidation the default tab; the quick trial balance has its own tab.
+    await page.getByTestId('consol-tab-quick').click();
     await expect(page.getByTestId('consolidation-row').first()).toBeVisible();
     await expect(page.getByText('Group trial balance')).toBeVisible();
   });

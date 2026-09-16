@@ -1,6 +1,6 @@
 'use client';
-import { ConsolidationPage } from '@/components/enterprise/intercompany';
+import { GroupConsolidationPage } from '@/components/consolidation/group-consolidation';
 
 export default function ConsolidationRoute() {
-  return <ConsolidationPage />;
+  return <GroupConsolidationPage />;
 }

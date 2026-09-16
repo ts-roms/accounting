@@ -48,6 +48,7 @@ export const AUDIT_ACTIONS = [
   'JOB_RUN',
   'QUEUE_RETRY',
   'QUEUE_DISCARD',
+  'FINALIZE',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

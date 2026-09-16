@@ -183,6 +183,13 @@
       "when": 1789549473550,
       "tag": "0025_cash_treasury",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1789567495715,
+      "tag": "0027_consolidation_groups",
+      "breakpoints": true
     }
   ]
 }

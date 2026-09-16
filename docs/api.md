@@ -447,6 +447,19 @@ New error codes: `IMPORT_FILE_INVALID`, `IMPORT_INVALID_ROWS`, `OPENING_BALANCE_
 
 New error codes: `JOB_ALREADY_RUNNING` (422), `QUEUE_UNAVAILABLE`. New audit actions: `JOB_RUN`, `QUEUE_RETRY`, `QUEUE_DISCARD`.
 
+### Consolidation groups (see `docs/consolidation.md`)
+
+| Method              | Path                                                                                                                                                                                     | Permission           |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| GET / POST          | `/consolidation/groups`, `/consolidation/groups/:id` (+ PATCH: name, currency, status, members)                                                                                          | view / manage        |
+| GET / POST / PATCH  | `/consolidation/groups/:id/accounts` (group chart), `/consolidation/groups/:id/accounts/:accountId`                                                                                      | view / manage        |
+| GET / PUT / POST    | `/consolidation/groups/:id/mappings/:companyId`, `/consolidation/groups/:id/mappings { companyId, mappings[] }`, `/consolidation/groups/:id/mappings/auto { companyId?, createMissing }` | view / manage        |
+| GET / POST / DELETE | `/consolidation/groups/:id/adjustments`, `.../adjustments/:adjustmentId` (balanced group-level lines in the presentation currency)                                                       | view / manage        |
+| GET                 | `/consolidation/groups/:id/report?from&to` (translated members, rows, eliminations, adjustments, CTA, NCI, totals), `/consolidation/groups/:id/readiness?from&to`                        | `consolidation.view` |
+| GET / POST          | `/consolidation/groups/:id/runs`, `/consolidation/groups/:id/runs/:runId`, `POST .../runs { from, to }` (DRAFT snapshot), `POST .../runs/:runId/finalize`                                | view / manage        |
+
+New error code: `CONSOLIDATION_NOT_READY` (422, `details.failing` lists the readiness keys). New audit action: `FINALIZE`.
+
 ### Audit & health
 
 | Method | Path                                                                                                                 | Notes                         |

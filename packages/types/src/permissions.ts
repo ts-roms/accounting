@@ -269,6 +269,7 @@ export const PERMISSION_DEFINITIONS = [
   define('exchange-rate.manage', 'ACCOUNTING', 'Maintain exchange rates'),
   define('fx.revalue', 'ACCOUNTING', 'Run and reverse foreign-currency revaluations'),
   define('consolidation.view', 'REPORTING', 'View consolidated group reports'),
+  define('consolidation.manage', 'REPORTING', 'Maintain consolidation groups, group chart mappings, adjustments and finalise consolidation runs'),
   define('intercompany.view', 'ACCOUNTING', 'View intercompany transactions'),
   define('intercompany.post', 'ACCOUNTING', 'Create and post intercompany transactions'),
   define('workflow.manage', 'ADMINISTRATION', 'Configure approval workflows'),

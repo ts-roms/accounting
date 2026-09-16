@@ -2818,3 +2818,155 @@ export interface IntegrityRunView {
   triggeredBy: string | null;
   ranAt: string;
 }
+
+// ---------------------------------------------------- consolidation groups (H9)
+
+export interface GroupMemberView {
+  companyId: string;
+  code: string;
+  name: string;
+  baseCurrency: string;
+  ownershipPct: string;
+  method: 'FULL' | 'PROPORTIONATE';
+  isParent: boolean;
+}
+
+export interface ConsolidationGroupView {
+  id: string;
+  organizationId: string;
+  code: string;
+  name: string;
+  description: string | null;
+  presentationCurrency: string;
+  parentCompanyId: string;
+  status: 'ACTIVE' | 'INACTIVE';
+  createdAt: string;
+  updatedAt: string;
+  members: GroupMemberView[];
+  groupAccountCount: number;
+}
+
+export interface GroupAccountView {
+  id: string;
+  groupId: string;
+  code: string;
+  name: string;
+  type: AccountType;
+  isIntercompany: boolean;
+  sortOrder: number;
+}
+
+export interface GroupMappingRow {
+  accountId: string;
+  code: string;
+  name: string;
+  type: string;
+  isHeader: boolean;
+  groupAccountId: string | null;
+}
+
+export interface ConsolidationAdjustmentView {
+  id: string;
+  groupId: string;
+  effectiveDate: string;
+  recurringUntil: string | null;
+  reference: string | null;
+  description: string;
+  createdAt: string;
+  total: string;
+  lines: Array<{
+    id: string;
+    lineNumber: number;
+    groupAccountId: string;
+    groupAccountCode: string;
+    groupAccountName: string;
+    debit: string;
+    credit: string;
+    description: string | null;
+  }>;
+}
+
+export interface GroupReportRow {
+  groupAccountId: string | null;
+  code: string;
+  name: string;
+  type: AccountType;
+  isIntercompany: boolean;
+  byCompany: Record<string, string>;
+  combined: string;
+  eliminations: string;
+  adjustments: string;
+  consolidated: string;
+}
+
+export interface GroupReport {
+  group: { id: string; code: string; name: string; parentCompanyId: string };
+  from: string;
+  to: string;
+  currency: string;
+  members: Array<
+    GroupMemberView & {
+      rates: { closing: string; average: string };
+      cta: string;
+      nci: { netAssets: string; earnings: string };
+    }
+  >;
+  rows: GroupReportRow[];
+  unmapped: Array<{
+    companyId: string;
+    companyCode: string;
+    code: string;
+    name: string;
+    balance: string;
+  }>;
+  adjustments: Array<{ id: string; reference: string | null; description: string; total: string }>;
+  totals: {
+    assets: string;
+    liabilities: string;
+    equity: string;
+    nonControllingInterest: string;
+    cumulativeTranslationAdjustment: string;
+    revenue: string;
+    expenses: string;
+    netIncome: string;
+    netIncomeToNci: string;
+    eliminationCheck: string;
+    adjustmentsBalanced: boolean;
+    balanced: boolean;
+  };
+  generatedAt: string;
+}
+
+export interface ReadinessCheck {
+  key: string;
+  title: string;
+  status: 'PASS' | 'WARN' | 'FAIL';
+  detail: string;
+  items?: string[];
+}
+
+export interface ReadinessResult {
+  from: string;
+  to: string;
+  ready: boolean;
+  checks: ReadinessCheck[];
+}
+
+export interface ConsolidationRunView {
+  id: string;
+  groupId: string;
+  fromDate: string;
+  toDate: string;
+  currency: string;
+  status: 'DRAFT' | 'FINAL';
+  createdBy: string | null;
+  finalizedBy: string | null;
+  finalizedAt: string | null;
+  createdAt: string;
+  readiness: ReadinessResult;
+  totals: GroupReport['totals'];
+}
+
+export interface ConsolidationRunDetail extends Omit<ConsolidationRunView, 'totals'> {
+  report: GroupReport;
+}
