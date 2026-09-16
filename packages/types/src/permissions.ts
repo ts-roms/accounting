@@ -77,7 +77,11 @@ export const PERMISSION_DEFINITIONS = [
   define('posting-rule.manage', 'ACCOUNTING', 'Create and update posting rules and dimension rules'),
   define('integrity.check', 'ACCOUNTING', 'Run and view financial integrity checks'),
   define('reconciliation.view', 'ACCOUNTING', 'View subledger reconciliations'),
-  define('reconciliation.prepare', 'ACCOUNTING', 'Run subledger reconciliations, log and resolve exceptions'),
+  define(
+    'reconciliation.prepare',
+    'ACCOUNTING',
+    'Run subledger reconciliations, log and resolve exceptions',
+  ),
   define('reconciliation.approve', 'ACCOUNTING', 'Review and approve subledger reconciliations'),
   define('policy.manage', 'ACCOUNTING', 'Manage accounting policies (materiality, close blockers)'),
   define('close.view', 'ACCOUNTING', 'View financial close checklists'),
@@ -95,7 +99,30 @@ export const PERMISSION_DEFINITIONS = [
   define('invoice.post', 'SALES', 'Post invoices to the ledger'),
   define('invoice.void', 'SALES', 'Void invoices'),
   define('customer-payment.create', 'SALES', 'Record customer payments'),
+  define('customer-payment.approve', 'SALES', 'Approve customer payments'),
   define('customer-payment.post', 'SALES', 'Post customer payments'),
+  define('customer.credit-manage', 'SALES', 'Change credit limits, credit holds and risk ratings'),
+  define('customer-refund.create', 'SALES', 'Request customer refunds'),
+  define('customer-refund.approve', 'SALES', 'Approve customer refunds'),
+  define('customer-refund.pay', 'SALES', 'Pay approved customer refunds'),
+  define('delivery.view', 'SALES', 'View deliveries'),
+  define('delivery.manage', 'SALES', 'Create, pick and deliver sales order deliveries'),
+  define('collection.view', 'SALES', 'View collection cases, promises and disputes'),
+  define('collection.manage', 'SALES', 'Work collection cases, record activities and promises'),
+  define('dispute.manage', 'SALES', 'Open, investigate and resolve invoice disputes'),
+  define('write-off.view', 'SALES', 'View receivable write-offs and bad-debt provisions'),
+  define('write-off.create', 'SALES', 'Request receivable write-offs'),
+  define('write-off.approve', 'SALES', 'Approve receivable write-offs'),
+  define(
+    'write-off.post',
+    'SALES',
+    'Post approved write-offs and bad-debt provisions to the ledger',
+  ),
+  define(
+    'ar-settings.manage',
+    'SALES',
+    'Configure payment terms, customer groups, credit rules, dunning and aging',
+  ),
   define('quotation.view', 'SALES', 'View quotations'),
   define('quotation.create', 'SALES', 'Create, send and convert quotations'),
   define('sales-order.view', 'SALES', 'View sales orders'),
@@ -157,7 +184,11 @@ export const PERMISSION_DEFINITIONS = [
   define('bank-transaction.create', 'BANKING', 'Record deposits, withdrawals, transfers, fees'),
   define('bank-transaction.post', 'BANKING', 'Post and void bank transactions'),
   define('bank-statement.import', 'BANKING', 'Import bank statements'),
-  define('bank-reconciliation.perform', 'BANKING', 'Match statement lines and complete reconciliations'),
+  define(
+    'bank-reconciliation.perform',
+    'BANKING',
+    'Match statement lines and complete reconciliations',
+  ),
 
   // Fixed assets
   define('fixed-asset.view', 'FIXED_ASSETS', 'View fixed assets and depreciation'),
@@ -205,7 +236,11 @@ export const PERMISSION_DEFINITIONS = [
 
   // Integration platform & delegated authority (Prompt #4)
   define('integration.view', 'INTEGRATIONS', 'View integrations, sync jobs, logs and health'),
-  define('integration.manage', 'INTEGRATIONS', 'Connect, configure, sync and disconnect integrations'),
+  define(
+    'integration.manage',
+    'INTEGRATIONS',
+    'Connect, configure, sync and disconnect integrations',
+  ),
   define('api-key.view', 'INTEGRATIONS', 'View API keys'),
   define('api-key.manage', 'INTEGRATIONS', 'Create, rotate and revoke API keys'),
   define('webhook.view', 'INTEGRATIONS', 'View outbound webhooks and deliveries'),
@@ -213,7 +248,11 @@ export const PERMISSION_DEFINITIONS = [
   define('delegation.view', 'ADMINISTRATION', 'View delegations of authority'),
   define('delegation.create', 'ADMINISTRATION', 'Delegate own approval authority to another user'),
   define('delegation.approve', 'ADMINISTRATION', 'Approve or reject delegations of authority'),
-  define('delegation.manage', 'ADMINISTRATION', 'Revoke any delegation and configure the delegation policy'),
+  define(
+    'delegation.manage',
+    'ADMINISTRATION',
+    'Revoke any delegation and configure the delegation policy',
+  ),
   define('notification.view', 'ADMINISTRATION', 'View own notifications'),
 ] as const;
 

@@ -105,16 +105,14 @@ export class TaxCodesService {
             isDefaultPurchases: input.isDefaultPurchases,
           })
           .returning();
-        await tx
-          .insert(taxRates)
-          .values(
-            input.rates.map((r) => ({
-              taxCodeId: row!.id,
-              ratePercent: r.ratePercent,
-              effectiveFrom: r.effectiveFrom,
-              effectiveTo: r.effectiveTo ?? null,
-            })),
-          );
+        await tx.insert(taxRates).values(
+          input.rates.map((r) => ({
+            taxCodeId: row!.id,
+            ratePercent: r.ratePercent,
+            effectiveFrom: r.effectiveFrom,
+            effectiveTo: r.effectiveTo ?? null,
+          })),
+        );
         await this.clearOtherDefaults(
           tx,
           companyId,
@@ -178,16 +176,14 @@ export class TaxCodesService {
         assertRates(input.rates);
         // Rates used by posted transactions must remain resolvable: keep history, replace the set.
         await tx.delete(taxRates).where(eq(taxRates.taxCodeId, id));
-        await tx
-          .insert(taxRates)
-          .values(
-            input.rates.map((r) => ({
-              taxCodeId: id,
-              ratePercent: r.ratePercent,
-              effectiveFrom: r.effectiveFrom,
-              effectiveTo: r.effectiveTo ?? null,
-            })),
-          );
+        await tx.insert(taxRates).values(
+          input.rates.map((r) => ({
+            taxCodeId: id,
+            ratePercent: r.ratePercent,
+            effectiveFrom: r.effectiveFrom,
+            effectiveTo: r.effectiveTo ?? null,
+          })),
+        );
       }
       const isDefaultSales = input.isDefaultSales ?? existing.isDefaultSales;
       const isDefaultPurchases = input.isDefaultPurchases ?? existing.isDefaultPurchases;

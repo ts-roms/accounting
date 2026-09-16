@@ -7,12 +7,7 @@
 // --------------------------------------------------------------------- intake
 
 /** Lifecycle of a document dropped into the intake tray. */
-export const AI_DOCUMENT_STATUSES = [
-  'EXTRACTED',
-  'NEEDS_REVIEW',
-  'DRAFTED',
-  'DISMISSED',
-] as const;
+export const AI_DOCUMENT_STATUSES = ['EXTRACTED', 'NEEDS_REVIEW', 'DRAFTED', 'DISMISSED'] as const;
 export type AiDocumentStatus = (typeof AI_DOCUMENT_STATUSES)[number];
 
 /** What the intake believes the document is. */

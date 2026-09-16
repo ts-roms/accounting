@@ -111,7 +111,7 @@ export function AgingPage({ cfg }: { cfg: SubledgerConfig }) {
                       {aging.data!.buckets.map((b) => (
                         <TableCell key={b.key}>
                           <Amount
-                            value={r.buckets[b.key]}
+                            value={r.buckets[b.key] ?? '0'}
                             currency={currency}
                             zeroAsDash
                             className={cn(
@@ -143,7 +143,7 @@ export function AgingPage({ cfg }: { cfg: SubledgerConfig }) {
                   {aging.data.buckets.map((b) => (
                     <TableCell key={b.key}>
                       <Amount
-                        value={aging.data!.totals[b.key]}
+                        value={aging.data!.totals[b.key] ?? '0'}
                         currency={currency}
                         className="font-semibold"
                         zeroAsDash

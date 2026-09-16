@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, inArray, lte, or, sql } from 'drizzle-orm';
 import { Money } from '@accounting/money';
-import { AGING_BUCKETS, type AgingBucketKey } from '@accounting/types';
+import type { AgingBucketDefinition } from '@accounting/types';
 import type { AgingQuery, ReconciliationQuery, StatementQuery } from '@accounting/validation';
 import { AccountsService } from '@/modules/accounting/accounts/accounts.service';
 import {
@@ -9,9 +9,21 @@ import {
   signedBalance,
 } from '@/modules/accounting/ledger/general-ledger.service';
 import { DRIZZLE, type Database } from '@/database/database.types';
-import { customerPayments, customers, fxAdjustments, invoices } from '@/database/schema';
-import { agingBucket, isDebitDocument } from '@/modules/subledger/subledger.logic';
+import {
+  collectionCases,
+  customerPayments,
+  customers,
+  fxAdjustments,
+  invoices,
+  writeOffRequests,
+} from '@/database/schema';
+import { isDebitDocument } from '@/modules/subledger/subledger.logic';
+import { ArConfigService } from './ar-config.service';
 import { CustomersService } from './customers.service';
+import { agingBucketFor } from './receivables.logic';
+
+/** Bucket keys are configurable per company (AR settings), so rows are keyed by string. */
+type AgingBucketKey = string;
 
 /** Explicit outer-table references for correlated subqueries. */
 const OUTER_DOC = sql.raw('"invoices"."id"');
@@ -34,14 +46,21 @@ export interface AgingRow {
 export interface AgingReport {
   asOf: string;
   currency: string;
-  buckets: Array<{ key: AgingBucketKey; label: string }>;
+  buckets: Array<{ key: AgingBucketKey; label: string; from: number; to: number | null }>;
   rows: AgingRow[];
   totals: AgingRow['buckets'] & { outstanding: string; unappliedCredit: string; net: string };
 }
 
 export interface StatementLine {
   date: string;
-  kind: 'INVOICE' | 'CREDIT_NOTE' | 'DEBIT_NOTE' | 'PAYMENT' | 'REFUND';
+  kind:
+    | 'INVOICE'
+    | 'CREDIT_NOTE'
+    | 'DEBIT_NOTE'
+    | 'PAYMENT'
+    | 'REFUND'
+    | 'WRITE_OFF'
+    | 'WRITE_OFF_RECOVERY';
   documentId: string;
   documentNumber: string;
   reference: string | null;
@@ -80,6 +99,8 @@ export interface ReconciliationReport {
     refunds: string;
     /** Realized and unrealized FX posted against the control (signed). */
     fxAdjustments: string;
+    /** Posted write-offs not yet recovered as of the date (Prompt #6). */
+    writeOffs: string;
   };
 }
 
@@ -95,6 +116,7 @@ export class ArReportsService {
     private readonly accounts: AccountsService,
     private readonly ledger: GeneralLedgerService,
     private readonly customersService: CustomersService,
+    private readonly config: ArConfigService,
   ) {}
 
   /** A document counts in the ledger as of a date if it was posted, and not yet reversed by then. */
@@ -121,12 +143,20 @@ export class ArReportsService {
   async aging(companyId: string, query: AgingQuery): Promise<AgingReport> {
     const currency = await this.accounts.companyCurrency(companyId);
     const asOf = query.asOf;
+    const bucketDefs: AgingBucketDefinition[] = await this.config.agingBuckets(companyId);
     const docFilters = [
       eq(invoices.companyId, companyId),
       lte(invoices.documentDate, asOf),
       this.inLedgerAsOf(asOf)!,
     ];
     if (query.partyId) docFilters.push(eq(invoices.customerId, query.partyId));
+    if (query.branchId) docFilters.push(eq(invoices.branchId, query.branchId));
+    // Customer-level filters (group / collector) restrict both documents and receipts.
+    const partyFilter =
+      query.customerGroupId || query.collectorId
+        ? sql`${invoices.customerId} in (select c.id from customers c where c.company_id = ${companyId}${query.customerGroupId ? sql` and c.customer_group_id = ${query.customerGroupId}` : sql``}${query.collectorId ? sql` and exists (select 1 from collection_cases k where k.customer_id = c.id and k.collector_id = ${query.collectorId} and k.status in ('NEW','CONTACTED','PROMISED','ESCALATED','DISPUTED'))` : sql``})`
+        : null;
+    if (partyFilter) docFilters.push(partyFilter);
 
     const docs = await this.db
       .select({
@@ -148,6 +178,11 @@ export class ArReportsService {
       this.paymentInLedgerAsOf(asOf)!,
     ];
     if (query.partyId) payFilters.push(eq(customerPayments.customerId, query.partyId));
+    if (query.branchId) payFilters.push(eq(customerPayments.branchId, query.branchId));
+    if (partyFilter)
+      payFilters.push(
+        sql`${customerPayments.customerId} in (select c.id from customers c where c.company_id = ${companyId}${query.customerGroupId ? sql` and c.customer_group_id = ${query.customerGroupId}` : sql``}${query.collectorId ? sql` and exists (select 1 from ${collectionCases} k where k.customer_id = c.id and k.collector_id = ${query.collectorId} and k.status in ('NEW','CONTACTED','PROMISED','ESCALATED','DISPUTED'))` : sql``})`,
+      );
     const pays = await this.db
       .select({
         customerId: customerPayments.customerId,
@@ -172,7 +207,7 @@ export class ArReportsService {
     const partyById = new Map(parties.map((p) => [p.id, p]));
 
     const emptyBuckets = (): Record<AgingBucketKey, Money> =>
-      Object.fromEntries(AGING_BUCKETS.map((b) => [b.key, Money.zero(currency)])) as Record<
+      Object.fromEntries(bucketDefs.map((b) => [b.key, Money.zero(currency)])) as Record<
         AgingBucketKey,
         Money
       >;
@@ -208,8 +243,8 @@ export class ArReportsService {
       if (remaining.isZero()) continue;
       const a = get(d.customerId);
       if (isDebitDocument(d.documentType)) {
-        a.buckets[agingBucket(asOf, d.dueDate)] =
-          a.buckets[agingBucket(asOf, d.dueDate)].add(remaining);
+        const key = agingBucketFor(asOf, d.dueDate, bucketDefs);
+        a.buckets[key] = (a.buckets[key] ?? Money.zero(currency)).add(remaining);
         a.outstanding = a.outstanding.add(remaining);
         a.documents += 1;
         if (d.dueDate < asOf && (!a.oldest || d.dueDate < a.oldest)) a.oldest = d.dueDate;
@@ -248,8 +283,8 @@ export class ArReportsService {
         oldestDueDate: a.oldest,
         documents: a.documents,
       });
-      for (const b of AGING_BUCKETS)
-        totalsAcc.buckets[b.key] = totalsAcc.buckets[b.key].add(a.buckets[b.key]);
+      for (const b of bucketDefs)
+        totalsAcc.buckets[b.key] = totalsAcc.buckets[b.key]!.add(a.buckets[b.key]!);
       totalsAcc.outstanding = totalsAcc.outstanding.add(a.outstanding);
       totalsAcc.credit = totalsAcc.credit.add(a.credit);
     }
@@ -259,7 +294,7 @@ export class ArReportsService {
     return {
       asOf,
       currency,
-      buckets: AGING_BUCKETS.map((b) => ({ key: b.key, label: b.label })),
+      buckets: bucketDefs.map((b) => ({ key: b.key, label: b.label, from: b.from, to: b.to })),
       rows,
       totals: {
         ...(Object.fromEntries(
@@ -320,9 +355,55 @@ export class ArReportsService {
         ),
       )
       .orderBy(asc(customerPayments.paymentDate), asc(customerPayments.documentNumber));
+    const writeOffs = await this.db
+      .select({
+        id: writeOffRequests.id,
+        documentNumber: writeOffRequests.documentNumber,
+        writeOffDate: writeOffRequests.writeOffDate,
+        recoveryDate: writeOffRequests.recoveryDate,
+        reason: writeOffRequests.reason,
+        amount: writeOffRequests.amount,
+        invoiceNumber: sql<string>`(select document_number from invoices i where i.id = ${writeOffRequests.invoiceId})`,
+      })
+      .from(writeOffRequests)
+      .where(
+        and(
+          eq(writeOffRequests.companyId, companyId),
+          eq(writeOffRequests.customerId, customerId),
+          inArray(writeOffRequests.status, ['POSTED', 'RECOVERED']),
+          lte(writeOffRequests.writeOffDate, query.to),
+        ),
+      );
 
     type Movement = Omit<StatementLine, 'balance'>;
+    const writeOffMovements: Movement[] = [];
+    for (const w of writeOffs) {
+      writeOffMovements.push({
+        date: w.writeOffDate!,
+        kind: 'WRITE_OFF',
+        documentId: w.id,
+        documentNumber: w.documentNumber,
+        reference: w.invoiceNumber,
+        description: `Write-off (${w.reason.toLowerCase().replace(/_/g, ' ')}) of ${w.invoiceNumber}`,
+        dueDate: null,
+        debit: '0.0000',
+        credit: w.amount,
+      });
+      if (w.recoveryDate && w.recoveryDate <= query.to)
+        writeOffMovements.push({
+          date: w.recoveryDate,
+          kind: 'WRITE_OFF_RECOVERY',
+          documentId: w.id,
+          documentNumber: w.documentNumber,
+          reference: w.invoiceNumber,
+          description: `Recovery of write-off on ${w.invoiceNumber}`,
+          dueDate: null,
+          debit: w.amount,
+          credit: '0.0000',
+        });
+    }
     const movements: Movement[] = [
+      ...writeOffMovements,
       ...docs.map<Movement>((d) => ({
         date: d.documentDate,
         kind: d.documentType,
@@ -424,7 +505,29 @@ export class ArReportsService {
         ),
       );
     const fxAdjustment = Money.of(fx?.total ?? '0', currency);
-    const subledger = inv.add(dn).subtract(cn).subtract(receipts).add(refunds).add(fxAdjustment);
+    // Write-offs relieve the control when posted and come back when recovered (Prompt #6).
+    const [wo] = await this.db
+      .select({ total: sql<string>`coalesce(sum(${writeOffRequests.baseAmount}), 0)` })
+      .from(writeOffRequests)
+      .where(
+        and(
+          eq(writeOffRequests.companyId, companyId),
+          inArray(writeOffRequests.status, ['POSTED', 'RECOVERED']),
+          lte(writeOffRequests.writeOffDate, asOf),
+          or(
+            sql`${writeOffRequests.recoveryDate} is null`,
+            sql`${writeOffRequests.recoveryDate} > ${asOf}`,
+          ),
+        ),
+      );
+    const writeOffTotal = Money.of(wo?.total ?? '0', currency);
+    const subledger = inv
+      .add(dn)
+      .subtract(cn)
+      .subtract(receipts)
+      .add(refunds)
+      .add(fxAdjustment)
+      .subtract(writeOffTotal);
 
     const activity = await this.ledger.activity({ companyId, to: asOf });
     const row = activity.find((a) => a.accountId === control.id);
@@ -448,6 +551,7 @@ export class ArReportsService {
         receipts: receipts.toString(),
         refunds: refunds.toString(),
         fxAdjustments: fxAdjustment.toString(),
+        writeOffs: writeOffTotal.toString(),
       },
     };
   }

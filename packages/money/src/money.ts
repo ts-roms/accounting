@@ -92,7 +92,11 @@ export class Money {
   convert(toCurrency: string, rate: string | number | Decimal, scale = this.scale): Money {
     const r = new MoneyDecimal(rate);
     if (r.lte(0)) throw new InvalidAmountError('exchange rate must be positive');
-    return new Money(this.value.times(r).toDecimalPlaces(scale, Decimal.ROUND_HALF_EVEN), toCurrency, scale);
+    return new Money(
+      this.value.times(r).toDecimalPlaces(scale, Decimal.ROUND_HALF_EVEN),
+      toCurrency,
+      scale,
+    );
   }
 
   divide(divisor: string | number | Decimal): Money {

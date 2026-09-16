@@ -118,13 +118,11 @@ test.describe('enterprise: FX, intercompany, workflows, attachments', () => {
       .first()
       .click();
     await expect(page.getByTestId('attachments-panel')).toBeVisible();
-    await page
-      .getByTestId('attachment-file')
-      .setInputFiles({
-        name: `voucher-${stamp}.pdf`,
-        mimeType: 'application/pdf',
-        buffer: Buffer.from('%PDF-1.4\n%%EOF'),
-      });
+    await page.getByTestId('attachment-file').setInputFiles({
+      name: `voucher-${stamp}.pdf`,
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('%PDF-1.4\n%%EOF'),
+    });
     await expect(
       page.getByTestId('attachment-row').filter({ hasText: `voucher-${stamp}.pdf` }),
     ).toBeVisible();

@@ -107,7 +107,12 @@ export const consolidationQuerySchema = z.object({
       z.array(uuidSchema),
       z
         .string()
-        .transform((v) => v.split(',').map((x) => x.trim()).filter(Boolean))
+        .transform((v) =>
+          v
+            .split(',')
+            .map((x) => x.trim())
+            .filter(Boolean),
+        )
         .pipe(z.array(uuidSchema)),
     ])
     .optional(),
@@ -148,10 +153,16 @@ export const createWorkflowSchema = z
     escalationPermission: z.string().trim().min(3).max(100).nullable().optional(),
     steps: z.array(workflowStepSchema).min(1, 'At least one step').max(10),
   })
-  .refine((w) => w.maxAmount === null || w.maxAmount === undefined || Number(w.maxAmount) > Number(w.minAmount), {
-    message: 'Max amount must exceed min amount',
-    path: ['maxAmount'],
-  });
+  .refine(
+    (w) =>
+      w.maxAmount === null ||
+      w.maxAmount === undefined ||
+      Number(w.maxAmount) > Number(w.minAmount),
+    {
+      message: 'Max amount must exceed min amount',
+      path: ['maxAmount'],
+    },
+  );
 export type CreateWorkflowInput = z.infer<typeof createWorkflowSchema>;
 
 export const updateWorkflowSchema = z.object({
@@ -238,12 +249,16 @@ export const createReconciliationExceptionSchema = z.object({
   amount: amountSchema,
   reference: optionalText(100),
 });
-export type CreateReconciliationExceptionInput = z.infer<typeof createReconciliationExceptionSchema>;
+export type CreateReconciliationExceptionInput = z.infer<
+  typeof createReconciliationExceptionSchema
+>;
 
 export const resolveReconciliationExceptionSchema = z.object({
   resolution: z.string().trim().min(3, 'Explain how it was resolved').max(1000),
 });
-export type ResolveReconciliationExceptionInput = z.infer<typeof resolveReconciliationExceptionSchema>;
+export type ResolveReconciliationExceptionInput = z.infer<
+  typeof resolveReconciliationExceptionSchema
+>;
 
 /** Close-blocker policy: which automatic checks must pass before approval / completion. */
 export const closePolicySchema = z.object({

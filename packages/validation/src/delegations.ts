@@ -37,7 +37,8 @@ export const createDelegationSchema = z
     path: ['endAt'],
   })
   .refine(
-    (d) => new Set(d.scopes.map((s) => `${s.permission}|${s.branchId ?? ''}`)).size === d.scopes.length,
+    (d) =>
+      new Set(d.scopes.map((s) => `${s.permission}|${s.branchId ?? ''}`)).size === d.scopes.length,
     { message: 'Duplicate permission / branch scope', path: ['scopes'] },
   );
 export type CreateDelegationInput = z.infer<typeof createDelegationSchema>;

@@ -76,6 +76,7 @@ import {
   ReceiptStatusBadge,
   ReturnStatusBadge,
 } from './badges';
+import { SalesOrderArPanel } from '@/components/receivables/order-panel';
 
 export function OrderDetailPage({ cfg, id }: { cfg: OrderConfig; id: string }) {
   const router = useRouter();
@@ -117,7 +118,7 @@ export function OrderDetailPage({ cfg, id }: { cfg: OrderConfig; id: string }) {
     cfg.convert &&
     (o.status === 'ACCEPTED' || (cfg.type === 'PURCHASE_REQUEST' && o.status === 'APPROVED')) &&
     hasPermission(cfg.convert.permission);
-  const openForFulfilment = o.status === 'APPROVED';
+  const openForFulfilment = o.status === 'APPROVED' || o.status === 'CONFIRMED';
   const canFulfil =
     cfg.fulfil &&
     openForFulfilment &&
@@ -242,6 +243,7 @@ export function OrderDetailPage({ cfg, id }: { cfg: OrderConfig; id: string }) {
           <AlertDescription>{o.cancelReason}</AlertDescription>
         </Alert>
       ) : null}
+      {cfg.type === 'SALES_ORDER' ? <SalesOrderArPanel order={o} /> : null}
       {warnings.length > 0 ? (
         <Alert variant="warning">
           <AlertTriangle />

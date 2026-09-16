@@ -8,9 +8,11 @@ const DOC_VARIANT: Record<
   'secondary' | 'default' | 'warning' | 'success' | 'destructive'
 > = {
   DRAFT: 'secondary',
+  SUBMITTED: 'warning',
   APPROVED: 'default',
   PARTIALLY_PAID: 'warning',
   PAID: 'success',
+  WRITTEN_OFF: 'destructive',
   VOID: 'destructive',
 };
 
@@ -34,8 +36,13 @@ export function DocumentStatusBadge({
   );
 }
 
-const PAY_VARIANT: Record<PaymentStatus, 'secondary' | 'success' | 'destructive'> = {
+const PAY_VARIANT: Record<
+  PaymentStatus,
+  'secondary' | 'success' | 'destructive' | 'warning' | 'default'
+> = {
   DRAFT: 'secondary',
+  SUBMITTED: 'warning',
+  APPROVED: 'default',
   POSTED: 'success',
   VOID: 'destructive',
 };

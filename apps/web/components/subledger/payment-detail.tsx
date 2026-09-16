@@ -46,6 +46,7 @@ import { useSession } from '@/lib/auth/session';
 import type { SubledgerConfig } from '@/lib/subledger/config';
 import { formatDateTime, titleCase } from '@/lib/format';
 import { ConfirmDialog, PageHeader } from '@/components/ui-ext/page';
+import { PaymentArActions } from '@/components/receivables/ar-panels';
 import { AttachmentsPanel } from '@/components/enterprise/attachments-panel';
 import { Amount, today } from '@/components/accounting/primitives';
 import { PaymentStatusBadge } from './badges';
@@ -69,7 +70,7 @@ export function PaymentDetailPage({ cfg, id }: { cfg: SubledgerConfig; id: strin
   const party = partyOf(cfg, p);
   const isDraft = p.status === 'DRAFT';
   const canEdit = isDraft && hasPermission(cfg.permissions.payCreate);
-  const canPost = isDraft && hasPermission(cfg.permissions.payPost);
+  const canPost = (isDraft || p.status === 'APPROVED') && hasPermission(cfg.permissions.payPost);
   const canVoid = p.status === 'POSTED' && hasPermission(cfg.permissions.payPost);
   const canAllocate =
     p.status === 'POSTED' &&
@@ -120,6 +121,7 @@ export function PaymentDetailPage({ cfg, id }: { cfg: SubledgerConfig; id: strin
                 Allocate on-account amount
               </Button>
             ) : null}
+            {cfg.side === 'AR' ? <PaymentArActions payment={p} /> : null}
             {canPost ? (
               <Button size="sm" onClick={() => setPosting(true)}>
                 <RotateCcw /> Post to ledger

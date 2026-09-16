@@ -84,6 +84,8 @@ export const ApprovalStatus = make<ApprovalRequestStatus>('ApprovalStatus', {
 
 export const PaymentStatus = make<PaymentStatusKey>('PaymentStatus', {
   DRAFT: 'pending',
+  SUBMITTED: 'warning',
+  APPROVED: 'info',
   POSTED: 'positive',
   VOID: 'critical',
 });

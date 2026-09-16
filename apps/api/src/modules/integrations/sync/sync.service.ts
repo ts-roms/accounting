@@ -36,6 +36,7 @@ import { CustomersImporter } from './importers/customers.importer';
 import type { Importer } from './importers/importer';
 import { InvoicesImporter } from './importers/invoices.importer';
 import { PaymentsImporter } from './importers/payments.importer';
+import { SalesOrdersImporter } from './importers/sales-orders.importer';
 import { syncEntity, type SyncCounters } from './sync-engine';
 
 const MODULE = 'INTEGRATIONS';
@@ -73,13 +74,20 @@ export class SyncService implements OnModuleInit {
     vendors: VendorsImporter,
     bills: BillsImporter,
     products: ProductsImporter,
+    salesOrders: SalesOrdersImporter,
   ) {
     this.logger.setContext(SyncService.name);
     this.importers = new Map<SyncEntity, Importer>(
-      [customers, invoices, payments, bankTransactions, vendors, bills, products].map((i) => [
-        i.entity,
-        i,
-      ]),
+      [
+        customers,
+        invoices,
+        payments,
+        bankTransactions,
+        vendors,
+        bills,
+        products,
+        salesOrders,
+      ].map((i) => [i.entity, i]),
     );
   }
 

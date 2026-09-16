@@ -1,5 +1,6 @@
 import { relations, sql } from 'drizzle-orm';
 import {
+  boolean,
   char,
   check,
   date,
@@ -16,7 +17,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import {
   ACCOUNTING_STATUSES,
-  PAYMENT_METHODS,
+  CUSTOMER_TYPES,
   PAYMENT_STATUSES,
   PAYMENT_TYPES,
   SUBLEDGER_DOCUMENT_STATUSES,
@@ -32,7 +33,16 @@ import { dimensionColumns } from './dimensions';
 import { orderLines, orders } from './orders';
 import { taxCodes } from './tax';
 import { branches, companies } from './organizations';
+import {
+  customerGroups,
+  deliveries,
+  paymentMethodEnum,
+  paymentTerms,
+  writeOffRequests,
+} from './receivables';
 import { users } from './users';
+
+export const customerTypeEnum = pgEnum('customer_type', CUSTOMER_TYPES);
 
 export const subledgerDocumentTypeEnum = pgEnum(
   'subledger_document_type',
@@ -45,7 +55,6 @@ export const subledgerDocumentStatusEnum = pgEnum(
 export const accountingStatusEnum = pgEnum('accounting_status', ACCOUNTING_STATUSES);
 export const paymentStatusEnum = pgEnum('payment_status', PAYMENT_STATUSES);
 export const paymentTypeEnum = pgEnum('payment_type', PAYMENT_TYPES);
-export const paymentMethodEnum = pgEnum('payment_method', PAYMENT_METHODS);
 export const matchStatusEnum = pgEnum('match_status', MATCH_STATUSES);
 
 /** Columns shared by customers and vendors. */
@@ -83,10 +92,28 @@ export const customers = pgTable(
     defaultRevenueAccountId: uuid('default_revenue_account_id').references(() => accounts.id, {
       onDelete: 'set null',
     }),
+    /** Enterprise customer master (Prompt #6). */
+    customerType: customerTypeEnum('customer_type').notNull().default('BUSINESS'),
+    displayName: text('display_name'),
+    customerGroupId: uuid('customer_group_id').references((): AnyPgColumn => customerGroups.id, {
+      onDelete: 'set null',
+    }),
+    /** Named payment term; when set it overrides paymentTermsDays for due dates. */
+    paymentTermId: uuid('payment_term_id').references((): AnyPgColumn => paymentTerms.id, {
+      onDelete: 'set null',
+    }),
+    salespersonId: uuid('salesperson_id').references(() => users.id, { onDelete: 'set null' }),
+    industry: text('industry'),
+    region: text('region'),
+    branchId: uuid('branch_id').references(() => branches.id, { onDelete: 'set null' }),
+    taxExempt: boolean('tax_exempt').notNull().default(false),
+    taxRegistrationType: text('tax_registration_type'),
   },
   (t) => [
     uniqueIndex('customers_company_code_uq').on(t.companyId, t.code),
     index('customers_company_name_idx').on(t.companyId, t.name),
+    index('customers_group_idx').on(t.customerGroupId),
+    index('customers_salesperson_idx').on(t.salespersonId),
   ],
 );
 
@@ -188,6 +215,17 @@ export const invoices = pgTable(
     salesOrderId: uuid('sales_order_id').references((): AnyPgColumn => orders.id, {
       onDelete: 'restrict',
     }),
+    /** Delivery this invoice bills (Prompt #6); stock already left with the delivery. */
+    deliveryId: uuid('delivery_id').references((): AnyPgColumn => deliveries.id, {
+      onDelete: 'restrict',
+    }),
+    paymentTermId: uuid('payment_term_id').references((): AnyPgColumn => paymentTerms.id, {
+      onDelete: 'set null',
+    }),
+    submittedBy: uuid('submitted_by').references(() => users.id, { onDelete: 'set null' }),
+    submittedAt: timestamp('submitted_at', { withTimezone: true }),
+    /** Amount removed by posted write-offs (already included in allocatedAmount; kept for reporting). */
+    writtenOffAmount: money('written_off_amount').notNull().default('0'),
   },
   (t) => [
     uniqueIndex('invoices_company_number_uq').on(t.companyId, t.documentNumber),
@@ -195,6 +233,8 @@ export const invoices = pgTable(
     index('invoices_customer_idx').on(t.customerId),
     index('invoices_company_status_idx').on(t.companyId, t.status),
     index('invoices_company_due_idx').on(t.companyId, t.dueDate),
+    index('invoices_delivery_idx').on(t.deliveryId),
+    index('invoices_sales_order_idx').on(t.salesOrderId),
     ...documentChecks(t, 'invoices'),
   ],
 );
@@ -264,10 +304,9 @@ const lineColumns = () => ({
   }),
   taxRate: money('tax_rate').notNull().default('0'),
   taxAmount: money('tax_amount').notNull().default('0'),
-  withholdingTaxCodeId: uuid('withholding_tax_code_id').references(
-    (): AnyPgColumn => taxCodes.id,
-    { onDelete: 'restrict' },
-  ),
+  withholdingTaxCodeId: uuid('withholding_tax_code_id').references((): AnyPgColumn => taxCodes.id, {
+    onDelete: 'restrict',
+  }),
   withholdingRate: money('withholding_rate').notNull().default('0'),
   withholdingAmount: money('withholding_amount').notNull().default('0'),
 });
@@ -331,8 +370,14 @@ const paymentColumns = () => ({
     .notNull()
     .references(() => accounts.id, { onDelete: 'restrict' }),
   reference: text('reference'),
+  /** Gateway / bank transaction id, cheque number... (Prompt #6). */
+  externalReference: text('external_reference'),
   memo: text('memo'),
   currency: char('currency', { length: 3 }).notNull(),
+  submittedBy: uuid('submitted_by').references(() => users.id, { onDelete: 'set null' }),
+  submittedAt: timestamp('submitted_at', { withTimezone: true }),
+  approvedBy: uuid('approved_by').references(() => users.id, { onDelete: 'set null' }),
+  approvedAt: timestamp('approved_at', { withTimezone: true }),
   journalEntryId: uuid('journal_entry_id').references(() => journalEntries.id, {
     onDelete: 'restrict',
   }),
@@ -404,6 +449,10 @@ export const paymentAllocations = pgTable(
       .references(() => invoices.id, { onDelete: 'restrict' }),
     paymentId: uuid('payment_id').references(() => customerPayments.id, { onDelete: 'restrict' }),
     creditNoteId: uuid('credit_note_id').references(() => invoices.id, { onDelete: 'restrict' }),
+    /** Posted write-off settling the balance (Prompt #6). */
+    writeOffId: uuid('write_off_id').references((): AnyPgColumn => writeOffRequests.id, {
+      onDelete: 'restrict',
+    }),
     amount: money('amount').notNull(),
     allocationDate: date('allocation_date').notNull(),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
@@ -412,10 +461,11 @@ export const paymentAllocations = pgTable(
   (t) => [
     index('payment_allocations_invoice_idx').on(t.invoiceId),
     index('payment_allocations_payment_idx').on(t.paymentId),
+    index('payment_allocations_write_off_idx').on(t.writeOffId),
     check('payment_allocations_amount_chk', sql`${t.amount} > 0`),
     check(
       'payment_allocations_source_chk',
-      sql`(${t.paymentId} IS NOT NULL)::int + (${t.creditNoteId} IS NOT NULL)::int = 1`,
+      sql`(${t.paymentId} IS NOT NULL)::int + (${t.creditNoteId} IS NOT NULL)::int + (${t.writeOffId} IS NOT NULL)::int = 1`,
     ),
   ],
 );

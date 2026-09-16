@@ -85,6 +85,8 @@ export class DocumentStockService {
       currency: string;
       isCreditNote: boolean;
       lines: StockDocumentLineRef[];
+      /** Deliveries (Prompt #6) issue stock under their own source identity. */
+      sourceType?: MovementSourceType;
     },
   ): Promise<StockPostingResult> {
     const result = empty();
@@ -98,7 +100,7 @@ export class DocumentStockService {
         serialNumbers: line.serialNumbers,
         quantity: line.quantity,
         movementDate: input.movementDate,
-        sourceType: 'AR_DOCUMENT' as MovementSourceType,
+        sourceType: (input.sourceType ?? 'AR_DOCUMENT') as MovementSourceType,
         sourceId: input.sourceId,
         sourceLineId: line.id,
         actorId: input.actorId,

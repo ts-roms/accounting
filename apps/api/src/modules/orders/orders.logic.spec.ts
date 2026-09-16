@@ -70,7 +70,9 @@ describe('orders logic', () => {
     expect(nextStatus('QUOTATION', 'send', 'DRAFT')).toBe('SENT');
     expect(nextStatus('QUOTATION', 'convert', 'ACCEPTED')).toBe('CONVERTED');
     expect(() => nextStatus('QUOTATION', 'convert', 'DRAFT')).toThrow(/cannot be converted/);
-    expect(() => nextStatus('SALES_ORDER', 'submit', 'DRAFT')).toThrow(/cannot be submitted/);
+    expect(nextStatus('SALES_ORDER', 'submit', 'DRAFT')).toBe('SUBMITTED');
+    expect(nextStatus('SALES_ORDER', 'confirm', 'APPROVED')).toBe('CONFIRMED');
+    expect(() => nextStatus('SALES_ORDER', 'confirm', 'DRAFT')).toThrow(/cannot be confirmed/);
     expect(nextStatus('PURCHASE_REQUEST', 'submit', 'REJECTED')).toBe('SUBMITTED');
     expect(nextStatus('PURCHASE_ORDER', 'cancel', 'APPROVED')).toBe('CANCELLED');
   });

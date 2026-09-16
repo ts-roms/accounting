@@ -26,6 +26,11 @@ export const WORKFLOW_DOCUMENT_TYPES = [
   'PURCHASE_ORDER',
   'EXPENSE_CLAIM',
   'VENDOR_BILL',
+  'SALES_ORDER',
+  'INVOICE',
+  'CUSTOMER_PAYMENT',
+  'CUSTOMER_REFUND',
+  'WRITE_OFF',
 ] as const;
 export type WorkflowDocumentType = (typeof WORKFLOW_DOCUMENT_TYPES)[number];
 
@@ -97,13 +102,25 @@ export const CLOSE_TYPES = ['MONTH', 'QUARTER', 'YEAR'] as const;
 export type CloseType = (typeof CLOSE_TYPES)[number];
 
 /** IN_PROGRESS -> READY (all required tasks done, no blockers) -> APPROVED -> COMPLETED (period closed / locked). */
-export const CLOSE_STATUSES = ['IN_PROGRESS', 'READY', 'APPROVED', 'COMPLETED', 'CANCELLED'] as const;
+export const CLOSE_STATUSES = [
+  'IN_PROGRESS',
+  'READY',
+  'APPROVED',
+  'COMPLETED',
+  'CANCELLED',
+] as const;
 export type CloseStatus = (typeof CLOSE_STATUSES)[number];
 
 export const CLOSE_TASK_KINDS = ['AUTO', 'MANUAL'] as const;
 export type CloseTaskKind = (typeof CLOSE_TASK_KINDS)[number];
 
-export const CLOSE_TASK_STATUSES = ['PENDING', 'IN_PROGRESS', 'DONE', 'SKIPPED', 'BLOCKED'] as const;
+export const CLOSE_TASK_STATUSES = [
+  'PENDING',
+  'IN_PROGRESS',
+  'DONE',
+  'SKIPPED',
+  'BLOCKED',
+] as const;
 export type CloseTaskStatus = (typeof CLOSE_TASK_STATUSES)[number];
 
 /** Checks the system evaluates itself; manual tasks are whatever the template says. */

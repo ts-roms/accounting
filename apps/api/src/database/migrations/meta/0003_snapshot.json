@@ -142,13 +142,9 @@
         "branches_company_id_companies_id_fk": {
           "name": "branches_company_id_companies_id_fk",
           "tableFrom": "branches",
-          "columnsFrom": [
-            "company_id"
-          ],
+          "columnsFrom": ["company_id"],
           "tableTo": "companies",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "restrict"
         }
@@ -316,13 +312,9 @@
         "companies_organization_id_organizations_id_fk": {
           "name": "companies_organization_id_organizations_id_fk",
           "tableFrom": "companies",
-          "columnsFrom": [
-            "organization_id"
-          ],
+          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "restrict"
         }
@@ -408,9 +400,7 @@
       "uniqueConstraints": {
         "organizations_slug_unique": {
           "name": "organizations_slug_unique",
-          "columns": [
-            "slug"
-          ],
+          "columns": ["slug"],
           "nullsNotDistinct": false
         }
       },
@@ -537,13 +527,9 @@
         "sessions_user_id_users_id_fk": {
           "name": "sessions_user_id_users_id_fk",
           "tableFrom": "sessions",
-          "columnsFrom": [
-            "user_id"
-          ],
+          "columnsFrom": ["user_id"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -680,13 +666,9 @@
         "users_organization_id_organizations_id_fk": {
           "name": "users_organization_id_organizations_id_fk",
           "tableFrom": "users",
-          "columnsFrom": [
-            "organization_id"
-          ],
+          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "restrict"
         }
@@ -749,9 +731,7 @@
       "uniqueConstraints": {
         "permissions_key_unique": {
           "name": "permissions_key_unique",
-          "columns": [
-            "key"
-          ],
+          "columns": ["key"],
           "nullsNotDistinct": false
         }
       },
@@ -788,26 +768,18 @@
         "role_permissions_role_id_roles_id_fk": {
           "name": "role_permissions_role_id_roles_id_fk",
           "tableFrom": "role_permissions",
-          "columnsFrom": [
-            "role_id"
-          ],
+          "columnsFrom": ["role_id"],
           "tableTo": "roles",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "role_permissions_permission_id_permissions_id_fk": {
           "name": "role_permissions_permission_id_permissions_id_fk",
           "tableFrom": "role_permissions",
-          "columnsFrom": [
-            "permission_id"
-          ],
+          "columnsFrom": ["permission_id"],
           "tableTo": "permissions",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -815,10 +787,7 @@
       "compositePrimaryKeys": {
         "role_permissions_role_id_permission_id_pk": {
           "name": "role_permissions_role_id_permission_id_pk",
-          "columns": [
-            "role_id",
-            "permission_id"
-          ]
+          "columns": ["role_id", "permission_id"]
         }
       },
       "uniqueConstraints": {},
@@ -910,13 +879,9 @@
         "roles_organization_id_organizations_id_fk": {
           "name": "roles_organization_id_organizations_id_fk",
           "tableFrom": "roles",
-          "columnsFrom": [
-            "organization_id"
-          ],
+          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "restrict"
         }
@@ -1031,13 +996,9 @@
         "sod_policies_organization_id_organizations_id_fk": {
           "name": "sod_policies_organization_id_organizations_id_fk",
           "tableFrom": "sod_policies",
-          "columnsFrom": [
-            "organization_id"
-          ],
+          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "restrict"
         }
@@ -1112,52 +1073,36 @@
         "user_roles_user_id_users_id_fk": {
           "name": "user_roles_user_id_users_id_fk",
           "tableFrom": "user_roles",
-          "columnsFrom": [
-            "user_id"
-          ],
+          "columnsFrom": ["user_id"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "user_roles_role_id_roles_id_fk": {
           "name": "user_roles_role_id_roles_id_fk",
           "tableFrom": "user_roles",
-          "columnsFrom": [
-            "role_id"
-          ],
+          "columnsFrom": ["role_id"],
           "tableTo": "roles",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "user_roles_company_id_companies_id_fk": {
           "name": "user_roles_company_id_companies_id_fk",
           "tableFrom": "user_roles",
-          "columnsFrom": [
-            "company_id"
-          ],
+          "columnsFrom": ["company_id"],
           "tableTo": "companies",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "user_roles_assigned_by_users_id_fk": {
           "name": "user_roles_assigned_by_users_id_fk",
           "tableFrom": "user_roles",
-          "columnsFrom": [
-            "assigned_by"
-          ],
+          "columnsFrom": ["assigned_by"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         }
@@ -1166,11 +1111,7 @@
       "uniqueConstraints": {
         "user_roles_uq": {
           "name": "user_roles_uq",
-          "columns": [
-            "user_id",
-            "role_id",
-            "company_id"
-          ],
+          "columns": ["user_id", "role_id", "company_id"],
           "nullsNotDistinct": true
         }
       },
@@ -1359,39 +1300,27 @@
         "audit_logs_organization_id_organizations_id_fk": {
           "name": "audit_logs_organization_id_organizations_id_fk",
           "tableFrom": "audit_logs",
-          "columnsFrom": [
-            "organization_id"
-          ],
+          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "restrict"
         },
         "audit_logs_company_id_companies_id_fk": {
           "name": "audit_logs_company_id_companies_id_fk",
           "tableFrom": "audit_logs",
-          "columnsFrom": [
-            "company_id"
-          ],
+          "columnsFrom": ["company_id"],
           "tableTo": "companies",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "restrict"
         },
         "audit_logs_user_id_users_id_fk": {
           "name": "audit_logs_user_id_users_id_fk",
           "tableFrom": "audit_logs",
-          "columnsFrom": [
-            "user_id"
-          ],
+          "columnsFrom": ["user_id"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         }
@@ -1474,26 +1403,18 @@
         "account_mappings_company_id_companies_id_fk": {
           "name": "account_mappings_company_id_companies_id_fk",
           "tableFrom": "account_mappings",
-          "columnsFrom": [
-            "company_id"
-          ],
+          "columnsFrom": ["company_id"],
           "tableTo": "companies",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "restrict"
         },
         "account_mappings_account_id_accounts_id_fk": {
           "name": "account_mappings_account_id_accounts_id_fk",
           "tableFrom": "account_mappings",
-          "columnsFrom": [
-            "account_id"
-          ],
+          "columnsFrom": ["account_id"],
           "tableTo": "accounts",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "restrict"
         }
@@ -1672,26 +1593,18 @@
         "accounts_company_id_companies_id_fk": {
           "name": "accounts_company_id_companies_id_fk",
           "tableFrom": "accounts",
-          "columnsFrom": [
-            "company_id"
-          ],
+          "columnsFrom": ["company_id"],
           "tableTo": "companies",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "restrict"
         },
         "accounts_parent_id_accounts_id_fk": {
           "name": "accounts_parent_id_accounts_id_fk",
           "tableFrom": "accounts",
-          "columnsFrom": [
-            "parent_id"
-          ],
+          "columnsFrom": ["parent_id"],
           "tableTo": "accounts",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "restrict"
         }
@@ -1800,13 +1713,9 @@
         "document_sequences_company_id_companies_id_fk": {
           "name": "document_sequences_company_id_companies_id_fk",
           "tableFrom": "document_sequences",
-          "columnsFrom": [
-            "company_id"
-          ],
+          "columnsFrom": ["company_id"],
           "tableTo": "companies",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "restrict"
         }
@@ -1970,52 +1879,36 @@
         "fiscal_periods_fiscal_year_id_fiscal_years_id_fk": {
           "name": "fiscal_periods_fiscal_year_id_fiscal_years_id_fk",
           "tableFrom": "fiscal_periods",
-          "columnsFrom": [
-            "fiscal_year_id"
-          ],
+          "columnsFrom": ["fiscal_year_id"],
           "tableTo": "fiscal_years",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "restrict"
         },
         "fiscal_periods_company_id_companies_id_fk": {
           "name": "fiscal_periods_company_id_companies_id_fk",
           "tableFrom": "fiscal_periods",
-          "columnsFrom": [
-            "company_id"
-          ],
+          "columnsFrom": ["company_id"],
           "tableTo": "companies",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "restrict"
         },
         "fiscal_periods_closed_by_users_id_fk": {
           "name": "fiscal_periods_closed_by_users_id_fk",
           "tableFrom": "fiscal_periods",
-          "columnsFrom": [
-            "closed_by"
-          ],
+          "columnsFrom": ["closed_by"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         },
         "fiscal_periods_reopened_by_users_id_fk": {
           "name": "fiscal_periods_reopened_by_users_id_fk",
           "tableFrom": "fiscal_periods",
-          "columnsFrom": [
-            "reopened_by"
-          ],
+          "columnsFrom": ["reopened_by"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         }
@@ -2153,26 +2046,18 @@
         "fiscal_years_company_id_companies_id_fk": {
           "name": "fiscal_years_company_id_companies_id_fk",
           "tableFrom": "fiscal_years",
-          "columnsFrom": [
-            "company_id"
-          ],
+          "columnsFrom": ["company_id"],
           "tableTo": "companies",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "restrict"
         },
         "fiscal_years_closed_by_users_id_fk": {
           "name": "fiscal_years_closed_by_users_id_fk",
           "tableFrom": "fiscal_years",
-          "columnsFrom": [
-            "closed_by"
-          ],
+          "columnsFrom": ["closed_by"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         }
@@ -2520,130 +2405,90 @@
         "journal_entries_company_id_companies_id_fk": {
           "name": "journal_entries_company_id_companies_id_fk",
           "tableFrom": "journal_entries",
-          "columnsFrom": [
-            "company_id"
-          ],
+          "columnsFrom": ["company_id"],
           "tableTo": "companies",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "restrict"
         },
         "journal_entries_branch_id_branches_id_fk": {
           "name": "journal_entries_branch_id_branches_id_fk",
           "tableFrom": "journal_entries",
-          "columnsFrom": [
-            "branch_id"
-          ],
+          "columnsFrom": ["branch_id"],
           "tableTo": "branches",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "restrict"
         },
         "journal_entries_fiscal_period_id_fiscal_periods_id_fk": {
           "name": "journal_entries_fiscal_period_id_fiscal_periods_id_fk",
           "tableFrom": "journal_entries",
-          "columnsFrom": [
-            "fiscal_period_id"
-          ],
+          "columnsFrom": ["fiscal_period_id"],
           "tableTo": "fiscal_periods",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "restrict"
         },
         "journal_entries_reversal_of_id_journal_entries_id_fk": {
           "name": "journal_entries_reversal_of_id_journal_entries_id_fk",
           "tableFrom": "journal_entries",
-          "columnsFrom": [
-            "reversal_of_id"
-          ],
+          "columnsFrom": ["reversal_of_id"],
           "tableTo": "journal_entries",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "restrict"
         },
         "journal_entries_reversed_by_id_journal_entries_id_fk": {
           "name": "journal_entries_reversed_by_id_journal_entries_id_fk",
           "tableFrom": "journal_entries",
-          "columnsFrom": [
-            "reversed_by_id"
-          ],
+          "columnsFrom": ["reversed_by_id"],
           "tableTo": "journal_entries",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "restrict"
         },
         "journal_entries_created_by_users_id_fk": {
           "name": "journal_entries_created_by_users_id_fk",
           "tableFrom": "journal_entries",
-          "columnsFrom": [
-            "created_by"
-          ],
+          "columnsFrom": ["created_by"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         },
         "journal_entries_submitted_by_users_id_fk": {
           "name": "journal_entries_submitted_by_users_id_fk",
           "tableFrom": "journal_entries",
-          "columnsFrom": [
-            "submitted_by"
-          ],
+          "columnsFrom": ["submitted_by"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         },
         "journal_entries_approved_by_users_id_fk": {
           "name": "journal_entries_approved_by_users_id_fk",
           "tableFrom": "journal_entries",
-          "columnsFrom": [
-            "approved_by"
-          ],
+          "columnsFrom": ["approved_by"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         },
         "journal_entries_rejected_by_users_id_fk": {
           "name": "journal_entries_rejected_by_users_id_fk",
           "tableFrom": "journal_entries",
-          "columnsFrom": [
-            "rejected_by"
-          ],
+          "columnsFrom": ["rejected_by"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         },
         "journal_entries_posted_by_users_id_fk": {
           "name": "journal_entries_posted_by_users_id_fk",
           "tableFrom": "journal_entries",
-          "columnsFrom": [
-            "posted_by"
-          ],
+          "columnsFrom": ["posted_by"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         }
@@ -2795,52 +2640,36 @@
         "journal_lines_journal_entry_id_journal_entries_id_fk": {
           "name": "journal_lines_journal_entry_id_journal_entries_id_fk",
           "tableFrom": "journal_lines",
-          "columnsFrom": [
-            "journal_entry_id"
-          ],
+          "columnsFrom": ["journal_entry_id"],
           "tableTo": "journal_entries",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "journal_lines_company_id_companies_id_fk": {
           "name": "journal_lines_company_id_companies_id_fk",
           "tableFrom": "journal_lines",
-          "columnsFrom": [
-            "company_id"
-          ],
+          "columnsFrom": ["company_id"],
           "tableTo": "companies",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "restrict"
         },
         "journal_lines_account_id_accounts_id_fk": {
           "name": "journal_lines_account_id_accounts_id_fk",
           "tableFrom": "journal_lines",
-          "columnsFrom": [
-            "account_id"
-          ],
+          "columnsFrom": ["account_id"],
           "tableTo": "accounts",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "restrict"
         },
         "journal_lines_branch_id_branches_id_fk": {
           "name": "journal_lines_branch_id_branches_id_fk",
           "tableFrom": "journal_lines",
-          "columnsFrom": [
-            "branch_id"
-          ],
+          "columnsFrom": ["branch_id"],
           "tableTo": "branches",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "restrict"
         }
@@ -2898,27 +2727,17 @@
     "public.entity_status": {
       "name": "entity_status",
       "schema": "public",
-      "values": [
-        "ACTIVE",
-        "INACTIVE"
-      ]
+      "values": ["ACTIVE", "INACTIVE"]
     },
     "public.sod_enforcement": {
       "name": "sod_enforcement",
       "schema": "public",
-      "values": [
-        "BLOCK",
-        "WARN"
-      ]
+      "values": ["BLOCK", "WARN"]
     },
     "public.user_status": {
       "name": "user_status",
       "schema": "public",
-      "values": [
-        "ACTIVE",
-        "INACTIVE",
-        "LOCKED"
-      ]
+      "values": ["ACTIVE", "INACTIVE", "LOCKED"]
     },
     "public.account_mapping_key": {
       "name": "account_mapping_key",
@@ -2972,69 +2791,37 @@
     "public.account_type": {
       "name": "account_type",
       "schema": "public",
-      "values": [
-        "ASSET",
-        "LIABILITY",
-        "EQUITY",
-        "REVENUE",
-        "COST_OF_SALES",
-        "EXPENSE"
-      ]
+      "values": ["ASSET", "LIABILITY", "EQUITY", "REVENUE", "COST_OF_SALES", "EXPENSE"]
     },
     "public.document_type": {
       "name": "document_type",
       "schema": "public",
-      "values": [
-        "JE"
-      ]
+      "values": ["JE"]
     },
     "public.fiscal_period_status": {
       "name": "fiscal_period_status",
       "schema": "public",
-      "values": [
-        "OPEN",
-        "CLOSED"
-      ]
+      "values": ["OPEN", "CLOSED"]
     },
     "public.fiscal_year_status": {
       "name": "fiscal_year_status",
       "schema": "public",
-      "values": [
-        "OPEN",
-        "CLOSED"
-      ]
+      "values": ["OPEN", "CLOSED"]
     },
     "public.journal_status": {
       "name": "journal_status",
       "schema": "public",
-      "values": [
-        "DRAFT",
-        "SUBMITTED",
-        "APPROVED",
-        "POSTED",
-        "LOCKED",
-        "REJECTED",
-        "REVERSED"
-      ]
+      "values": ["DRAFT", "SUBMITTED", "APPROVED", "POSTED", "LOCKED", "REJECTED", "REVERSED"]
     },
     "public.journal_type": {
       "name": "journal_type",
       "schema": "public",
-      "values": [
-        "GENERAL",
-        "ADJUSTING",
-        "REVERSAL",
-        "CLOSING",
-        "OPENING"
-      ]
+      "values": ["GENERAL", "ADJUSTING", "REVERSAL", "CLOSING", "OPENING"]
     },
     "public.normal_balance": {
       "name": "normal_balance",
       "schema": "public",
-      "values": [
-        "DEBIT",
-        "CREDIT"
-      ]
+      "values": ["DEBIT", "CREDIT"]
     }
   },
   "schemas": {},

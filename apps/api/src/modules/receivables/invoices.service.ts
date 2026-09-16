@@ -40,7 +40,10 @@ import { ErrorCodes } from '@/common/errors/error-codes';
 import { offsetFor, toPaginatedResult } from '@/common/pagination/pagination';
 import { DRIZZLE, type Database, type DbExecutor } from '@/database/database.types';
 import {
+  companies,
   customers,
+  deliveries,
+  deliveryLines,
   invoiceLines,
   invoices,
   journalEntries,
@@ -68,6 +71,11 @@ import { ExchangeRatesService } from '@/modules/fx/exchange-rates.service';
 import { FxService } from '@/modules/fx/fx.service';
 import { AuthorityService } from '@/modules/delegations/authority.service';
 import { OutboxService } from '@/modules/integrations/events/outbox.service';
+import { NotificationsService } from '@/modules/integrations/notifications/notifications.service';
+import { ApprovalsService } from '@/modules/workflows/approvals.service';
+import { ArConfigService } from './ar-config.service';
+import { CreditService } from './credit.service';
+import { dueDateFor, type CreditFinding } from './receivables.logic';
 
 const MODULE = 'RECEIVABLES';
 const NUMBER_TYPE: Record<SubledgerDocumentType, DocumentType> = {
@@ -77,9 +85,9 @@ const NUMBER_TYPE: Record<SubledgerDocumentType, DocumentType> = {
 };
 
 export interface InvoiceWarning {
-  code: 'CREDIT_LIMIT_EXCEEDED';
+  code: 'CREDIT_LIMIT_EXCEEDED' | 'CREDIT_RULE';
   message: string;
-  details: Record<string, string>;
+  details: Record<string, unknown>;
 }
 
 export interface InvoiceView extends Invoice {
@@ -88,6 +96,10 @@ export interface InvoiceView extends Invoice {
   journalNumber: string | null;
   balance: string;
   daysOverdue: number;
+  /** Open (unresolved) disputes on this document. */
+  openDisputes: number;
+  deliveryNumber: string | null;
+  salesOrderNumber: string | null;
 }
 
 export interface AllocationView {
@@ -134,6 +146,10 @@ export class InvoicesService {
     private readonly authority: AuthorityService,
     private readonly outbox: OutboxService,
     private readonly sod: SodService,
+    private readonly notifications: NotificationsService,
+    private readonly approvals: ApprovalsService,
+    private readonly config: ArConfigService,
+    private readonly credit: CreditService,
   ) {}
 
   // ----------------------------------------------------------------- queries
@@ -146,6 +162,12 @@ export class InvoicesService {
     if (query.status) filters.push(eq(invoices.status, query.status));
     if (query.from) filters.push(gte(invoices.documentDate, query.from));
     if (query.to) filters.push(lte(invoices.documentDate, query.to));
+    if (query.branchId) filters.push(eq(invoices.branchId, query.branchId));
+    if (query.salesOrderId) filters.push(eq(invoices.salesOrderId, query.salesOrderId));
+    if (query.disputedOnly)
+      filters.push(
+        sql`exists (select 1 from invoice_disputes d where d.invoice_id = ${invoices.id} and d.status in ('OPEN', 'INVESTIGATING'))`,
+      );
     if (query.openOnly)
       filters.push(
         inArray(invoices.status, [...OPEN_DOCUMENT_STATUSES]),
@@ -279,7 +301,16 @@ export class InvoicesService {
       const total = subtotal.add(taxed.totals.taxTotal).subtract(taxed.totals.withholdingTotal);
       const baseTotal = total.convert(baseCurrency, exchangeRate);
       await this.posting.resolvePeriod(tx, companyId, input.documentDate, { draft: true });
-      const dueDate = input.dueDate ?? addDays(input.documentDate, customer.paymentTermsDays);
+      const paymentTermId = input.paymentTermId ?? customer.paymentTermId ?? null;
+      const dueDate =
+        input.dueDate ??
+        (await this.dueDate(
+          tx,
+          companyId,
+          input.documentDate,
+          paymentTermId,
+          customer.paymentTermsDays,
+        ));
       if (dueDate < input.documentDate)
         throw new BusinessRuleError(
           ErrorCodes.VALIDATION_FAILED,
@@ -309,6 +340,17 @@ export class InvoicesService {
           'Lines reference order lines but no sales order is set.',
         );
       }
+      if (input.deliveryId) {
+        await this.consumeDelivery(
+          tx,
+          companyId,
+          input.deliveryId,
+          input.salesOrderId ?? null,
+          customer.id,
+          lines,
+          currency,
+        );
+      }
       const [created] = await tx
         .insert(invoices)
         .values({
@@ -316,6 +358,8 @@ export class InvoicesService {
           customerId: customer.id,
           branchId: input.branchId ?? null,
           salesOrderId: input.salesOrderId ?? null,
+          deliveryId: input.deliveryId ?? null,
+          paymentTermId,
           documentType: input.documentType,
           documentNumber,
           documentDate: input.documentDate,
@@ -454,9 +498,19 @@ export class InvoicesService {
             .toString(),
         };
       }
+      const paymentTermId =
+        input.paymentTermId === undefined ? existing.paymentTermId : input.paymentTermId;
       const dueDate =
         input.dueDate ??
-        (input.documentDate ? addDays(documentDate, customer.paymentTermsDays) : existing.dueDate);
+        (input.documentDate || input.paymentTermId !== undefined
+          ? await this.dueDate(
+              tx,
+              companyId,
+              documentDate,
+              paymentTermId,
+              customer.paymentTermsDays,
+            )
+          : existing.dueDate);
       if (dueDate < documentDate)
         throw new BusinessRuleError(
           ErrorCodes.VALIDATION_FAILED,
@@ -469,6 +523,7 @@ export class InvoicesService {
           branchId: input.branchId === undefined ? existing.branchId : input.branchId,
           documentDate,
           dueDate,
+          paymentTermId,
           reference: input.reference === undefined ? existing.reference : input.reference,
           description: input.description === undefined ? existing.description : input.description,
           exchangeRate,
@@ -524,6 +579,7 @@ export class InvoicesService {
     await this.db.transaction(async (tx) => {
       const existing = await this.lock(tx, companyId, id);
       this.assertStatus(existing, ['DRAFT'], 'deleted');
+      if (existing.deliveryId) await this.releaseDelivery(tx, id);
       if (existing.salesOrderId) {
         await this.fulfillment.release(
           tx,
@@ -547,10 +603,49 @@ export class InvoicesService {
     });
   }
 
+  /**
+   * DRAFT -> SUBMITTED: runs the credit policy for invoices / debit notes and
+   * opens the approval workflow when one matches the amount (Prompt #6).
+   */
+  async submit(companyId: string, actor: AuthenticatedUser, id: string): Promise<InvoiceDetail> {
+    const warnings = await this.db.transaction(async (tx) => {
+      const existing = await this.lock(tx, companyId, id);
+      this.assertStatus(existing, ['DRAFT'], 'submitted');
+      const warnings = await this.runCreditPolicy(tx, companyId, existing);
+      await this.approvals.open(tx, this.workflowRef(companyId, existing, actor.id));
+      await tx
+        .update(invoices)
+        .set({ status: 'SUBMITTED', submittedBy: actor.id, submittedAt: new Date() })
+        .where(eq(invoices.id, id));
+      await this.audit.record(
+        {
+          action: 'SUBMIT',
+          module: MODULE,
+          entityType: 'Invoice',
+          entityId: id,
+          previousValue: { status: 'DRAFT' },
+          newValue: { status: 'SUBMITTED', warnings },
+          metadata: { documentNumber: existing.documentNumber },
+          companyId,
+        },
+        tx,
+      );
+      await this.notifyApprovers(tx, companyId, existing);
+      return warnings;
+    });
+    return { ...(await this.get(companyId, id)), warnings };
+  }
+
   async approve(companyId: string, actor: AuthenticatedUser, id: string): Promise<InvoiceDetail> {
     const warnings = await this.db.transaction(async (tx) => {
       const existing = await this.lock(tx, companyId, id);
-      this.assertStatus(existing, ['DRAFT'], 'approved');
+      this.assertStatus(existing, ['DRAFT', 'SUBMITTED'], 'approved');
+      // Configured approval chain (if any) must be complete before the approver's own step.
+      await this.approvals.assertApproved(
+        tx,
+        this.workflowRef(companyId, existing, existing.createdBy ?? actor.id),
+      );
+      const creditWarnings = await this.runCreditPolicy(tx, companyId, existing);
       // Delegated authority (if any) is validated and recorded in this transaction.
       const authority = await this.authority.assert(tx, actor, P['invoice.approve'], {
         companyId,
@@ -594,7 +689,17 @@ export class InvoicesService {
         dedupeKey: `invoice.approved:${id}`,
         payload: this.eventPayload(existing),
       });
-      return this.creditLimitWarnings(companyId, existing.customerId, existing, tx);
+      await this.notify(tx, companyId, existing, {
+        eventType: 'INVOICE_APPROVED',
+        title: `${labelFor(existing.documentType)} ${existing.documentNumber} approved`,
+        body: `Approved for ${existing.currency} ${existing.total}; ready to post.`,
+        permission: P['invoice.post'],
+        userIds: existing.createdBy ? [existing.createdBy] : [],
+      });
+      return [
+        ...creditWarnings,
+        ...(await this.creditLimitWarnings(companyId, existing.customerId, existing, tx)),
+      ];
     });
     return { ...(await this.get(companyId, id)), warnings };
   }
@@ -632,6 +737,7 @@ export class InvoicesService {
         baseCurrency,
       );
       // Stocked product lines move inventory and add COGS lines to the same entry (Phase 5).
+      // When the invoice bills a delivery the goods already left (and COGS posted) with it.
       const stock = await this.stock.postSalesLines(tx, {
         companyId,
         sourceId: existing.id,
@@ -639,8 +745,10 @@ export class InvoicesService {
         actorId: actor.id,
         currency: baseCurrency,
         isCreditNote: !debitSide,
-        lines: baseLines,
+        lines: existing.deliveryId ? baseLines.map((l) => ({ ...l, productId: null })) : baseLines,
       });
+      if (existing.deliveryId)
+        await this.copyDeliveryCosts(tx, existing.deliveryId, lines, baseCurrency);
       for (const [lineId, cost] of stock.costByLine) {
         await tx
           .update(invoiceLines)
@@ -736,7 +844,12 @@ export class InvoicesService {
         tx,
       );
       await this.outbox.enqueue(tx, {
-        eventType: 'invoice.posted',
+        eventType:
+          existing.documentType === 'CREDIT_NOTE'
+            ? 'credit_note.posted'
+            : existing.documentType === 'DEBIT_NOTE'
+              ? 'debit_note.posted'
+              : 'invoice.posted',
         companyId,
         dedupeKey: 'invoice.posted:' + id,
         payload: {
@@ -745,6 +858,12 @@ export class InvoicesService {
           journalEntryId: entry.id,
           journalNumber: entry.documentNumber,
         },
+      });
+      await this.notify(tx, companyId, existing, {
+        eventType: 'INVOICE_POSTED',
+        title: `${labelFor(existing.documentType)} ${existing.documentNumber} posted`,
+        body: `Journal ${entry.documentNumber} - ${existing.currency} ${existing.total}.`,
+        userIds: [existing.createdBy, existing.approvedBy].filter((u): u is string => Boolean(u)),
       });
     });
     return this.get(companyId, id);
@@ -836,6 +955,8 @@ export class InvoicesService {
         );
         reversalId = reversal.id;
       }
+      await this.approvals.cancelFor(tx, 'INVOICE', id);
+      if (existing.deliveryId) await this.releaseDelivery(tx, id);
       if (existing.salesOrderId) {
         await this.fulfillment.release(
           tx,
@@ -869,7 +990,7 @@ export class InvoicesService {
         tx,
       );
       await this.outbox.enqueue(tx, {
-        eventType: 'invoice.cancelled',
+        eventType: reversalId ? 'invoice.voided' : 'invoice.cancelled',
         companyId,
         dedupeKey: 'invoice.cancelled:' + id,
         payload: { ...this.eventPayload(existing), status: 'VOID', reason: input.reason },
@@ -1102,9 +1223,209 @@ export class InvoicesService {
         journalNumber: sql<
           string | null
         >`(select document_number from journal_entries j where j.id = ${invoices.journalEntryId})`,
+        openDisputes: sql<number>`(select count(*)::int from invoice_disputes d where d.invoice_id = ${invoices.id} and d.status in ('OPEN', 'INVESTIGATING'))`,
+        deliveryNumber: sql<
+          string | null
+        >`(select document_number from deliveries dl where dl.id = ${invoices.deliveryId})`,
+        salesOrderNumber: sql<
+          string | null
+        >`(select document_number from orders o where o.id = ${invoices.salesOrderId})`,
       })
       .from(invoices)
       .innerJoin(customers, eq(customers.id, invoices.customerId));
+  }
+
+  // ------------------------------------------------------- Prompt #6 helpers
+
+  /** Due date from the named payment term, falling back to the customer's net days. */
+  private async dueDate(
+    tx: DbExecutor,
+    companyId: string,
+    documentDate: string,
+    paymentTermId: string | null,
+    fallbackDays: number,
+  ): Promise<string> {
+    if (!paymentTermId) return addDays(documentDate, fallbackDays);
+    const term = await this.config.paymentTerm(companyId, paymentTermId, tx);
+    return dueDateFor(documentDate, term);
+  }
+
+  private workflowRef(companyId: string, doc: Invoice, requestedBy: string) {
+    return {
+      companyId,
+      documentType: 'INVOICE' as const,
+      documentId: doc.id,
+      documentNumber: doc.documentNumber,
+      amount: doc.total,
+      currency: doc.currency,
+      requestedBy,
+    };
+  }
+
+  /** Credit policy for invoices / debit notes: BLOCK throws, the rest become warnings on the document. */
+  private async runCreditPolicy(
+    tx: DbExecutor,
+    companyId: string,
+    doc: Invoice,
+  ): Promise<InvoiceWarning[]> {
+    if (!isDebitDocument(doc.documentType)) return [];
+    const customer = await this.customersService.getOrThrow(companyId, doc.customerId, tx);
+    const result = await this.credit.check(tx, companyId, customer, 'INVOICE', doc.total, {
+      excludeDocumentId: doc.id,
+    });
+    await this.credit.notifyOverLimit(tx, companyId, customer, result.summary);
+    return result.findings.map((f: CreditFinding) => ({
+      code: 'CREDIT_RULE' as const,
+      message: `${f.rule}: ${f.message}`,
+      details: { action: f.action, trigger: f.trigger, ...f.details },
+    }));
+  }
+
+  /** Links a draft invoice to a delivered delivery and records the invoiced quantities per delivery line. */
+  private async consumeDelivery(
+    tx: DbExecutor,
+    companyId: string,
+    deliveryId: string,
+    salesOrderId: string | null,
+    customerId: string,
+    lines: Array<{ orderLineId: string | null; quantity: string }>,
+    currency: string,
+  ): Promise<void> {
+    const [delivery] = await tx
+      .select()
+      .from(deliveries)
+      .where(and(eq(deliveries.id, deliveryId), eq(deliveries.companyId, companyId)))
+      .for('update');
+    if (!delivery) throw new NotFoundError('Delivery', deliveryId);
+    if (delivery.status !== 'DELIVERED')
+      throw new BusinessRuleError(
+        ErrorCodes.DOCUMENT_INVALID_STATE,
+        `${delivery.documentNumber} is ${delivery.status}; only delivered deliveries can be invoiced.`,
+      );
+    if (
+      delivery.customerId !== customerId ||
+      (salesOrderId && delivery.salesOrderId !== salesOrderId)
+    )
+      throw new BusinessRuleError(
+        ErrorCodes.VALIDATION_FAILED,
+        `${delivery.documentNumber} belongs to a different customer or sales order.`,
+      );
+    const dlines = await tx
+      .select()
+      .from(deliveryLines)
+      .where(eq(deliveryLines.deliveryId, deliveryId));
+    const byOrderLine = new Map(dlines.map((l) => [l.orderLineId, l]));
+    for (const line of lines) {
+      if (!line.orderLineId) continue;
+      const dl = byOrderLine.get(line.orderLineId);
+      if (!dl) continue;
+      const remaining = Money.of(dl.quantity, currency).subtract(
+        Money.of(dl.invoicedQuantity, currency),
+      );
+      if (Money.of(line.quantity, currency).greaterThan(remaining))
+        throw new BusinessRuleError(
+          ErrorCodes.ORDER_LINE_OVERFULFILLED,
+          `${delivery.documentNumber} line ${dl.lineNumber}: only ${remaining.toString()} left to invoice.`,
+        );
+      await tx
+        .update(deliveryLines)
+        .set({ invoicedQuantity: sql`${deliveryLines.invoicedQuantity} + ${line.quantity}` })
+        .where(eq(deliveryLines.id, dl.id));
+    }
+  }
+
+  private async releaseDelivery(tx: DbExecutor, invoiceId: string): Promise<void> {
+    const rows = await tx
+      .select({
+        orderLineId: invoiceLines.orderLineId,
+        quantity: invoiceLines.quantity,
+        deliveryId: invoices.deliveryId,
+      })
+      .from(invoiceLines)
+      .innerJoin(invoices, eq(invoices.id, invoiceLines.invoiceId))
+      .where(eq(invoiceLines.invoiceId, invoiceId));
+    for (const r of rows) {
+      if (!r.orderLineId || !r.deliveryId) continue;
+      await tx
+        .update(deliveryLines)
+        .set({
+          invoicedQuantity: sql`GREATEST(${deliveryLines.invoicedQuantity} - ${r.quantity}, 0)`,
+        })
+        .where(
+          and(
+            eq(deliveryLines.deliveryId, r.deliveryId),
+            eq(deliveryLines.orderLineId, r.orderLineId),
+          ),
+        );
+    }
+  }
+
+  /** Cost already relieved by the delivery, recorded on the invoice lines for margin reporting. */
+  private async copyDeliveryCosts(
+    tx: DbExecutor,
+    deliveryId: string,
+    lines: InvoiceLine[],
+    baseCurrency: string,
+  ): Promise<void> {
+    const dlines = await tx
+      .select()
+      .from(deliveryLines)
+      .where(eq(deliveryLines.deliveryId, deliveryId));
+    for (const line of lines) {
+      const dl = dlines.find((d) => d.orderLineId === line.orderLineId);
+      if (!dl?.costAmount || !line.orderLineId) continue;
+      const share = Money.of(dl.costAmount, baseCurrency)
+        .multiply(line.quantity)
+        .divide(dl.quantity);
+      await tx
+        .update(invoiceLines)
+        .set({ costAmount: share.toString() })
+        .where(eq(invoiceLines.id, line.id));
+    }
+  }
+
+  private async notify(
+    tx: DbExecutor,
+    companyId: string,
+    doc: Invoice,
+    input: {
+      eventType: 'INVOICE_APPROVED' | 'INVOICE_POSTED' | 'APPROVAL_REQUIRED';
+      title: string;
+      body: string;
+      permission?: string;
+      userIds?: string[];
+    },
+  ): Promise<void> {
+    const [company] = await tx
+      .select({ organizationId: companies.organizationId })
+      .from(companies)
+      .where(eq(companies.id, companyId));
+    if (!company) return;
+    await this.notifications.notify(
+      {
+        organizationId: company.organizationId,
+        eventType: input.eventType,
+        title: input.title,
+        body: input.body,
+        link: `/receivables/invoices/${doc.id}`,
+        entityType: 'Invoice',
+        entityId: doc.id,
+        userIds: input.userIds,
+        permission: input.permission,
+        companyId,
+        dedupeKey: `${input.eventType}:${doc.id}`,
+      },
+      tx,
+    );
+  }
+
+  private async notifyApprovers(tx: DbExecutor, companyId: string, doc: Invoice): Promise<void> {
+    await this.notify(tx, companyId, doc, {
+      eventType: 'APPROVAL_REQUIRED',
+      title: `${labelFor(doc.documentType)} ${doc.documentNumber} awaits approval`,
+      body: `${doc.currency} ${doc.total} submitted for approval.`,
+      permission: P['invoice.approve'],
+    });
   }
 
   private decorate<
