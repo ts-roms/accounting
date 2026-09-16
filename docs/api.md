@@ -363,6 +363,21 @@ and every request carries `overdue`, `dueAt`, `escalatedAt`.
 `closeBlockOnSuspense`; `PATCH /invoices/:id` and `/bills/:id` accept `changeReason`.
 New audit actions: `SOD_WARNING`, `ESCALATE`.
 
+### Data infrastructure (see `docs/data-infrastructure.md`)
+
+| Method       | Path                                                                                                                                                                      | Permission                      |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| GET          | `/numbering-rules?year` (effective rule per document type + branch overrides + next number), `/numbering-rules/preview?documentType&branchId&year`                        | `numbering.view`                |
+| PUT / DELETE | `/numbering-rules { documentType, branchId?, prefix, format, padding, resetYearly, isActive }`, `/numbering-rules/:id`                                                    | `numbering.manage`              |
+| GET          | `/imports/types`, `/imports/templates/:type` (CSV header + example; no company header needed)                                                                             | `import.view`                   |
+| GET          | `/imports` (paginated; `type`, `status`), `/imports/:id` (rows with errors and results)                                                                                   | `import.view`                   |
+| POST         | `/imports` multipart `file` + `type` [+ `asOfDate`, `branchId`] → validated preview; `/imports/:id/commit { skipInvalid? }`; `/imports/:id/cancel`                        | `import.run`                    |
+| GET          | `/exports?dataset&from&to&asOf&accountId&status&search` → CSV (`Content-Disposition`, `X-Export-Rows`)                                                                    | `reports.export` + dataset view |
+| GET          | `/opening-balances/report?asOf[&area]` - control accounts vs subledgers, opening journals, equity residual                                                                | `opening-balance.view`          |
+| POST         | `/opening-balances/subledger { area: AR\|AP, asOfDate, items[] }`, `/opening-balances/inventory { asOfDate, lines[] }`, `/opening-balances/assets { asOfDate, assets[] }` | `opening-balance.manage`        |
+
+New error codes: `IMPORT_FILE_INVALID`, `IMPORT_INVALID_ROWS`, `OPENING_BALANCE_INVALID` (all 422). New audit actions: `IMPORT`, `EXPORT`.
+
 ### Audit & health
 
 | Method | Path                                                                                                                 | Notes                         |

@@ -26,6 +26,7 @@ import type { JournalEntryView } from '@/lib/api/types';
 import { titleCase } from '@/lib/format';
 import { DataTable, useTableState } from '@/components/ui-ext/data-table';
 import { Can, EmptyState, PageHeader } from '@/components/ui-ext/page';
+import { ExportButton } from '@/components/data-infrastructure/export-button';
 import {
   Amount,
   DateRange,
@@ -121,13 +122,19 @@ export default function JournalEntriesPage() {
         title="Journal Entries"
         description="Every ledger movement is a balanced journal entry. Drafts are submitted, approved and posted; posted entries are only ever reversed."
         actions={
-          <Can permissions={[P['journal.create']]}>
-            <Button asChild>
-              <Link href="/accounting/journal-entries/new">
-                <Plus /> New entry
-              </Link>
-            </Button>
-          </Can>
+          <div className="flex items-center gap-2">
+            <ExportButton
+              dataset="JOURNAL_ENTRIES"
+              query={{ from: range.from || undefined, to: range.to || undefined }}
+            />
+            <Can permissions={[P['journal.create']]}>
+              <Button asChild>
+                <Link href="/accounting/journal-entries/new">
+                  <Plus /> New entry
+                </Link>
+              </Button>
+            </Can>
+          </div>
         }
       />
       <DataTable

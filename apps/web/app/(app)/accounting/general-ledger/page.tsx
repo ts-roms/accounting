@@ -18,6 +18,7 @@ import {
 import { useGeneralLedger } from '@/lib/api/accounting-hooks';
 import { titleCase } from '@/lib/format';
 import { EmptyState, PageHeader, TableSkeleton } from '@/components/ui-ext/page';
+import { ExportButton } from '@/components/data-infrastructure/export-button';
 import {
   AccountCombobox,
   Amount,
@@ -65,6 +66,14 @@ function GeneralLedgerContent() {
       <PageHeader
         title="General Ledger"
         description="Posted lines per account with opening, running and closing balances. Balances are signed by the account's normal side."
+        actions={
+          accountId ? (
+            <ExportButton
+              dataset="GENERAL_LEDGER"
+              query={{ accountId, from: range.from, to: range.to }}
+            />
+          ) : null
+        }
       />
       <Card>
         <CardContent className="flex flex-wrap items-end gap-3 p-4">

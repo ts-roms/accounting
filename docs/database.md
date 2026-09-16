@@ -208,6 +208,17 @@ Migration: `0012_reconciliation.sql` (also adds `RECONCILIATION` to `attachment_
 Enum additions: `audit_action` += `ESCALATE`, `SOD_WARNING`; `workflow_document_type` += `VENDOR_BILL`.
 Migration: `0017_enterprise_controls.sql` (also installs the `field_changes` immutability triggers).
 
+## Hardening phase 6 (data infrastructure)
+
+| Table / column                 | Purpose                                                                                                                                                              |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `numbering_rules`              | Prefix / format / padding / reset per company, document type and optional branch; unique `(company, type, branch)` NULLS NOT DISTINCT; CHECK format contains `{SEQ}` |
+| `document_sequences.branch_id` | Counters keyed `(company, type, year, branch)` NULLS NOT DISTINCT (`year = 0` when never reset)                                                                      |
+| `import_jobs`                  | Validated CSV rows (+ errors, results) and the commit outcome; enums `import_type`, `import_status`                                                                  |
+
+Enum additions: `audit_action` += `IMPORT`, `EXPORT`; `adjustment_reason` += `OPENING`.
+Migration: `0021_data_infrastructure.sql`.
+
 ## Posted-journal immutability
 
 Migration `0003_posted_journal_immutability.sql` installs triggers that reject

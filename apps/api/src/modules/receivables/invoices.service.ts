@@ -321,6 +321,7 @@ export class InvoicesService {
         NUMBER_TYPE[input.documentType],
         Number(input.documentDate.slice(0, 4)),
         tx,
+        { branchId: input.branchId ?? null },
       );
 
       if (input.salesOrderId) {

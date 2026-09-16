@@ -24,6 +24,7 @@ import type { AuditLog } from '@/lib/api/types';
 import { formatDateTime } from '@/lib/format';
 import { DataTable, useTableState } from '@/components/ui-ext/data-table';
 import { EmptyState, PageHeader } from '@/components/ui-ext/page';
+import { ExportButton } from '@/components/data-infrastructure/export-button';
 import { toneOf } from '@/components/status';
 
 const ACTION_VARIANT: Partial<
@@ -116,6 +117,7 @@ function AuditLogsContent() {
       <PageHeader
         title="Audit Logs"
         description="Immutable record of every significant action. Entries cannot be edited or deleted, even by administrators."
+        actions={<ExportButton dataset="AUDIT_LOGS" />}
       />
       <DataTable
         columns={columns}

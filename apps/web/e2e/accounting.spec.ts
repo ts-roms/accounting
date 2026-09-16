@@ -26,7 +26,7 @@ test.describe('accounting core', () => {
     await pickAccount(page, 1, '1120');
     await expect(page.getByTestId('account-combobox').nth(1)).toContainText('Petty Cash');
 
-    const amounts = page.locator('input[inputmode="decimal"]');
+    const amounts = page.locator('input[inputmode="decimal"]:not([data-testid="je-rate"])');
     await amounts.nth(0).fill('345.67');
     await amounts.nth(0).blur();
     await expect(page.getByText('Out of balance')).toBeVisible();

@@ -68,7 +68,7 @@ test.describe('enterprise: FX, intercompany, workflows, attachments', () => {
     await page.getByLabel('Entry date').fill('2026-09-12');
     await pickAccount(page, 0, '6400');
     await pickAccount(page, 1, '2120');
-    const amounts = page.locator('input[inputmode="decimal"]');
+    const amounts = page.locator('input[inputmode="decimal"]:not([data-testid="je-rate"])');
     await amounts.nth(0).fill('75000');
     await amounts.nth(0).blur();
     await amounts.nth(3).fill('75000');

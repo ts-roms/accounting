@@ -251,6 +251,7 @@ export class OrdersService {
         NUMBER_TYPE[type],
         Number(input.orderDate.slice(0, 4)),
         tx,
+        { branchId: input.branchId ?? null },
       );
       const [created] = await tx
         .insert(orders)
@@ -643,6 +644,7 @@ export class OrdersService {
         NUMBER_TYPE[target],
         Number(orderDate.slice(0, 4)),
         tx,
+        { branchId: existing.branchId },
       );
       const [created] = await tx
         .insert(orders)

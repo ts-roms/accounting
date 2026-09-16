@@ -19,6 +19,7 @@ import {
 import { useTrialBalance } from '@/lib/api/accounting-hooks';
 import { titleCase } from '@/lib/format';
 import { PageHeader, TableSkeleton } from '@/components/ui-ext/page';
+import { ExportButton } from '@/components/data-infrastructure/export-button';
 import { Amount, DateRange, startOfYear, today } from '@/components/accounting/primitives';
 
 export default function TrialBalancePage() {
@@ -36,17 +37,20 @@ export default function TrialBalancePage() {
         title="Trial Balance"
         description="Opening balances, period movement and closing balances for every account. Debits must equal credits."
         actions={
-          data ? (
-            data.balanced ? (
-              <Badge variant="success">
-                <CheckCircle2 className="mr-1 h-3 w-3" /> Balanced
-              </Badge>
-            ) : (
-              <Badge variant="destructive">
-                <XCircle className="mr-1 h-3 w-3" /> Out of balance
-              </Badge>
-            )
-          ) : null
+          <div className="flex items-center gap-2">
+            {data ? (
+              data.balanced ? (
+                <Badge variant="success">
+                  <CheckCircle2 className="mr-1 h-3 w-3" /> Balanced
+                </Badge>
+              ) : (
+                <Badge variant="destructive">
+                  <XCircle className="mr-1 h-3 w-3" /> Out of balance
+                </Badge>
+              )
+            ) : null}
+            <ExportButton dataset="TRIAL_BALANCE" query={{ from: range.from, to: range.to }} />
+          </div>
         }
       />
       <Card>

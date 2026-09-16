@@ -16,7 +16,7 @@ async function postJournal(page: Page, description: string, amount: string, date
   await page.getByLabel('Entry date').fill(date);
   await pickAccount(page, 0, '6400');
   await pickAccount(page, 1, '1120');
-  const amounts = page.locator('input[inputmode="decimal"]');
+  const amounts = page.locator('input[inputmode="decimal"]:not([data-testid="je-rate"])');
   await amounts.nth(0).fill(amount);
   await amounts.nth(0).blur();
   await amounts.nth(3).fill(amount);
@@ -95,7 +95,7 @@ test.describe('accounting controls', () => {
     await login(page);
     await page.goto('/accounting/integrity');
     await expect(page.getByTestId('integrity-status')).toBeVisible();
-    await expect(page.getByTestId('integrity-check')).toHaveCount(16);
+    await expect(page.getByTestId('integrity-check')).toHaveCount(22);
     await expect(page.getByText('Posted journals balance')).toBeVisible();
     await expect(page.getByRole('row').filter({ hasText: 'UNBALANCED_JOURNAL' })).toContainText(
       'PASS',

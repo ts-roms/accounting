@@ -173,11 +173,14 @@ export class SubledgerBalancesService {
       })
       .from(fixedAssets)
       .innerJoin(assetCategories, eq(assetCategories.id, fixedAssets.categoryId))
+      // An asset is in the register from the date its capitalisation was posted (a back-dated
+      // capitalisation or a migrated opening balance counts from that date, not from the wall clock).
+      .innerJoin(journalEntries, eq(journalEntries.id, fixedAssets.capitalizationJournalEntryId))
       .where(
         and(
           eq(fixedAssets.companyId, companyId),
           inArray(fixedAssets.status, ['ACTIVE', 'FULLY_DEPRECIATED']),
-          sql`${fixedAssets.capitalizedAt} IS NOT NULL AND ${fixedAssets.capitalizedAt}::date <= ${asOf}`,
+          lte(journalEntries.entryDate, asOf),
         ),
       )
       .groupBy(assetCategories.assetAccountId, assetCategories.accumulatedDepreciationAccountId);

@@ -249,7 +249,31 @@ export class JournalEntriesService {
     actor: AuthenticatedUser,
     input: CreateJournalEntryInput,
   ): Promise<JournalEntryDetail> {
-    const id = await this.db.transaction(async (tx) => {
+    const id = await this.db.transaction((tx) => this.createIn(tx, companyId, actor, input));
+    return this.get(companyId, id);
+  }
+
+  /** Document number of an entry, inside the caller's transaction (import engine). */
+  async documentNumberOf(tx: DbExecutor, id: string): Promise<string> {
+    const [row] = await tx
+      .select({ documentNumber: journalEntries.documentNumber })
+      .from(journalEntries)
+      .where(eq(journalEntries.id, id));
+    if (!row) throw new NotFoundError('Journal entry', id);
+    return row.documentNumber;
+  }
+
+  /**
+   * Creates a DRAFT inside the caller's transaction and returns its id - the
+   * import engine uses it so a file of journals is all-or-nothing.
+   */
+  async createIn(
+    tx: DbExecutor,
+    companyId: string,
+    actor: AuthenticatedUser,
+    input: CreateJournalEntryInput,
+  ): Promise<string> {
+    {
       if (input.idempotencyKey) {
         const [existing] = await tx
           .select({ id: journalEntries.id })
@@ -276,6 +300,7 @@ export class JournalEntriesService {
         'JE',
         Number(input.entryDate.slice(0, 4)),
         tx,
+        { branchId: input.branchId ?? null },
       );
 
       const [entry] = await tx
@@ -325,8 +350,7 @@ export class JournalEntriesService {
         tx,
       );
       return entry.id;
-    });
-    return this.get(companyId, id);
+    }
   }
 
   /**
@@ -754,6 +778,7 @@ export class JournalEntriesService {
         'JE',
         Number(correctionDate.slice(0, 4)),
         tx,
+        { branchId: entry.branchId },
       );
       const [correction] = await tx
         .insert(journalEntries)

@@ -226,7 +226,13 @@ export const PERMISSION_DEFINITIONS = [
 
   // Reporting & audit
   define('reports.view', 'REPORTING', 'View financial reports'),
-  define('reports.export', 'REPORTING', 'Export reports'),
+  define('reports.export', 'REPORTING', 'Export reports and lists as files'),
+  define('numbering.view', 'ADMINISTRATION', 'View document numbering rules'),
+  define('numbering.manage', 'ADMINISTRATION', 'Configure document numbering rules'),
+  define('import.view', 'ADMINISTRATION', 'View data imports'),
+  define('import.run', 'ADMINISTRATION', 'Upload, validate and commit data imports'),
+  define('opening-balance.view', 'ACCOUNTING', 'View opening balances and their reconciliation'),
+  define('opening-balance.manage', 'ACCOUNTING', 'Load opening balances into the ledger and subledgers'),
   define('audit.view', 'AUDIT', 'View the audit trail'),
 
   // AI assistance (advisory only - nothing here posts)

@@ -34,6 +34,8 @@ describe('navigation', () => {
       '/admin/users',
       '/admin/roles',
       '/admin/audit-logs',
+      '/admin/numbering',
+      '/admin/imports',
       '/admin/organization',
       ...[
         'chart-of-accounts',
@@ -41,6 +43,7 @@ describe('navigation', () => {
         'general-ledger',
         'trial-balance',
         'period-closing',
+        'opening-balances',
         'control-center',
         'suspense',
       ].map((p) => `/accounting/${p}`),

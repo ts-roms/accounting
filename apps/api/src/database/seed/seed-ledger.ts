@@ -19,12 +19,14 @@ export async function allocateNumber(
   const year = Number(isoDate.slice(0, 4));
   const [seq] = await tx
     .insert(schema.documentSequences)
-    .values({ companyId, documentType, year, prefix: documentType, nextNumber: 2 })
+    .values({ companyId, documentType, year, branchId: null, prefix: documentType, nextNumber: 2 })
     .onConflictDoUpdate({
+      // Company-wide counter (branch NULL); the constraint is NULLS NOT DISTINCT.
       target: [
         schema.documentSequences.companyId,
         schema.documentSequences.documentType,
         schema.documentSequences.year,
+        schema.documentSequences.branchId,
       ],
       set: { nextNumber: sql`${schema.documentSequences.nextNumber} + 1` },
     })

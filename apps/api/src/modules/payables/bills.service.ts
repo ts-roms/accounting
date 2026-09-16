@@ -292,6 +292,7 @@ export class BillsService {
         NUMBER_TYPE[input.documentType],
         Number(input.documentDate.slice(0, 4)),
         tx,
+        { branchId: input.branchId ?? null },
       );
 
       const warnings = await this.duplicateWarnings(

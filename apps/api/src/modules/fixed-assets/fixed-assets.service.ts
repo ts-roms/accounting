@@ -514,6 +514,151 @@ export class FixedAssetsService {
     return this.get(companyId, id);
   }
 
+  /**
+   * Migrated asset at cut-over (hardening H6): registers it, capitalises the
+   * cost against OPENING_BALANCE_EQUITY and books the depreciation already
+   * taken (Dr opening equity / Cr accumulated) so the register, the cost account
+   * and the accumulated account all agree with the legacy books. One
+   * transaction; depreciation continues from the remaining life.
+   */
+  async openingBalance(
+    companyId: string,
+    actor: AuthenticatedUser,
+    input: CreateAssetInput,
+    accumulatedDepreciation: string,
+    asOfDate: string,
+  ): Promise<AssetDetail> {
+    const created = await this.create(companyId, actor, input);
+    await this.db.transaction(async (tx) => {
+      const existing = await this.lock(tx, companyId, created.id);
+      const equity = await this.accounts.resolveMapped(companyId, 'OPENING_BALANCE_EQUITY', tx);
+      const accts = await this.resolveAccounts(companyId, existing.categoryId, tx);
+      const currency = existing.currency;
+      const cost = Money.of(existing.acquisitionCost, currency);
+      const accumulated = Money.of(accumulatedDepreciation, currency);
+      if (accumulated.isNegative() || !cost.greaterThan(accumulated))
+        throw new BusinessRuleError(
+          ErrorCodes.VALIDATION_FAILED,
+          'Accumulated depreciation must be at least zero and below the cost.',
+        );
+      const capitalisation = await this.posting.postEvent(
+        tx,
+        {
+          companyId,
+          entryDate: asOfDate,
+          description: `Opening balance ${existing.assetNumber} ${existing.name}`,
+          reference: existing.reference ?? existing.assetNumber,
+          journalType: 'OPENING',
+          branchId: existing.branchId,
+          sourceType: 'FIXED_ASSET_CAPITALIZATION',
+          sourceId: existing.id,
+          actor,
+          lines: [
+            {
+              accountId: accts.asset,
+              debit: cost.toString(),
+              credit: '0',
+              description: `${existing.assetNumber} cost at cut-over`,
+              branchId: existing.branchId,
+            },
+            {
+              accountId: equity.id,
+              debit: '0',
+              credit: cost.toString(),
+              description: `${existing.assetNumber} opening balance offset`,
+              branchId: existing.branchId,
+            },
+          ],
+        },
+        { permission: P['fixed-asset.post'] },
+      );
+      let depreciationEntryId: string | null = null;
+      if (!accumulated.isZero()) {
+        const entry = await this.posting.postEvent(
+          tx,
+          {
+            companyId,
+            entryDate: asOfDate,
+            description: `Opening accumulated depreciation ${existing.assetNumber}`,
+            reference: existing.reference ?? existing.assetNumber,
+            journalType: 'OPENING',
+            branchId: existing.branchId,
+            sourceType: 'FIXED_ASSET_OPENING_DEPRECIATION',
+            sourceId: existing.id,
+            actor,
+            lines: [
+              {
+                accountId: equity.id,
+                debit: accumulated.toString(),
+                credit: '0',
+                description: `${existing.assetNumber} depreciation taken before cut-over`,
+                branchId: existing.branchId,
+              },
+              {
+                accountId: accts.accumulated,
+                debit: '0',
+                credit: accumulated.toString(),
+                description: `${existing.assetNumber} accumulated depreciation at cut-over`,
+                branchId: existing.branchId,
+              },
+            ],
+          },
+          { permission: P['fixed-asset.post'] },
+        );
+        depreciationEntryId = entry.id;
+      }
+      await tx
+        .update(fixedAssets)
+        .set({
+          status: 'ACTIVE',
+          cost: cost.toString(),
+          accumulatedDepreciation: accumulated.toString(),
+          capitalizationJournalEntryId: capitalisation.id,
+          capitalizedAt: new Date(),
+        })
+        .where(eq(fixedAssets.id, existing.id));
+      await tx.insert(assetEvents).values({
+        assetId: existing.id,
+        eventType: 'CAPITALIZATION',
+        eventDate: asOfDate,
+        amount: cost.toString(),
+        bookValueAfter: cost.subtract(accumulated).toString(),
+        journalEntryId: capitalisation.id,
+        notes: `Opening balance credited to ${equity.code} ${equity.name}`,
+        createdBy: actor.id,
+      });
+      if (depreciationEntryId) {
+        await tx.insert(assetEvents).values({
+          assetId: existing.id,
+          eventType: 'DEPRECIATION',
+          eventDate: asOfDate,
+          amount: accumulated.toString(),
+          bookValueAfter: cost.subtract(accumulated).toString(),
+          journalEntryId: depreciationEntryId,
+          notes: 'Accumulated depreciation before cut-over',
+          createdBy: actor.id,
+        });
+      }
+      await this.audit.record(
+        {
+          action: 'OPENING_BALANCE',
+          module: MODULE,
+          entityType: 'FixedAsset',
+          entityId: existing.id,
+          newValue: {
+            assetNumber: existing.assetNumber,
+            cost: cost.toString(),
+            accumulatedDepreciation: accumulated.toString(),
+            asOfDate,
+          },
+          companyId,
+        },
+        tx,
+      );
+    });
+    return this.get(companyId, created.id);
+  }
+
   /** Location / branch change - recorded, no ledger effect. */
   async transfer(
     companyId: string,

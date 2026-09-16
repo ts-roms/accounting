@@ -11,6 +11,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
   type AnyPgColumn,
@@ -168,7 +169,12 @@ export const fiscalPeriods = pgTable(
 
 // ---------------------------------------------------------------- numbering
 
-/** One row per (company, document type, fiscal year); allocated under a row lock. */
+/**
+ * Running counters: one row per (company, document type, year, branch);
+ * `year` is 0 for rules that never reset and `branch_id` NULL for company-wide
+ * sequences. Allocation is an atomic upsert inside the document's transaction,
+ * so numbers are never reused and a rolled-back document leaves no gap.
+ */
 export const documentSequences = pgTable(
   'document_sequences',
   {
@@ -177,6 +183,7 @@ export const documentSequences = pgTable(
       .notNull()
       .references(() => companies.id, { onDelete: 'restrict' }),
     documentType: documentTypeEnum('document_type').notNull(),
+    branchId: uuid('branch_id').references(() => branches.id, { onDelete: 'restrict' }),
     year: integer('year').notNull(),
     prefix: text('prefix').notNull(),
     nextNumber: integer('next_number').notNull().default(1),
@@ -184,10 +191,43 @@ export const documentSequences = pgTable(
     ...timestamps,
   },
   (t) => [
-    uniqueIndex('document_sequences_uq').on(t.companyId, t.documentType, t.year),
+    unique('document_sequences_uq')
+      .on(t.companyId, t.documentType, t.year, t.branchId)
+      .nullsNotDistinct(),
     check('document_sequences_next_chk', sql`${t.nextNumber} >= 1`),
   ],
 );
+
+/**
+ * Configurable numbering per company, document type and (optionally) branch:
+ * prefix, format template (`{PREFIX}-{BRANCH}-{YEAR}-{SEQ}`), padding and
+ * whether the counter restarts each fiscal year. Without a rule the engine
+ * uses the built-in `<PREFIX>-<YEAR>-<NNNNNN>` default.
+ */
+export const numberingRules = pgTable(
+  'numbering_rules',
+  {
+    id: primaryId(),
+    companyId: uuid('company_id')
+      .notNull()
+      .references(() => companies.id, { onDelete: 'restrict' }),
+    documentType: documentTypeEnum('document_type').notNull(),
+    branchId: uuid('branch_id').references(() => branches.id, { onDelete: 'restrict' }),
+    prefix: text('prefix').notNull(),
+    format: text('format').notNull().default('{PREFIX}-{YEAR}-{SEQ}'),
+    padding: integer('padding').notNull().default(6),
+    resetYearly: boolean('reset_yearly').notNull().default(true),
+    isActive: boolean('is_active').notNull().default(true),
+    ...timestamps,
+  },
+  (t) => [
+    unique('numbering_rules_uq').on(t.companyId, t.documentType, t.branchId).nullsNotDistinct(),
+    check('numbering_rules_padding_chk', sql`${t.padding} BETWEEN 3 AND 12`),
+    check('numbering_rules_format_chk', sql`position('{SEQ}' in ${t.format}) > 0`),
+  ],
+);
+
+export type NumberingRule = typeof numberingRules.$inferSelect;
 
 // ------------------------------------------------------------------ journals
 

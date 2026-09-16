@@ -12,14 +12,19 @@ import { DRIZZLE, PG_POOL, type Database } from './database.types';
   providers: [
     {
       provide: PG_POOL,
-      inject: [AppConfigService],
-      useFactory: (config: AppConfigService) =>
-        new Pool({
+      inject: [AppConfigService, PinoLogger],
+      useFactory: (config: AppConfigService, logger: PinoLogger) => {
+        const pool = new Pool({
           connectionString: config.env.DATABASE_URL,
           max: config.env.DATABASE_POOL_MAX,
           // Always work with timezone-aware timestamps; pg returns them as Date.
           application_name: 'accounting-api',
-        }),
+        });
+        // An idle client dropped by the server (restart, admin kill) emits 'error' on the
+        // pool; without a listener Node treats it as unhandled and exits the process.
+        pool.on('error', (err) => logger.error({ err }, 'Idle database connection lost'));
+        return pool;
+      },
     },
     {
       provide: DRIZZLE,

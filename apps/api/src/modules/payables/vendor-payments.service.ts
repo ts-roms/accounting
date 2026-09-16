@@ -206,6 +206,7 @@ export class VendorPaymentsService {
         'PAY',
         Number(input.paymentDate.slice(0, 4)),
         tx,
+        { branchId: input.branchId ?? null },
       );
 
       const [created] = await tx
