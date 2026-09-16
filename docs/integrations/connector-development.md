@@ -95,6 +95,17 @@ export class AcmeBankConnector extends BaseConnector {
   it as the template for other REST providers: a pure `*.logic.ts` for amounts,
   cursors and normalisation, a thin connector class, and an in-memory API stub
   in the e2e test (`IntegrationsService.fetchImpl`).
+- **Plaid** (`connectors/plaid/`, see `connectors/plaid.md`): client id +
+  secret headers, Link public-token exchange on connect (the access token is
+  stored encrypted through `ConnectResult.secrets`), `/transactions/sync`
+  pages turned into chained daily statements, Plaid error codes reclassified
+  from the blanket HTTP 400, and ES256-JWT webhook verification with the key
+  fetched by `kid`. Use it as the template for providers that deliver
+  transactions rather than statements, or that sign webhooks with JWTs.
+
+Provider HTTP errors carry a bounded excerpt of the response body in
+`IntegrationError.options.details.body`; reclassify provider-specific codes
+there (see `classifyPlaidError`) instead of trusting the HTTP status alone.
 
 ## Demo connectors
 
@@ -113,5 +124,5 @@ e-commerce (Shopify / WooCommerce / Lazada / Shopee-like), tax and government
 CRM (Salesforce / HubSpot via OAuth), storage (S3-compatible, Google Drive,
 OneDrive), communication (SMTP, SMS, messaging) and identity (OAuth 2.0 /
 OIDC, Google, Microsoft Entra ID) and analytics (Power BI, warehouses). The
-`IntegrationCategory` enum and `authType` list cover them; only the demo
-representatives and Stripe are implemented.
+`IntegrationCategory` enum and `authType` list cover them; the demo
+representatives, Stripe and Plaid are implemented.

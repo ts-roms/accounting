@@ -72,11 +72,15 @@ export function createProviderHttp(options: ProviderHttpOptions) {
         durationMs: Date.now() - started,
       });
       if (!response.ok) {
-        throw IntegrationError.fromHttpStatus(
+        // Keep a bounded excerpt of the error body so connectors can classify
+        // provider-specific codes (Plaid's error_code, Stripe's error.type ...).
+        const error = IntegrationError.fromHttpStatus(
           response.status,
           undefined,
           parseRetryAfter(response.headers.get('retry-after')),
         );
+        error.options.details = { body: await errorBody(response) };
+        throw error;
       }
       return response;
     } catch (err) {
@@ -87,4 +91,18 @@ export function createProviderHttp(options: ProviderHttpOptions) {
       clearTimeout(timer);
     }
   };
+}
+
+/** Parsed JSON when possible, else a short text excerpt; never more than a few hundred bytes. */
+async function errorBody(response: Response): Promise<unknown> {
+  try {
+    const text = (await response.text()).slice(0, 2000);
+    try {
+      return JSON.parse(text) as unknown;
+    } catch {
+      return text.slice(0, 500);
+    }
+  } catch {
+    return undefined;
+  }
 }
