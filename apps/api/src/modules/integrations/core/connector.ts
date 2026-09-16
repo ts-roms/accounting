@@ -50,6 +50,8 @@ export interface ConnectorDescriptor {
   }>;
   /** Default inbound field mappings per entity (overridable per integration). */
   defaultMappings?: Partial<Record<SyncEntity, MappingFieldRuleInput[]>>;
+  /** Default outbound field mappings per entity (internal view -> provider payload); identity when absent. */
+  defaultOutboundMappings?: Partial<Record<SyncEntity, MappingFieldRuleInput[]>>;
   oauth?: OAuthProviderConfig;
   /** Provider rate limit the outbound client honours (requests per second). */
   rateLimitPerSecond?: number;
@@ -135,13 +137,28 @@ export interface PullResult {
   hasMore: boolean;
 }
 
+/** One batch of mapped internal records to send to the provider. */
 export interface PushRequest {
   entity: SyncEntity;
-  records: Array<{ internalId: string; data: Record<string, unknown> }>;
+  records: Array<{
+    internalId: string;
+    /** Provider id from an earlier push of the same record (update instead of create). */
+    externalId: string | null;
+    data: Record<string, unknown>;
+  }>;
 }
 
 export interface PushResult {
-  results: Array<{ internalId: string; externalId: string | null; ok: boolean; error?: string }>;
+  results: Array<{
+    internalId: string;
+    /** Provider id to remember for the record; null when the provider issues none. */
+    externalId: string | null;
+    ok: boolean;
+    /** Record-level rejection (validation, business rule); transport errors are thrown instead. */
+    error?: string;
+    /** Anything worth keeping next to the reference (receipt, acknowledgement, status). */
+    metadata?: Record<string, unknown>;
+  }>;
 }
 
 /** A verified inbound webhook, normalised by the connector. */

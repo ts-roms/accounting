@@ -2,7 +2,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Plug, RefreshCw, Trash2, Unplug, Zap } from 'lucide-react';
+import { ArrowLeft, Plug, RefreshCw, Trash2, Unplug, Upload, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { P } from '@accounting/types';
 import {
@@ -44,6 +44,7 @@ import {
   useOAuthStart,
   usePreviewMapping,
   useSyncJobs,
+  useTriggerPush,
   useTriggerSync,
   useUpdateIntegration,
   useUpsertMapping,
@@ -71,6 +72,7 @@ export function IntegrationDetailPage({ id }: { id: string }) {
   const detail = useIntegration(id);
   const action = useIntegrationAction();
   const sync = useTriggerSync();
+  const push = useTriggerPush();
   const remove = useDeleteIntegration();
   const oauth = useOAuthStart();
   const [deleting, setDeleting] = React.useState(false);
@@ -162,6 +164,25 @@ export function IntegrationDetailPage({ id }: { id: string }) {
                 data-testid="integration-sync"
               >
                 <RefreshCw /> Sync now
+              </Button>
+            ) : null}
+            {i.capabilities.includes('PUSH') &&
+            (i.status === 'CONNECTED' || i.status === 'SYNCING') ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  push.mutate(
+                    { id },
+                    {
+                      onSuccess: () => toast.success('Push queued'),
+                      onError: (e) => toast.error(describeError(e)),
+                    },
+                  )
+                }
+                data-testid="integration-push"
+              >
+                <Upload /> Push now
               </Button>
             ) : null}
             {i.status !== 'DISCONNECTED' && i.status !== 'DISABLED' ? (
@@ -449,6 +470,7 @@ function SyncTab({ i }: { i: IntegrationView }) {
   const jobItems = jobs.data?.items ?? [];
   const cursors = useExternalReferences(i.id);
   const trigger = useTriggerSync();
+  const push = useTriggerPush();
   const cancel = useCancelSync();
   const [entity, setEntity] = React.useState<string>('ALL');
   const [mode, setMode] = React.useState<'INCREMENTAL' | 'FULL'>('INCREMENTAL');
@@ -493,27 +515,49 @@ function SyncTab({ i }: { i: IntegrationView }) {
               </SelectContent>
             </Select>
           </div>
-          <Button
-            size="sm"
-            loading={trigger.isPending}
-            onClick={() =>
-              trigger.mutate(
-                { id: i.id, mode, entity: entity === 'ALL' ? undefined : (entity as never) },
-                {
-                  onSuccess: () => toast.success('Sync queued'),
-                  onError: (e) => toast.error(describeError(e)),
-                },
-              )
-            }
-          >
-            <RefreshCw /> Run sync
-          </Button>
+          {i.capabilities.includes('PULL') ? (
+            <Button
+              size="sm"
+              loading={trigger.isPending}
+              onClick={() =>
+                trigger.mutate(
+                  { id: i.id, mode, entity: entity === 'ALL' ? undefined : (entity as never) },
+                  {
+                    onSuccess: () => toast.success('Sync queued'),
+                    onError: (e) => toast.error(describeError(e)),
+                  },
+                )
+              }
+            >
+              <RefreshCw /> Run sync
+            </Button>
+          ) : null}
+          {i.capabilities.includes('PUSH') ? (
+            <Button
+              size="sm"
+              variant={i.capabilities.includes('PULL') ? 'outline' : 'default'}
+              loading={push.isPending}
+              onClick={() =>
+                push.mutate(
+                  { id: i.id, mode, entity: entity === 'ALL' ? undefined : (entity as never) },
+                  {
+                    onSuccess: () => toast.success('Push queued'),
+                    onError: (e) => toast.error(describeError(e)),
+                  },
+                )
+              }
+              data-testid="sync-run-push"
+            >
+              <Upload /> Run push
+            </Button>
+          ) : null}
         </div>
       </Can>
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Started</TableHead>
+            <TableHead>Direction</TableHead>
             <TableHead>Entity</TableHead>
             <TableHead>Mode</TableHead>
             <TableHead>Trigger</TableHead>
@@ -535,6 +579,7 @@ function SyncTab({ i }: { i: IntegrationView }) {
                 <TableCell className="text-xs">
                   {formatDateTime(j.startedAt ?? j.createdAt)}
                 </TableCell>
+                <TableCell>{j.direction === 'OUTBOUND' ? 'Push' : 'Pull'}</TableCell>
                 <TableCell>{j.entity ?? 'all'}</TableCell>
                 <TableCell>{titleCase(j.mode)}</TableCell>
                 <TableCell>{titleCase(j.trigger)}</TableCell>
@@ -757,19 +802,25 @@ function MappingsTab({ i }: { i: IntegrationView }) {
   const upsert = useUpsertMapping();
   const preview = usePreviewMapping();
   const [entity, setEntity] = React.useState('customers');
+  const [direction, setDirection] = React.useState<'INBOUND' | 'OUTBOUND'>(
+    i.capabilities.includes('PULL') || !i.capabilities.includes('PUSH') ? 'INBOUND' : 'OUTBOUND',
+  );
+  const defaultsFor = (d: 'INBOUND' | 'OUTBOUND') =>
+    d === 'OUTBOUND' ? mappings.data?.outboundDefaults : mappings.data?.defaults;
   const [rules, setRules] = React.useState('');
   const [lookups, setLookups] = React.useState('{}');
   const [sample, setSample] = React.useState('{\n  "id": "123",\n  "name": "Sample Co"\n}');
   React.useEffect(() => {
     const stored = mappings.data?.mappings.find(
-      (m) => m.entity === entity && m.direction === 'INBOUND',
+      (m) => m.entity === entity && m.direction === direction,
     );
-    const source = stored?.rules ?? mappings.data?.defaults[entity] ?? [];
+    const source = stored?.rules ?? defaultsFor(direction)?.[entity] ?? [];
     setRules(JSON.stringify(source, null, 2));
     setLookups(JSON.stringify(stored?.lookups ?? {}, null, 2));
-  }, [mappings.data, entity]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mappings.data, entity, direction]);
   const stored = mappings.data?.mappings.find(
-    (m) => m.entity === entity && m.direction === 'INBOUND',
+    (m) => m.entity === entity && m.direction === direction,
   );
   const parse = () => {
     try {
@@ -803,12 +854,26 @@ function MappingsTab({ i }: { i: IntegrationView }) {
               ))}
             </SelectContent>
           </Select>
+          <Select
+            value={direction}
+            onValueChange={(v) => setDirection(v as 'INBOUND' | 'OUTBOUND')}
+          >
+            <SelectTrigger className="w-36" data-testid="mapping-direction">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="INBOUND">Inbound (import)</SelectItem>
+              <SelectItem value="OUTBOUND">Outbound (push)</SelectItem>
+            </SelectContent>
+          </Select>
           <Badge variant={stored ? 'default' : 'outline'}>
             {stored
               ? `custom v${stored.version}`
-              : mappings.data?.defaults[entity]
+              : defaultsFor(direction)?.[entity]
                 ? 'connector default'
-                : 'no mapping'}
+                : direction === 'OUTBOUND'
+                  ? 'pass-through (no mapping)'
+                  : 'no mapping'}
           </Badge>
         </div>
         <Label>Field rules (target, source, transforms, when, required, default)</Label>
@@ -837,8 +902,8 @@ function MappingsTab({ i }: { i: IntegrationView }) {
                 {
                   id: i.id,
                   entity: entity as never,
-                  direction: 'INBOUND',
-                  name: `${entity} mapping`,
+                  direction,
+                  name: `${entity} ${direction === 'OUTBOUND' ? 'outbound ' : ''}mapping`,
                   rules: p.rules,
                   lookups: p.lookups,
                   isActive: true,
@@ -871,7 +936,7 @@ function MappingsTab({ i }: { i: IntegrationView }) {
               preview.mutate({
                 id: i.id,
                 entity: entity as never,
-                direction: 'INBOUND',
+                direction,
                 sample: JSON.parse(sample),
               });
             } catch {
@@ -982,9 +1047,7 @@ export function LogTable({
               </Badge>
             </TableCell>
             <TableCell className="font-mono text-xs">{l.httpStatus ?? ''}</TableCell>
-            <TableCell className="font-mono text-xs text-critical">
-              {l.errorCode ?? ''}
-            </TableCell>
+            <TableCell className="font-mono text-xs text-critical">{l.errorCode ?? ''}</TableCell>
             <TableCell className="text-right font-mono text-xs">{l.durationMs ?? ''}</TableCell>
             <TableCell className="max-w-96 truncate text-xs">{l.message}</TableCell>
             <TableCell className="font-mono text-[10px] text-muted-foreground">

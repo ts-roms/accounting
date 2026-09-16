@@ -24,6 +24,12 @@ import { ExternalReferencesService } from './mapping/external-references.service
 import { MappingsService } from './mapping/mappings.service';
 import { NotificationsModule } from './notifications/notifications.module';
 import { OAuthService } from './oauth/oauth.service';
+import { BillsExporter, InvoicesExporter } from './sync/exporters/documents.exporter';
+import {
+  CustomersExporter,
+  ProductsExporter,
+  VendorsExporter,
+} from './sync/exporters/parties.exporter';
 import { BankTransactionsImporter } from './sync/importers/bank-transactions.importer';
 import { BillsImporter } from './sync/importers/bills.importer';
 import { ProductsImporter } from './sync/importers/products.importer';
@@ -74,6 +80,11 @@ import { WebhooksController } from './webhooks/webhooks.controller';
     VendorsImporter,
     BillsImporter,
     ProductsImporter,
+    CustomersExporter,
+    VendorsExporter,
+    ProductsExporter,
+    InvoicesExporter,
+    BillsExporter,
     SyncService,
     InboundWebhooksService,
     OutboundWebhooksService,

@@ -75,9 +75,17 @@ export class AcmeBankConnector extends BaseConnector {
 - **OAuth**: set `descriptor.oauth` (authorize / token / revoke URLs, scopes,
   PKCE). The platform runs the flow; override `exchangeAuthorizationCode` /
   `refreshAccessToken` only when the provider is non-standard.
+- **Push**: declare `PUSH`, implement `push(ctx, { entity, records })` and
+  answer one result per record (`ok`, the provider's `externalId`, optional
+  `metadata` such as a receipt). Records carry the `externalId` of an earlier
+  push so the provider can update rather than duplicate. Reject bad records
+  per result (`ok: false, error`) - throw only for transport / auth failures.
+  Describe the payload with `defaultOutboundMappings` (domain view -> provider
+  shape); see `DEMO_TAX_AUTHORITY`.
 - **New entity?** Add an importer in `sync/importers/` that validates with the
   same Zod schema as the REST API and calls the existing domain service, then
-  register it in `SyncService` and `InboundWebhooksService`. Do not add tables
+  register it in `SyncService` and `InboundWebhooksService`; for pushes add an
+  exporter in `sync/exporters/` that reads the domain view. Do not add tables
   or posting code.
 
 ## Real connectors

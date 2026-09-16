@@ -161,6 +161,8 @@ export const integrationSyncJobs = pgTable(
       .notNull()
       .references(() => integrations.id, { onDelete: 'cascade' }),
     entity: text('entity'),
+    /** INBOUND = pull + import; OUTBOUND = export + push. */
+    direction: integrationDirectionEnum('direction').notNull().default('INBOUND'),
     mode: syncModeEnum('mode').notNull().default('INCREMENTAL'),
     trigger: syncTriggerEnum('trigger').notNull().default('MANUAL'),
     status: syncJobStatusEnum('status').notNull().default('QUEUED'),
@@ -202,13 +204,16 @@ export const integrationSyncCursors = pgTable(
       .notNull()
       .references(() => integrations.id, { onDelete: 'cascade' }),
     entity: text('entity').notNull(),
+    direction: integrationDirectionEnum('direction').notNull().default('INBOUND'),
     cursor: text('cursor'),
     lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
     /** Anything else the connector needs to resume (page token, watermark). */
     checkpoint: jsonb('checkpoint').$type<Record<string, unknown>>().notNull().default({}),
     ...timestamps,
   },
-  (t) => [uniqueIndex('integration_sync_cursors_uq').on(t.integrationId, t.entity)],
+  (t) => [
+    uniqueIndex('integration_sync_cursors_uq').on(t.integrationId, t.entity, t.direction),
+  ],
 );
 
 // ------------------------------------------------------------------ mapping

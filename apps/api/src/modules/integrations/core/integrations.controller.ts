@@ -162,6 +162,20 @@ export class IntegrationsController {
     return this.sync.trigger(user, user.organizationId, id, body);
   }
 
+  @Post(':id/push')
+  @HttpCode(202)
+  @RequirePermissions(P['integration.manage'])
+  @ApiOperation({
+    summary: 'Queue an outbound push job (export -> map -> provider); returns the job to poll',
+  })
+  triggerPush(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: SyncDto,
+  ) {
+    return this.sync.trigger(user, user.organizationId, id, body, 'MANUAL', 'OUTBOUND');
+  }
+
   @Get(':id/sync-jobs')
   @RequirePermissions(P['integration.view'])
   syncJobs(
@@ -201,8 +215,12 @@ export class IntegrationsController {
   ) {
     const row = await this.service.getRow(user.organizationId, id);
     const stored = await this.mappings.list(id);
-    const defaults = this.service.connector(row.provider).descriptor.defaultMappings ?? {};
-    return { mappings: stored, defaults };
+    const descriptor = this.service.connector(row.provider).descriptor;
+    return {
+      mappings: stored,
+      defaults: descriptor.defaultMappings ?? {},
+      outboundDefaults: descriptor.defaultOutboundMappings ?? {},
+    };
   }
 
   @Post(':id/mappings')

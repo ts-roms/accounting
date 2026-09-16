@@ -781,6 +781,174 @@ describe('Integration platform (e2e)', () => {
     expect((await sql('select count(*)::int as n from journal_entries'))[0]!.n).toBe(before);
   });
 
+  // ---------------------------------------------------------- outbound push
+
+  it('pushes posted invoices to an e-invoicing authority: export -> outbound mapping -> push, idempotent and resumable', async () => {
+    const created = await as(server().post('/api/v1/integrations'))
+      .send({
+        provider: 'DEMO_TAX_AUTHORITY',
+        name: 'E2E e-invoicing',
+        scopes: ['invoices:read'],
+        credentials: { apiKey: 'demo-tax-e2e-key' },
+        config: { taxpayerId: '000-111-222-333', environment: 'SANDBOX' },
+      })
+      .expect(201);
+    const authorityId = created.body.id as string;
+    // Push-only provider: a pull is refused, a push is queued.
+    await as(server().post(`/api/v1/integrations/${authorityId}/sync`))
+      .send({})
+      .expect(422);
+    const postedCount = (
+      await sql<{ n: number }>(
+        "select count(*)::int as n from invoices where company_id = $1 and accounting_status <> 'UNPOSTED'",
+        [companyId],
+      )
+    )[0]!.n;
+    expect(postedCount).toBeGreaterThan(0);
+
+    const queued = await as(server().post(`/api/v1/integrations/${authorityId}/push`))
+      .send({ entity: 'invoices' })
+      .expect(202);
+    expect(queued.body.direction).toBe('OUTBOUND');
+    await drain();
+    const job = await as(
+      server().get(`/api/v1/integrations/${authorityId}/sync-jobs/${queued.body.id}`),
+    ).expect(200);
+    expect(job.body.status).toBe('COMPLETED');
+    // Only documents that left UNPOSTED are exported; drafts (e.g. DRAFT-1) never leave the books.
+    expect(job.body).toMatchObject({
+      recordsProcessed: postedCount,
+      recordsCreated: postedCount,
+      recordsFailed: 0,
+    });
+    const refs = await as(
+      server().get(`/api/v1/integrations/${authorityId}/external-references?entityType=invoices`),
+    ).expect(200);
+    expect(refs.body).toHaveLength(postedCount);
+    const web1Ref = refs.body.find(
+      (r: { metadata: { documentNumber?: string; label?: string } }) =>
+        r.metadata.label !== undefined && r.metadata.documentNumber === r.metadata.label,
+    );
+    expect(web1Ref.externalId).toMatch(/^ACK-[0-9A-F]{8}$/);
+    expect(web1Ref.metadata).toMatchObject({ version: 'original' });
+    expect(typeof web1Ref.metadata.pushedAt).toBe('string');
+    const cursors = await as(server().get(`/api/v1/integrations/${authorityId}/cursors`)).expect(
+      200,
+    );
+    expect(cursors.body).toEqual([
+      expect.objectContaining({ entity: 'invoices', direction: 'OUTBOUND' }),
+    ]);
+    // The outbound mapping came from the connector default and reshaped the invoice detail.
+    const preview = await as(server().post(`/api/v1/integrations/${authorityId}/mappings/preview`))
+      .send({
+        entity: 'invoices',
+        direction: 'OUTBOUND',
+        sample: {
+          documentNumber: 'INV-X',
+          documentType: 'INVOICE',
+          documentDate: '2026-03-01',
+          subtotal: '100.0000',
+          total: '112.0000',
+          lines: [{ description: 'A', amount: '100.0000' }],
+        },
+      })
+      .expect(200);
+    expect(preview.body.source).toBe('CONNECTOR_DEFAULT');
+    expect(preview.body.output).toMatchObject({
+      document_number: 'INV-X',
+      amounts: { net: '100.0000', gross: '112.0000' },
+      lines: [{ description: 'A', amount: '100.0000' }],
+    });
+
+    // Incremental re-run: nothing changed, nothing re-sent.
+    const again = await as(server().post(`/api/v1/integrations/${authorityId}/push`))
+      .send({ entity: 'invoices' })
+      .expect(202);
+    await drain();
+    const job2 = await as(
+      server().get(`/api/v1/integrations/${authorityId}/sync-jobs/${again.body.id}`),
+    ).expect(200);
+    expect(job2.body).toMatchObject({ status: 'COMPLETED', recordsCreated: 0, recordsUpdated: 0 });
+
+    // A newly posted invoice is picked up by the next incremental push, and only that one.
+    const customer = await as(server().get('/api/v1/customers?search=EC-C_2')).expect(200);
+    const inv = await as(server().post('/api/v1/invoices'))
+      .send({
+        customerId: customer.body.items[0].id,
+        documentDate: '2026-03-12',
+        reference: 'PUSH-1',
+        lines: [{ description: 'Pushed later', unitPrice: '250', accountId: acc['4100'] }],
+      })
+      .expect(201);
+    await as(server().post(`/api/v1/invoices/${inv.body.id}/approve`)).expect(201);
+    await as(server().post(`/api/v1/invoices/${inv.body.id}/post`)).expect(201);
+    const third = await as(server().post(`/api/v1/integrations/${authorityId}/push`))
+      .send({ entity: 'invoices' })
+      .expect(202);
+    await drain();
+    const job3 = await as(
+      server().get(`/api/v1/integrations/${authorityId}/sync-jobs/${third.body.id}`),
+    ).expect(200);
+    expect(job3.body).toMatchObject({
+      status: 'COMPLETED',
+      recordsProcessed: 1,
+      recordsCreated: 1,
+    });
+    expect(job3.body.failures).toEqual([]);
+    const pushedRef = (
+      await as(
+        server().get(`/api/v1/integrations/${authorityId}/external-references?entityType=invoices`),
+      ).expect(200)
+    ).body.find((r: { internalId: string }) => r.internalId === inv.body.id);
+    expect(pushedRef.metadata.documentNumber).toBe(inv.body.documentNumber);
+
+    // A FULL push re-submits everything; the authority keeps the acknowledgement numbers.
+    const full = await as(server().post(`/api/v1/integrations/${authorityId}/push`))
+      .send({ entity: 'invoices', mode: 'FULL' })
+      .expect(202);
+    await drain();
+    const job4 = await as(
+      server().get(`/api/v1/integrations/${authorityId}/sync-jobs/${full.body.id}`),
+    ).expect(200);
+    expect(job4.body).toMatchObject({ recordsUpdated: postedCount + 1, recordsCreated: 0 });
+    const afterFull = (
+      await as(
+        server().get(`/api/v1/integrations/${authorityId}/external-references?entityType=invoices`),
+      ).expect(200)
+    ).body.find((r: { internalId: string }) => r.internalId === inv.body.id);
+    expect(afterFull.externalId).toBe(pushedRef.externalId);
+    expect(afterFull.metadata.version).toBe('resubmission');
+
+    // Pushing is read-only for the books and scope-gated like everything else.
+    const jobs = await as(
+      server().get(`/api/v1/integrations/${authorityId}/sync-jobs?direction=OUTBOUND`),
+    ).expect(200);
+    expect(jobs.body.total).toBe(4);
+    const unscoped = await as(server().post('/api/v1/integrations'))
+      .send({
+        provider: 'DEMO_TAX_AUTHORITY',
+        name: 'E2E e-invoicing (no read scope)',
+        scopes: ['companies:read'],
+        credentials: { apiKey: 'demo-tax-e2e-key-2' },
+        config: { taxpayerId: '000-111-222-444' },
+      })
+      .expect(201);
+    const denied = await as(server().post(`/api/v1/integrations/${unscoped.body.id}/push`))
+      .send({})
+      .expect(202);
+    await drain();
+    const deniedJob = await as(
+      server().get(`/api/v1/integrations/${unscoped.body.id}/sync-jobs/${denied.body.id}`),
+    ).expect(200);
+    expect(deniedJob.body).toMatchObject({ status: 'FAILED', errorCode: 'AUTHORIZATION_ERROR' });
+    const logs = await as(
+      server().get(`/api/v1/integration-logs?integrationId=${authorityId}&direction=OUTBOUND`),
+    ).expect(200);
+    expect(
+      logs.body.items.some((l: { operation: string }) => l.operation === 'push:invoices'),
+    ).toBe(true);
+  });
+
   // ------------------------------------------------------- inbound webhooks
 
   let gatewayId: string;

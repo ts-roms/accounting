@@ -95,6 +95,7 @@ export type TriggerSyncInput = z.infer<typeof triggerSyncSchema>;
 export const listSyncJobsQuerySchema = paginationQuerySchema.extend({
   status: z.enum(SYNC_JOB_STATUSES).optional(),
   entity: z.enum(SYNC_ENTITIES).optional(),
+  direction: z.enum(INTEGRATION_DIRECTIONS).optional(),
 });
 export type ListSyncJobsQuery = z.infer<typeof listSyncJobsQuerySchema>;
 

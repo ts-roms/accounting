@@ -151,9 +151,13 @@ export class MappingsService {
         lookups: row.lookups,
         source: 'INTEGRATION',
       };
-    const defaults = this.registry.has(provider)
-      ? this.registry.get(provider).descriptor.defaultMappings?.[entity]
+    const descriptor = this.registry.has(provider)
+      ? this.registry.get(provider).descriptor
       : undefined;
+    const defaults =
+      direction === 'OUTBOUND'
+        ? descriptor?.defaultOutboundMappings?.[entity]
+        : descriptor?.defaultMappings?.[entity];
     if (defaults) return { rules: defaults, lookups: {}, source: 'CONNECTOR_DEFAULT' };
     return { rules: [], lookups: {}, source: 'NONE' };
   }
@@ -165,8 +169,12 @@ export class MappingsService {
     record: Record<string, unknown>,
     ctx: Omit<MappingContext, 'lookups'> = {},
     executor: DbExecutor = this.db,
+    direction: IntegrationDirection = 'INBOUND',
   ): Promise<MappingResult & { source: ResolvedMapping['source'] }> {
-    const mapping = await this.resolve(integrationId, provider, entity, 'INBOUND', executor);
+    const mapping = await this.resolve(integrationId, provider, entity, direction, executor);
+    // Outbound with no rules at all = pass the domain view through unchanged.
+    if (mapping.source === 'NONE' && direction === 'OUTBOUND')
+      return { output: { ...record }, errors: [], source: mapping.source };
     const result = applyMapping(mapping.rules, record, { ...ctx, lookups: mapping.lookups });
     return { ...result, source: mapping.source };
   }

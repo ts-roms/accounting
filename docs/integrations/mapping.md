@@ -9,12 +9,12 @@ else the connector's `defaultMappings`, else nothing.
 
 ```json
 {
-  "target": "email",              // dotted path in the output
-  "source": "customer.email",     // dotted path in the input (arrays: items.0.price)
-  "default": "PHP",               // used when the source is missing / empty
+  "target": "email", // dotted path in the output
+  "source": "customer.email", // dotted path in the input (arrays: items.0.price)
+  "default": "PHP", // used when the source is missing / empty
   "transforms": [{ "name": "lower" }],
   "when": { "path": "status", "op": "in", "value": ["paid", "settled"] },
-  "required": true                // missing after transforms -> mapping error
+  "required": true // missing after transforms -> mapping error
 }
 ```
 
@@ -38,17 +38,44 @@ problem listed (`MAPPING_ERROR` in the sync job's `failures`).
 
 ```json
 [
-  { "target": "customerExternalId", "source": "customer_id", "transforms": [{ "name": "toString" }], "required": true },
-  { "target": "documentDate", "source": "created_at", "transforms": [{ "name": "toDate" }], "required": true },
+  {
+    "target": "customerExternalId",
+    "source": "customer_id",
+    "transforms": [{ "name": "toString" }],
+    "required": true
+  },
+  {
+    "target": "documentDate",
+    "source": "created_at",
+    "transforms": [{ "name": "toDate" }],
+    "required": true
+  },
   { "target": "reference", "source": "order_number" },
-  { "target": "lines", "source": "line_items", "required": true, "transforms": [{
-      "name": "mapEach",
-      "arg": [
-        { "target": "description", "source": "title", "required": true },
-        { "target": "quantity", "source": "quantity", "transforms": [{ "name": "toDecimal" }], "default": "1" },
-        { "target": "unitPrice", "source": "price", "transforms": [{ "name": "toDecimal" }], "required": true }
-      ]
-  }] }
+  {
+    "target": "lines",
+    "source": "line_items",
+    "required": true,
+    "transforms": [
+      {
+        "name": "mapEach",
+        "arg": [
+          { "target": "description", "source": "title", "required": true },
+          {
+            "target": "quantity",
+            "source": "quantity",
+            "transforms": [{ "name": "toDecimal" }],
+            "default": "1"
+          },
+          {
+            "target": "unitPrice",
+            "source": "price",
+            "transforms": [{ "name": "toDecimal" }],
+            "required": true
+          }
+        ]
+      }
+    ]
+  }
 ]
 ```
 
@@ -57,10 +84,10 @@ API (`createInvoiceSchema`) - mapping can only produce what a user could type.
 
 ## Endpoints
 
-- `GET /integrations/:id/mappings` - stored mappings and connector defaults
+- `GET /integrations/:id/mappings` - stored mappings and connector defaults (`defaults` inbound, `outboundDefaults` for pushes)
 - `POST /integrations/:id/mappings` - upsert (versioned, audited)
 - `DELETE /integrations/:id/mappings/:mappingId`
-- `POST /integrations/:id/mappings/preview` - dry-run a sample record
+- `POST /integrations/:id/mappings/preview` - dry-run a sample record (`direction: OUTBOUND` previews a push payload from a domain view)
 - `GET /integrations/:id/external-references` - internal <-> external ids
 
 ## External references
