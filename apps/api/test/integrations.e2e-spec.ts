@@ -1150,6 +1150,7 @@ describe('Integration platform (e2e)', () => {
     expect(outbox.map((o) => o.event_type).sort()).toEqual([
       'payment.completed',
       'payment.created',
+      'payment.received',
     ]);
     await outbound.flush();
     const delivered = received.filter((r) => r.headers['x-webhook-event'] === 'payment.completed');

@@ -4,7 +4,12 @@ import { login } from './helpers';
 const ACCOUNTANT = { email: 'accountant@acme.local', password: 'Demo!Passw0rd' };
 
 /** Calls the API through the page's cookie jar with the active company header. */
-async function apiCall(page: Page, method: 'get' | 'post' | 'delete', path: string, data?: unknown) {
+async function apiCall(
+  page: Page,
+  method: 'get' | 'post' | 'delete',
+  path: string,
+  data?: unknown,
+) {
   const me = await page.request.get('/api/v1/auth/me');
   const companyId = (await me.json()).companies[0].id as string;
   const headers = { 'x-requested-with': 'XMLHttpRequest', 'x-company-id': companyId };
@@ -102,7 +107,9 @@ test.describe('integration platform', () => {
       await apiCall(page, 'post', '/bills', {
         vendorId: vendors.items[0].id,
         documentDate: '2026-09-14',
-        lines: [{ description: 'Delegated approval demo', unitPrice: '1000', accountId: expense.id }],
+        lines: [
+          { description: 'Delegated approval demo', unitPrice: '1000', accountId: expense.id },
+        ],
       })
     ).json();
     await login(page, ACCOUNTANT);

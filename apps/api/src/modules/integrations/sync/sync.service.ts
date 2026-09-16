@@ -42,6 +42,7 @@ import { CustomersImporter } from './importers/customers.importer';
 import type { Importer } from './importers/importer';
 import { InvoicesImporter } from './importers/invoices.importer';
 import { PaymentsImporter } from './importers/payments.importer';
+import { SalesOrdersImporter } from './importers/sales-orders.importer';
 import { BillsExporter, InvoicesExporter } from './exporters/documents.exporter';
 import { EXPORT_BATCH_SIZE, type Exporter } from './exporters/exporter';
 import { CustomersExporter, ProductsExporter, VendorsExporter } from './exporters/parties.exporter';
@@ -87,6 +88,7 @@ export class SyncService implements OnModuleInit {
     vendors: VendorsImporter,
     bills: BillsImporter,
     products: ProductsImporter,
+    salesOrders: SalesOrdersImporter,
     customersOut: CustomersExporter,
     vendorsOut: VendorsExporter,
     productsOut: ProductsExporter,
@@ -95,10 +97,16 @@ export class SyncService implements OnModuleInit {
   ) {
     this.logger.setContext(SyncService.name);
     this.importers = new Map<SyncEntity, Importer>(
-      [customers, invoices, payments, bankTransactions, vendors, bills, products].map((i) => [
-        i.entity,
-        i,
-      ]),
+      [
+        customers,
+        invoices,
+        payments,
+        bankTransactions,
+        vendors,
+        bills,
+        products,
+        salesOrders,
+      ].map((i) => [i.entity, i]),
     );
     this.exporters = new Map<SyncEntity, Exporter>(
       [customersOut, vendorsOut, productsOut, invoicesOut, billsOut].map((e) => [e.entity, e]),

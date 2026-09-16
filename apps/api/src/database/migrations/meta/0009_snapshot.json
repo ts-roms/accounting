@@ -143,12 +143,8 @@
           "name": "branches_company_id_companies_id_fk",
           "tableFrom": "branches",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -317,12 +313,8 @@
           "name": "companies_organization_id_organizations_id_fk",
           "tableFrom": "companies",
           "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -409,9 +401,7 @@
         "organizations_slug_unique": {
           "name": "organizations_slug_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "slug"
-          ]
+          "columns": ["slug"]
         }
       },
       "policies": {},
@@ -538,12 +528,8 @@
           "name": "sessions_user_id_users_id_fk",
           "tableFrom": "sessions",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -681,12 +667,8 @@
           "name": "users_organization_id_organizations_id_fk",
           "tableFrom": "users",
           "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -750,9 +732,7 @@
         "permissions_key_unique": {
           "name": "permissions_key_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "key"
-          ]
+          "columns": ["key"]
         }
       },
       "policies": {},
@@ -789,12 +769,8 @@
           "name": "role_permissions_role_id_roles_id_fk",
           "tableFrom": "role_permissions",
           "tableTo": "roles",
-          "columnsFrom": [
-            "role_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["role_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -802,12 +778,8 @@
           "name": "role_permissions_permission_id_permissions_id_fk",
           "tableFrom": "role_permissions",
           "tableTo": "permissions",
-          "columnsFrom": [
-            "permission_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["permission_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -815,10 +787,7 @@
       "compositePrimaryKeys": {
         "role_permissions_role_id_permission_id_pk": {
           "name": "role_permissions_role_id_permission_id_pk",
-          "columns": [
-            "role_id",
-            "permission_id"
-          ]
+          "columns": ["role_id", "permission_id"]
         }
       },
       "uniqueConstraints": {},
@@ -911,12 +880,8 @@
           "name": "roles_organization_id_organizations_id_fk",
           "tableFrom": "roles",
           "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -1032,12 +997,8 @@
           "name": "sod_policies_organization_id_organizations_id_fk",
           "tableFrom": "sod_policies",
           "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -1113,12 +1074,8 @@
           "name": "user_roles_user_id_users_id_fk",
           "tableFrom": "user_roles",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1126,12 +1083,8 @@
           "name": "user_roles_role_id_roles_id_fk",
           "tableFrom": "user_roles",
           "tableTo": "roles",
-          "columnsFrom": [
-            "role_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["role_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1139,12 +1092,8 @@
           "name": "user_roles_company_id_companies_id_fk",
           "tableFrom": "user_roles",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1152,12 +1101,8 @@
           "name": "user_roles_assigned_by_users_id_fk",
           "tableFrom": "user_roles",
           "tableTo": "users",
-          "columnsFrom": [
-            "assigned_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["assigned_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1167,11 +1112,7 @@
         "user_roles_uq": {
           "name": "user_roles_uq",
           "nullsNotDistinct": true,
-          "columns": [
-            "user_id",
-            "role_id",
-            "company_id"
-          ]
+          "columns": ["user_id", "role_id", "company_id"]
         }
       },
       "policies": {},
@@ -1360,12 +1301,8 @@
           "name": "audit_logs_organization_id_organizations_id_fk",
           "tableFrom": "audit_logs",
           "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -1373,12 +1310,8 @@
           "name": "audit_logs_company_id_companies_id_fk",
           "tableFrom": "audit_logs",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -1386,12 +1319,8 @@
           "name": "audit_logs_user_id_users_id_fk",
           "tableFrom": "audit_logs",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1475,12 +1404,8 @@
           "name": "account_mappings_company_id_companies_id_fk",
           "tableFrom": "account_mappings",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -1488,12 +1413,8 @@
           "name": "account_mappings_account_id_accounts_id_fk",
           "tableFrom": "account_mappings",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -1680,12 +1601,8 @@
           "name": "accounts_company_id_companies_id_fk",
           "tableFrom": "accounts",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -1693,12 +1610,8 @@
           "name": "accounts_parent_id_accounts_id_fk",
           "tableFrom": "accounts",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "parent_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["parent_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -1808,12 +1721,8 @@
           "name": "document_sequences_company_id_companies_id_fk",
           "tableFrom": "document_sequences",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -1978,12 +1887,8 @@
           "name": "fiscal_periods_fiscal_year_id_fiscal_years_id_fk",
           "tableFrom": "fiscal_periods",
           "tableTo": "fiscal_years",
-          "columnsFrom": [
-            "fiscal_year_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["fiscal_year_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -1991,12 +1896,8 @@
           "name": "fiscal_periods_company_id_companies_id_fk",
           "tableFrom": "fiscal_periods",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -2004,12 +1905,8 @@
           "name": "fiscal_periods_closed_by_users_id_fk",
           "tableFrom": "fiscal_periods",
           "tableTo": "users",
-          "columnsFrom": [
-            "closed_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["closed_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -2017,12 +1914,8 @@
           "name": "fiscal_periods_reopened_by_users_id_fk",
           "tableFrom": "fiscal_periods",
           "tableTo": "users",
-          "columnsFrom": [
-            "reopened_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["reopened_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -2161,12 +2054,8 @@
           "name": "fiscal_years_company_id_companies_id_fk",
           "tableFrom": "fiscal_years",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -2174,12 +2063,8 @@
           "name": "fiscal_years_closed_by_users_id_fk",
           "tableFrom": "fiscal_years",
           "tableTo": "users",
-          "columnsFrom": [
-            "closed_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["closed_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -2528,12 +2413,8 @@
           "name": "journal_entries_company_id_companies_id_fk",
           "tableFrom": "journal_entries",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -2541,12 +2422,8 @@
           "name": "journal_entries_branch_id_branches_id_fk",
           "tableFrom": "journal_entries",
           "tableTo": "branches",
-          "columnsFrom": [
-            "branch_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["branch_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -2554,12 +2431,8 @@
           "name": "journal_entries_fiscal_period_id_fiscal_periods_id_fk",
           "tableFrom": "journal_entries",
           "tableTo": "fiscal_periods",
-          "columnsFrom": [
-            "fiscal_period_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["fiscal_period_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -2567,12 +2440,8 @@
           "name": "journal_entries_reversal_of_id_journal_entries_id_fk",
           "tableFrom": "journal_entries",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "reversal_of_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["reversal_of_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -2580,12 +2449,8 @@
           "name": "journal_entries_reversed_by_id_journal_entries_id_fk",
           "tableFrom": "journal_entries",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "reversed_by_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["reversed_by_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -2593,12 +2458,8 @@
           "name": "journal_entries_created_by_users_id_fk",
           "tableFrom": "journal_entries",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -2606,12 +2467,8 @@
           "name": "journal_entries_submitted_by_users_id_fk",
           "tableFrom": "journal_entries",
           "tableTo": "users",
-          "columnsFrom": [
-            "submitted_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["submitted_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -2619,12 +2476,8 @@
           "name": "journal_entries_approved_by_users_id_fk",
           "tableFrom": "journal_entries",
           "tableTo": "users",
-          "columnsFrom": [
-            "approved_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["approved_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -2632,12 +2485,8 @@
           "name": "journal_entries_rejected_by_users_id_fk",
           "tableFrom": "journal_entries",
           "tableTo": "users",
-          "columnsFrom": [
-            "rejected_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["rejected_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -2645,12 +2494,8 @@
           "name": "journal_entries_posted_by_users_id_fk",
           "tableFrom": "journal_entries",
           "tableTo": "users",
-          "columnsFrom": [
-            "posted_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["posted_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -2884,12 +2729,8 @@
           "name": "journal_lines_journal_entry_id_journal_entries_id_fk",
           "tableFrom": "journal_lines",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "journal_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["journal_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2897,12 +2738,8 @@
           "name": "journal_lines_company_id_companies_id_fk",
           "tableFrom": "journal_lines",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -2910,12 +2747,8 @@
           "name": "journal_lines_account_id_accounts_id_fk",
           "tableFrom": "journal_lines",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -2923,12 +2756,8 @@
           "name": "journal_lines_branch_id_branches_id_fk",
           "tableFrom": "journal_lines",
           "tableTo": "branches",
-          "columnsFrom": [
-            "branch_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["branch_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -2936,12 +2765,8 @@
           "name": "journal_lines_department_id_dimensions_id_fk",
           "tableFrom": "journal_lines",
           "tableTo": "dimensions",
-          "columnsFrom": [
-            "department_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["department_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -2949,12 +2774,8 @@
           "name": "journal_lines_cost_center_id_dimensions_id_fk",
           "tableFrom": "journal_lines",
           "tableTo": "dimensions",
-          "columnsFrom": [
-            "cost_center_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["cost_center_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -2962,12 +2783,8 @@
           "name": "journal_lines_project_id_dimensions_id_fk",
           "tableFrom": "journal_lines",
           "tableTo": "dimensions",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -3197,12 +3014,8 @@
           "name": "bill_lines_order_line_id_order_lines_id_fk",
           "tableFrom": "bill_lines",
           "tableTo": "order_lines",
-          "columnsFrom": [
-            "order_line_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["order_line_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -3210,12 +3023,8 @@
           "name": "bill_lines_product_id_products_id_fk",
           "tableFrom": "bill_lines",
           "tableTo": "products",
-          "columnsFrom": [
-            "product_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["product_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -3223,12 +3032,8 @@
           "name": "bill_lines_warehouse_id_warehouses_id_fk",
           "tableFrom": "bill_lines",
           "tableTo": "warehouses",
-          "columnsFrom": [
-            "warehouse_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["warehouse_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -3236,12 +3041,8 @@
           "name": "bill_lines_account_id_accounts_id_fk",
           "tableFrom": "bill_lines",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -3249,12 +3050,8 @@
           "name": "bill_lines_branch_id_branches_id_fk",
           "tableFrom": "bill_lines",
           "tableTo": "branches",
-          "columnsFrom": [
-            "branch_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["branch_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -3262,12 +3059,8 @@
           "name": "bill_lines_department_id_dimensions_id_fk",
           "tableFrom": "bill_lines",
           "tableTo": "dimensions",
-          "columnsFrom": [
-            "department_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["department_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -3275,12 +3068,8 @@
           "name": "bill_lines_cost_center_id_dimensions_id_fk",
           "tableFrom": "bill_lines",
           "tableTo": "dimensions",
-          "columnsFrom": [
-            "cost_center_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["cost_center_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -3288,12 +3077,8 @@
           "name": "bill_lines_project_id_dimensions_id_fk",
           "tableFrom": "bill_lines",
           "tableTo": "dimensions",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -3301,12 +3086,8 @@
           "name": "bill_lines_tax_code_id_tax_codes_id_fk",
           "tableFrom": "bill_lines",
           "tableTo": "tax_codes",
-          "columnsFrom": [
-            "tax_code_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tax_code_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -3314,12 +3095,8 @@
           "name": "bill_lines_withholding_tax_code_id_tax_codes_id_fk",
           "tableFrom": "bill_lines",
           "tableTo": "tax_codes",
-          "columnsFrom": [
-            "withholding_tax_code_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["withholding_tax_code_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -3327,12 +3104,8 @@
           "name": "bill_lines_bill_id_vendor_bills_id_fk",
           "tableFrom": "bill_lines",
           "tableTo": "vendor_bills",
-          "columnsFrom": [
-            "bill_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["bill_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3604,12 +3377,8 @@
           "name": "customer_payments_company_id_companies_id_fk",
           "tableFrom": "customer_payments",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -3617,12 +3386,8 @@
           "name": "customer_payments_branch_id_branches_id_fk",
           "tableFrom": "customer_payments",
           "tableTo": "branches",
-          "columnsFrom": [
-            "branch_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["branch_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -3630,12 +3395,8 @@
           "name": "customer_payments_cash_account_id_accounts_id_fk",
           "tableFrom": "customer_payments",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "cash_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["cash_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -3643,12 +3404,8 @@
           "name": "customer_payments_journal_entry_id_journal_entries_id_fk",
           "tableFrom": "customer_payments",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "journal_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["journal_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -3656,12 +3413,8 @@
           "name": "customer_payments_reversal_journal_entry_id_journal_entries_id_fk",
           "tableFrom": "customer_payments",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "reversal_journal_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["reversal_journal_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -3669,12 +3422,8 @@
           "name": "customer_payments_voided_by_users_id_fk",
           "tableFrom": "customer_payments",
           "tableTo": "users",
-          "columnsFrom": [
-            "voided_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["voided_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -3682,12 +3431,8 @@
           "name": "customer_payments_posted_by_users_id_fk",
           "tableFrom": "customer_payments",
           "tableTo": "users",
-          "columnsFrom": [
-            "posted_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["posted_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -3695,12 +3440,8 @@
           "name": "customer_payments_created_by_users_id_fk",
           "tableFrom": "customer_payments",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -3708,12 +3449,8 @@
           "name": "customer_payments_customer_id_customers_id_fk",
           "tableFrom": "customer_payments",
           "tableTo": "customers",
-          "columnsFrom": [
-            "customer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["customer_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -3929,12 +3666,8 @@
           "name": "customers_company_id_companies_id_fk",
           "tableFrom": "customers",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -3942,12 +3675,8 @@
           "name": "customers_default_revenue_account_id_accounts_id_fk",
           "tableFrom": "customers",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "default_revenue_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["default_revenue_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -4164,12 +3893,8 @@
           "name": "invoice_lines_order_line_id_order_lines_id_fk",
           "tableFrom": "invoice_lines",
           "tableTo": "order_lines",
-          "columnsFrom": [
-            "order_line_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["order_line_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4177,12 +3902,8 @@
           "name": "invoice_lines_product_id_products_id_fk",
           "tableFrom": "invoice_lines",
           "tableTo": "products",
-          "columnsFrom": [
-            "product_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["product_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4190,12 +3911,8 @@
           "name": "invoice_lines_warehouse_id_warehouses_id_fk",
           "tableFrom": "invoice_lines",
           "tableTo": "warehouses",
-          "columnsFrom": [
-            "warehouse_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["warehouse_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4203,12 +3920,8 @@
           "name": "invoice_lines_account_id_accounts_id_fk",
           "tableFrom": "invoice_lines",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4216,12 +3929,8 @@
           "name": "invoice_lines_branch_id_branches_id_fk",
           "tableFrom": "invoice_lines",
           "tableTo": "branches",
-          "columnsFrom": [
-            "branch_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["branch_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4229,12 +3938,8 @@
           "name": "invoice_lines_department_id_dimensions_id_fk",
           "tableFrom": "invoice_lines",
           "tableTo": "dimensions",
-          "columnsFrom": [
-            "department_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["department_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4242,12 +3947,8 @@
           "name": "invoice_lines_cost_center_id_dimensions_id_fk",
           "tableFrom": "invoice_lines",
           "tableTo": "dimensions",
-          "columnsFrom": [
-            "cost_center_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["cost_center_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4255,12 +3956,8 @@
           "name": "invoice_lines_project_id_dimensions_id_fk",
           "tableFrom": "invoice_lines",
           "tableTo": "dimensions",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4268,12 +3965,8 @@
           "name": "invoice_lines_tax_code_id_tax_codes_id_fk",
           "tableFrom": "invoice_lines",
           "tableTo": "tax_codes",
-          "columnsFrom": [
-            "tax_code_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tax_code_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4281,12 +3974,8 @@
           "name": "invoice_lines_withholding_tax_code_id_tax_codes_id_fk",
           "tableFrom": "invoice_lines",
           "tableTo": "tax_codes",
-          "columnsFrom": [
-            "withholding_tax_code_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["withholding_tax_code_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4294,12 +3983,8 @@
           "name": "invoice_lines_invoice_id_invoices_id_fk",
           "tableFrom": "invoice_lines",
           "tableTo": "invoices",
-          "columnsFrom": [
-            "invoice_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["invoice_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -4658,12 +4343,8 @@
           "name": "invoices_company_id_companies_id_fk",
           "tableFrom": "invoices",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4671,12 +4352,8 @@
           "name": "invoices_branch_id_branches_id_fk",
           "tableFrom": "invoices",
           "tableTo": "branches",
-          "columnsFrom": [
-            "branch_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["branch_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4684,12 +4361,8 @@
           "name": "invoices_journal_entry_id_journal_entries_id_fk",
           "tableFrom": "invoices",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "journal_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["journal_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4697,12 +4370,8 @@
           "name": "invoices_reversal_journal_entry_id_journal_entries_id_fk",
           "tableFrom": "invoices",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "reversal_journal_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["reversal_journal_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4710,12 +4379,8 @@
           "name": "invoices_voided_by_users_id_fk",
           "tableFrom": "invoices",
           "tableTo": "users",
-          "columnsFrom": [
-            "voided_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["voided_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -4723,12 +4388,8 @@
           "name": "invoices_approved_by_users_id_fk",
           "tableFrom": "invoices",
           "tableTo": "users",
-          "columnsFrom": [
-            "approved_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["approved_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -4736,12 +4397,8 @@
           "name": "invoices_posted_by_users_id_fk",
           "tableFrom": "invoices",
           "tableTo": "users",
-          "columnsFrom": [
-            "posted_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["posted_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -4749,12 +4406,8 @@
           "name": "invoices_created_by_users_id_fk",
           "tableFrom": "invoices",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -4762,12 +4415,8 @@
           "name": "invoices_customer_id_customers_id_fk",
           "tableFrom": "invoices",
           "tableTo": "customers",
-          "columnsFrom": [
-            "customer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["customer_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4775,12 +4424,8 @@
           "name": "invoices_sales_order_id_orders_id_fk",
           "tableFrom": "invoices",
           "tableTo": "orders",
-          "columnsFrom": [
-            "sales_order_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["sales_order_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -4902,12 +4547,8 @@
           "name": "payment_allocations_company_id_companies_id_fk",
           "tableFrom": "payment_allocations",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4915,12 +4556,8 @@
           "name": "payment_allocations_invoice_id_invoices_id_fk",
           "tableFrom": "payment_allocations",
           "tableTo": "invoices",
-          "columnsFrom": [
-            "invoice_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["invoice_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4928,12 +4565,8 @@
           "name": "payment_allocations_payment_id_customer_payments_id_fk",
           "tableFrom": "payment_allocations",
           "tableTo": "customer_payments",
-          "columnsFrom": [
-            "payment_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["payment_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4941,12 +4574,8 @@
           "name": "payment_allocations_credit_note_id_invoices_id_fk",
           "tableFrom": "payment_allocations",
           "tableTo": "invoices",
-          "columnsFrom": [
-            "credit_note_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["credit_note_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4954,12 +4583,8 @@
           "name": "payment_allocations_created_by_users_id_fk",
           "tableFrom": "payment_allocations",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -5376,12 +5001,8 @@
           "name": "vendor_bills_company_id_companies_id_fk",
           "tableFrom": "vendor_bills",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -5389,12 +5010,8 @@
           "name": "vendor_bills_branch_id_branches_id_fk",
           "tableFrom": "vendor_bills",
           "tableTo": "branches",
-          "columnsFrom": [
-            "branch_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["branch_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -5402,12 +5019,8 @@
           "name": "vendor_bills_journal_entry_id_journal_entries_id_fk",
           "tableFrom": "vendor_bills",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "journal_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["journal_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -5415,12 +5028,8 @@
           "name": "vendor_bills_reversal_journal_entry_id_journal_entries_id_fk",
           "tableFrom": "vendor_bills",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "reversal_journal_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["reversal_journal_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -5428,12 +5037,8 @@
           "name": "vendor_bills_voided_by_users_id_fk",
           "tableFrom": "vendor_bills",
           "tableTo": "users",
-          "columnsFrom": [
-            "voided_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["voided_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -5441,12 +5046,8 @@
           "name": "vendor_bills_approved_by_users_id_fk",
           "tableFrom": "vendor_bills",
           "tableTo": "users",
-          "columnsFrom": [
-            "approved_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["approved_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -5454,12 +5055,8 @@
           "name": "vendor_bills_posted_by_users_id_fk",
           "tableFrom": "vendor_bills",
           "tableTo": "users",
-          "columnsFrom": [
-            "posted_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["posted_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -5467,12 +5064,8 @@
           "name": "vendor_bills_created_by_users_id_fk",
           "tableFrom": "vendor_bills",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -5480,12 +5073,8 @@
           "name": "vendor_bills_vendor_id_vendors_id_fk",
           "tableFrom": "vendor_bills",
           "tableTo": "vendors",
-          "columnsFrom": [
-            "vendor_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["vendor_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -5493,12 +5082,8 @@
           "name": "vendor_bills_purchase_order_id_orders_id_fk",
           "tableFrom": "vendor_bills",
           "tableTo": "orders",
-          "columnsFrom": [
-            "purchase_order_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["purchase_order_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -5506,12 +5091,8 @@
           "name": "vendor_bills_match_reviewed_by_users_id_fk",
           "tableFrom": "vendor_bills",
           "tableTo": "users",
-          "columnsFrom": [
-            "match_reviewed_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["match_reviewed_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -5633,12 +5214,8 @@
           "name": "vendor_payment_allocations_company_id_companies_id_fk",
           "tableFrom": "vendor_payment_allocations",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -5646,12 +5223,8 @@
           "name": "vendor_payment_allocations_bill_id_vendor_bills_id_fk",
           "tableFrom": "vendor_payment_allocations",
           "tableTo": "vendor_bills",
-          "columnsFrom": [
-            "bill_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["bill_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -5659,12 +5232,8 @@
           "name": "vendor_payment_allocations_payment_id_vendor_payments_id_fk",
           "tableFrom": "vendor_payment_allocations",
           "tableTo": "vendor_payments",
-          "columnsFrom": [
-            "payment_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["payment_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -5672,12 +5241,8 @@
           "name": "vendor_payment_allocations_credit_note_id_vendor_bills_id_fk",
           "tableFrom": "vendor_payment_allocations",
           "tableTo": "vendor_bills",
-          "columnsFrom": [
-            "credit_note_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["credit_note_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -5685,12 +5250,8 @@
           "name": "vendor_payment_allocations_created_by_users_id_fk",
           "tableFrom": "vendor_payment_allocations",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -5966,12 +5527,8 @@
           "name": "vendor_payments_company_id_companies_id_fk",
           "tableFrom": "vendor_payments",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -5979,12 +5536,8 @@
           "name": "vendor_payments_branch_id_branches_id_fk",
           "tableFrom": "vendor_payments",
           "tableTo": "branches",
-          "columnsFrom": [
-            "branch_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["branch_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -5992,12 +5545,8 @@
           "name": "vendor_payments_cash_account_id_accounts_id_fk",
           "tableFrom": "vendor_payments",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "cash_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["cash_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -6005,12 +5554,8 @@
           "name": "vendor_payments_journal_entry_id_journal_entries_id_fk",
           "tableFrom": "vendor_payments",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "journal_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["journal_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -6018,12 +5563,8 @@
           "name": "vendor_payments_reversal_journal_entry_id_journal_entries_id_fk",
           "tableFrom": "vendor_payments",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "reversal_journal_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["reversal_journal_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -6031,12 +5572,8 @@
           "name": "vendor_payments_voided_by_users_id_fk",
           "tableFrom": "vendor_payments",
           "tableTo": "users",
-          "columnsFrom": [
-            "voided_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["voided_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -6044,12 +5581,8 @@
           "name": "vendor_payments_posted_by_users_id_fk",
           "tableFrom": "vendor_payments",
           "tableTo": "users",
-          "columnsFrom": [
-            "posted_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["posted_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -6057,12 +5590,8 @@
           "name": "vendor_payments_created_by_users_id_fk",
           "tableFrom": "vendor_payments",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -6070,12 +5599,8 @@
           "name": "vendor_payments_vendor_id_vendors_id_fk",
           "tableFrom": "vendor_payments",
           "tableTo": "vendors",
-          "columnsFrom": [
-            "vendor_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["vendor_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -6285,12 +5810,8 @@
           "name": "vendors_company_id_companies_id_fk",
           "tableFrom": "vendors",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -6298,12 +5819,8 @@
           "name": "vendors_default_expense_account_id_accounts_id_fk",
           "tableFrom": "vendors",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "default_expense_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["default_expense_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -6430,12 +5947,8 @@
           "name": "goods_receipt_lines_goods_receipt_id_goods_receipts_id_fk",
           "tableFrom": "goods_receipt_lines",
           "tableTo": "goods_receipts",
-          "columnsFrom": [
-            "goods_receipt_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["goods_receipt_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -6443,12 +5956,8 @@
           "name": "goods_receipt_lines_order_line_id_order_lines_id_fk",
           "tableFrom": "goods_receipt_lines",
           "tableTo": "order_lines",
-          "columnsFrom": [
-            "order_line_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["order_line_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -6667,12 +6176,8 @@
           "name": "goods_receipts_company_id_companies_id_fk",
           "tableFrom": "goods_receipts",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -6680,12 +6185,8 @@
           "name": "goods_receipts_purchase_order_id_orders_id_fk",
           "tableFrom": "goods_receipts",
           "tableTo": "orders",
-          "columnsFrom": [
-            "purchase_order_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["purchase_order_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -6693,12 +6194,8 @@
           "name": "goods_receipts_vendor_id_vendors_id_fk",
           "tableFrom": "goods_receipts",
           "tableTo": "vendors",
-          "columnsFrom": [
-            "vendor_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["vendor_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -6706,12 +6203,8 @@
           "name": "goods_receipts_journal_entry_id_journal_entries_id_fk",
           "tableFrom": "goods_receipts",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "journal_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["journal_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -6719,12 +6212,8 @@
           "name": "goods_receipts_reversal_journal_entry_id_journal_entries_id_fk",
           "tableFrom": "goods_receipts",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "reversal_journal_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["reversal_journal_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -6732,12 +6221,8 @@
           "name": "goods_receipts_confirmed_by_users_id_fk",
           "tableFrom": "goods_receipts",
           "tableTo": "users",
-          "columnsFrom": [
-            "confirmed_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["confirmed_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -6745,12 +6230,8 @@
           "name": "goods_receipts_created_by_users_id_fk",
           "tableFrom": "goods_receipts",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -6896,12 +6377,8 @@
           "name": "order_lines_order_id_orders_id_fk",
           "tableFrom": "order_lines",
           "tableTo": "orders",
-          "columnsFrom": [
-            "order_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["order_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -6909,12 +6386,8 @@
           "name": "order_lines_account_id_accounts_id_fk",
           "tableFrom": "order_lines",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -6922,12 +6395,8 @@
           "name": "order_lines_branch_id_branches_id_fk",
           "tableFrom": "order_lines",
           "tableTo": "branches",
-          "columnsFrom": [
-            "branch_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["branch_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -6935,12 +6404,8 @@
           "name": "order_lines_source_line_id_order_lines_id_fk",
           "tableFrom": "order_lines",
           "tableTo": "order_lines",
-          "columnsFrom": [
-            "source_line_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_line_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -6948,12 +6413,8 @@
           "name": "order_lines_product_id_products_id_fk",
           "tableFrom": "order_lines",
           "tableTo": "products",
-          "columnsFrom": [
-            "product_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["product_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -6961,12 +6422,8 @@
           "name": "order_lines_warehouse_id_warehouses_id_fk",
           "tableFrom": "order_lines",
           "tableTo": "warehouses",
-          "columnsFrom": [
-            "warehouse_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["warehouse_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -7296,12 +6753,8 @@
           "name": "orders_company_id_companies_id_fk",
           "tableFrom": "orders",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -7309,12 +6762,8 @@
           "name": "orders_branch_id_branches_id_fk",
           "tableFrom": "orders",
           "tableTo": "branches",
-          "columnsFrom": [
-            "branch_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["branch_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -7322,12 +6771,8 @@
           "name": "orders_customer_id_customers_id_fk",
           "tableFrom": "orders",
           "tableTo": "customers",
-          "columnsFrom": [
-            "customer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["customer_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -7335,12 +6780,8 @@
           "name": "orders_vendor_id_vendors_id_fk",
           "tableFrom": "orders",
           "tableTo": "vendors",
-          "columnsFrom": [
-            "vendor_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["vendor_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -7348,12 +6789,8 @@
           "name": "orders_source_order_id_orders_id_fk",
           "tableFrom": "orders",
           "tableTo": "orders",
-          "columnsFrom": [
-            "source_order_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_order_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -7361,12 +6798,8 @@
           "name": "orders_converted_order_id_orders_id_fk",
           "tableFrom": "orders",
           "tableTo": "orders",
-          "columnsFrom": [
-            "converted_order_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["converted_order_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -7374,12 +6807,8 @@
           "name": "orders_approved_by_users_id_fk",
           "tableFrom": "orders",
           "tableTo": "users",
-          "columnsFrom": [
-            "approved_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["approved_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -7387,12 +6816,8 @@
           "name": "orders_created_by_users_id_fk",
           "tableFrom": "orders",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -7478,12 +6903,8 @@
           "name": "purchasing_settings_company_id_companies_id_fk",
           "tableFrom": "purchasing_settings",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -7639,12 +7060,8 @@
           "name": "return_lines_return_id_returns_id_fk",
           "tableFrom": "return_lines",
           "tableTo": "returns",
-          "columnsFrom": [
-            "return_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["return_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -7652,12 +7069,8 @@
           "name": "return_lines_order_line_id_order_lines_id_fk",
           "tableFrom": "return_lines",
           "tableTo": "order_lines",
-          "columnsFrom": [
-            "order_line_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["order_line_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -7665,12 +7078,8 @@
           "name": "return_lines_account_id_accounts_id_fk",
           "tableFrom": "return_lines",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -7678,12 +7087,8 @@
           "name": "return_lines_product_id_products_id_fk",
           "tableFrom": "return_lines",
           "tableTo": "products",
-          "columnsFrom": [
-            "product_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["product_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -7691,12 +7096,8 @@
           "name": "return_lines_warehouse_id_warehouses_id_fk",
           "tableFrom": "return_lines",
           "tableTo": "warehouses",
-          "columnsFrom": [
-            "warehouse_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["warehouse_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -7947,12 +7348,8 @@
           "name": "returns_company_id_companies_id_fk",
           "tableFrom": "returns",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -7960,12 +7357,8 @@
           "name": "returns_order_id_orders_id_fk",
           "tableFrom": "returns",
           "tableTo": "orders",
-          "columnsFrom": [
-            "order_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["order_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -7973,12 +7366,8 @@
           "name": "returns_customer_id_customers_id_fk",
           "tableFrom": "returns",
           "tableTo": "customers",
-          "columnsFrom": [
-            "customer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["customer_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -7986,12 +7375,8 @@
           "name": "returns_vendor_id_vendors_id_fk",
           "tableFrom": "returns",
           "tableTo": "vendors",
-          "columnsFrom": [
-            "vendor_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["vendor_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -7999,12 +7384,8 @@
           "name": "returns_approved_by_users_id_fk",
           "tableFrom": "returns",
           "tableTo": "users",
-          "columnsFrom": [
-            "approved_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["approved_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -8012,12 +7393,8 @@
           "name": "returns_created_by_users_id_fk",
           "tableFrom": "returns",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -8123,12 +7500,8 @@
           "name": "inventory_balances_company_id_companies_id_fk",
           "tableFrom": "inventory_balances",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -8136,12 +7509,8 @@
           "name": "inventory_balances_product_id_products_id_fk",
           "tableFrom": "inventory_balances",
           "tableTo": "products",
-          "columnsFrom": [
-            "product_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["product_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -8149,12 +7518,8 @@
           "name": "inventory_balances_warehouse_id_warehouses_id_fk",
           "tableFrom": "inventory_balances",
           "tableTo": "warehouses",
-          "columnsFrom": [
-            "warehouse_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["warehouse_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -8162,12 +7527,8 @@
           "name": "inventory_balances_lot_id_stock_lots_id_fk",
           "tableFrom": "inventory_balances",
           "tableTo": "stock_lots",
-          "columnsFrom": [
-            "lot_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["lot_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -8177,11 +7538,7 @@
         "inventory_balances_uq": {
           "name": "inventory_balances_uq",
           "nullsNotDistinct": true,
-          "columns": [
-            "product_id",
-            "warehouse_id",
-            "lot_id"
-          ]
+          "columns": ["product_id", "warehouse_id", "lot_id"]
         }
       },
       "policies": {},
@@ -8306,12 +7663,8 @@
           "name": "inventory_layers_company_id_companies_id_fk",
           "tableFrom": "inventory_layers",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -8319,12 +7672,8 @@
           "name": "inventory_layers_product_id_products_id_fk",
           "tableFrom": "inventory_layers",
           "tableTo": "products",
-          "columnsFrom": [
-            "product_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["product_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -8332,12 +7681,8 @@
           "name": "inventory_layers_warehouse_id_warehouses_id_fk",
           "tableFrom": "inventory_layers",
           "tableTo": "warehouses",
-          "columnsFrom": [
-            "warehouse_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["warehouse_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -8345,12 +7690,8 @@
           "name": "inventory_layers_lot_id_stock_lots_id_fk",
           "tableFrom": "inventory_layers",
           "tableTo": "stock_lots",
-          "columnsFrom": [
-            "lot_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["lot_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -8358,12 +7699,8 @@
           "name": "inventory_layers_movement_id_inventory_movements_id_fk",
           "tableFrom": "inventory_layers",
           "tableTo": "inventory_movements",
-          "columnsFrom": [
-            "movement_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["movement_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -8584,12 +7921,8 @@
           "name": "inventory_movements_company_id_companies_id_fk",
           "tableFrom": "inventory_movements",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -8597,12 +7930,8 @@
           "name": "inventory_movements_product_id_products_id_fk",
           "tableFrom": "inventory_movements",
           "tableTo": "products",
-          "columnsFrom": [
-            "product_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["product_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -8610,12 +7939,8 @@
           "name": "inventory_movements_warehouse_id_warehouses_id_fk",
           "tableFrom": "inventory_movements",
           "tableTo": "warehouses",
-          "columnsFrom": [
-            "warehouse_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["warehouse_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -8623,12 +7948,8 @@
           "name": "inventory_movements_location_id_warehouse_locations_id_fk",
           "tableFrom": "inventory_movements",
           "tableTo": "warehouse_locations",
-          "columnsFrom": [
-            "location_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["location_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -8636,12 +7957,8 @@
           "name": "inventory_movements_lot_id_stock_lots_id_fk",
           "tableFrom": "inventory_movements",
           "tableTo": "stock_lots",
-          "columnsFrom": [
-            "lot_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["lot_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -8649,12 +7966,8 @@
           "name": "inventory_movements_journal_entry_id_journal_entries_id_fk",
           "tableFrom": "inventory_movements",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "journal_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["journal_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -8662,12 +7975,8 @@
           "name": "inventory_movements_reverses_movement_id_inventory_movements_id_fk",
           "tableFrom": "inventory_movements",
           "tableTo": "inventory_movements",
-          "columnsFrom": [
-            "reverses_movement_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["reverses_movement_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -8675,12 +7984,8 @@
           "name": "inventory_movements_created_by_users_id_fk",
           "tableFrom": "inventory_movements",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -8742,12 +8047,8 @@
           "name": "inventory_settings_company_id_companies_id_fk",
           "tableFrom": "inventory_settings",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -8803,12 +8104,8 @@
           "name": "movement_serials_movement_id_inventory_movements_id_fk",
           "tableFrom": "movement_serials",
           "tableTo": "inventory_movements",
-          "columnsFrom": [
-            "movement_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["movement_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -8816,12 +8113,8 @@
           "name": "movement_serials_serial_id_serial_numbers_id_fk",
           "tableFrom": "movement_serials",
           "tableTo": "serial_numbers",
-          "columnsFrom": [
-            "serial_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["serial_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -8948,12 +8241,8 @@
           "name": "product_categories_company_id_companies_id_fk",
           "tableFrom": "product_categories",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -8961,12 +8250,8 @@
           "name": "product_categories_parent_id_product_categories_id_fk",
           "tableFrom": "product_categories",
           "tableTo": "product_categories",
-          "columnsFrom": [
-            "parent_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["parent_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -8974,12 +8259,8 @@
           "name": "product_categories_inventory_account_id_accounts_id_fk",
           "tableFrom": "product_categories",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "inventory_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["inventory_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -8987,12 +8268,8 @@
           "name": "product_categories_cogs_account_id_accounts_id_fk",
           "tableFrom": "product_categories",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "cogs_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["cogs_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -9000,12 +8277,8 @@
           "name": "product_categories_revenue_account_id_accounts_id_fk",
           "tableFrom": "product_categories",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "revenue_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["revenue_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -9013,12 +8286,8 @@
           "name": "product_categories_expense_account_id_accounts_id_fk",
           "tableFrom": "product_categories",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "expense_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["expense_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -9232,12 +8501,8 @@
           "name": "products_company_id_companies_id_fk",
           "tableFrom": "products",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -9245,12 +8510,8 @@
           "name": "products_category_id_product_categories_id_fk",
           "tableFrom": "products",
           "tableTo": "product_categories",
-          "columnsFrom": [
-            "category_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["category_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -9258,12 +8519,8 @@
           "name": "products_inventory_account_id_accounts_id_fk",
           "tableFrom": "products",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "inventory_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["inventory_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -9271,12 +8528,8 @@
           "name": "products_cogs_account_id_accounts_id_fk",
           "tableFrom": "products",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "cogs_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["cogs_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -9284,12 +8537,8 @@
           "name": "products_revenue_account_id_accounts_id_fk",
           "tableFrom": "products",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "revenue_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["revenue_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -9297,12 +8546,8 @@
           "name": "products_expense_account_id_accounts_id_fk",
           "tableFrom": "products",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "expense_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["expense_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -9416,12 +8661,8 @@
           "name": "serial_numbers_company_id_companies_id_fk",
           "tableFrom": "serial_numbers",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -9429,12 +8670,8 @@
           "name": "serial_numbers_product_id_products_id_fk",
           "tableFrom": "serial_numbers",
           "tableTo": "products",
-          "columnsFrom": [
-            "product_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["product_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -9442,12 +8679,8 @@
           "name": "serial_numbers_warehouse_id_warehouses_id_fk",
           "tableFrom": "serial_numbers",
           "tableTo": "warehouses",
-          "columnsFrom": [
-            "warehouse_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["warehouse_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -9455,12 +8688,8 @@
           "name": "serial_numbers_lot_id_stock_lots_id_fk",
           "tableFrom": "serial_numbers",
           "tableTo": "stock_lots",
-          "columnsFrom": [
-            "lot_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["lot_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -9468,12 +8697,8 @@
           "name": "serial_numbers_last_movement_id_inventory_movements_id_fk",
           "tableFrom": "serial_numbers",
           "tableTo": "inventory_movements",
-          "columnsFrom": [
-            "last_movement_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["last_movement_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -9611,12 +8836,8 @@
           "name": "stock_document_lines_document_id_stock_documents_id_fk",
           "tableFrom": "stock_document_lines",
           "tableTo": "stock_documents",
-          "columnsFrom": [
-            "document_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["document_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -9624,12 +8845,8 @@
           "name": "stock_document_lines_product_id_products_id_fk",
           "tableFrom": "stock_document_lines",
           "tableTo": "products",
-          "columnsFrom": [
-            "product_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["product_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -9637,12 +8854,8 @@
           "name": "stock_document_lines_location_id_warehouse_locations_id_fk",
           "tableFrom": "stock_document_lines",
           "tableTo": "warehouse_locations",
-          "columnsFrom": [
-            "location_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["location_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -9873,12 +9086,8 @@
           "name": "stock_documents_company_id_companies_id_fk",
           "tableFrom": "stock_documents",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -9886,12 +9095,8 @@
           "name": "stock_documents_warehouse_id_warehouses_id_fk",
           "tableFrom": "stock_documents",
           "tableTo": "warehouses",
-          "columnsFrom": [
-            "warehouse_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["warehouse_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -9899,12 +9104,8 @@
           "name": "stock_documents_to_warehouse_id_warehouses_id_fk",
           "tableFrom": "stock_documents",
           "tableTo": "warehouses",
-          "columnsFrom": [
-            "to_warehouse_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["to_warehouse_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -9912,12 +9113,8 @@
           "name": "stock_documents_journal_entry_id_journal_entries_id_fk",
           "tableFrom": "stock_documents",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "journal_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["journal_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -9925,12 +9122,8 @@
           "name": "stock_documents_posted_by_users_id_fk",
           "tableFrom": "stock_documents",
           "tableTo": "users",
-          "columnsFrom": [
-            "posted_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["posted_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -9938,12 +9131,8 @@
           "name": "stock_documents_created_by_users_id_fk",
           "tableFrom": "stock_documents",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -10037,12 +9226,8 @@
           "name": "stock_lots_company_id_companies_id_fk",
           "tableFrom": "stock_lots",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -10050,12 +9235,8 @@
           "name": "stock_lots_product_id_products_id_fk",
           "tableFrom": "stock_lots",
           "tableTo": "products",
-          "columnsFrom": [
-            "product_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["product_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -10146,12 +9327,8 @@
           "name": "warehouse_locations_warehouse_id_warehouses_id_fk",
           "tableFrom": "warehouse_locations",
           "tableTo": "warehouses",
-          "columnsFrom": [
-            "warehouse_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["warehouse_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -10266,12 +9443,8 @@
           "name": "warehouses_company_id_companies_id_fk",
           "tableFrom": "warehouses",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -10279,12 +9452,8 @@
           "name": "warehouses_branch_id_branches_id_fk",
           "tableFrom": "warehouses",
           "tableTo": "branches",
-          "columnsFrom": [
-            "branch_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["branch_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -10420,12 +9589,8 @@
           "name": "asset_categories_company_id_companies_id_fk",
           "tableFrom": "asset_categories",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -10433,12 +9598,8 @@
           "name": "asset_categories_asset_account_id_accounts_id_fk",
           "tableFrom": "asset_categories",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "asset_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["asset_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -10446,12 +9607,8 @@
           "name": "asset_categories_accumulated_depreciation_account_id_accounts_id_fk",
           "tableFrom": "asset_categories",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "accumulated_depreciation_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["accumulated_depreciation_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -10459,12 +9616,8 @@
           "name": "asset_categories_depreciation_expense_account_id_accounts_id_fk",
           "tableFrom": "asset_categories",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "depreciation_expense_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["depreciation_expense_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -10589,12 +9742,8 @@
           "name": "asset_events_asset_id_fixed_assets_id_fk",
           "tableFrom": "asset_events",
           "tableTo": "fixed_assets",
-          "columnsFrom": [
-            "asset_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["asset_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -10602,12 +9751,8 @@
           "name": "asset_events_depreciation_run_id_depreciation_runs_id_fk",
           "tableFrom": "asset_events",
           "tableTo": "depreciation_runs",
-          "columnsFrom": [
-            "depreciation_run_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["depreciation_run_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -10615,12 +9760,8 @@
           "name": "asset_events_fiscal_period_id_fiscal_periods_id_fk",
           "tableFrom": "asset_events",
           "tableTo": "fiscal_periods",
-          "columnsFrom": [
-            "fiscal_period_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["fiscal_period_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -10628,12 +9769,8 @@
           "name": "asset_events_journal_entry_id_journal_entries_id_fk",
           "tableFrom": "asset_events",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "journal_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["journal_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -10641,12 +9778,8 @@
           "name": "asset_events_created_by_users_id_fk",
           "tableFrom": "asset_events",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -10788,12 +9921,8 @@
           "name": "bank_accounts_company_id_companies_id_fk",
           "tableFrom": "bank_accounts",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -10801,12 +9930,8 @@
           "name": "bank_accounts_gl_account_id_accounts_id_fk",
           "tableFrom": "bank_accounts",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "gl_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["gl_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -10814,12 +9939,8 @@
           "name": "bank_accounts_branch_id_branches_id_fk",
           "tableFrom": "bank_accounts",
           "tableTo": "branches",
-          "columnsFrom": [
-            "branch_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["branch_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -10917,12 +10038,8 @@
           "name": "bank_line_matches_statement_line_id_bank_statement_lines_id_fk",
           "tableFrom": "bank_line_matches",
           "tableTo": "bank_statement_lines",
-          "columnsFrom": [
-            "statement_line_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["statement_line_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -10930,12 +10047,8 @@
           "name": "bank_line_matches_journal_line_id_journal_lines_id_fk",
           "tableFrom": "bank_line_matches",
           "tableTo": "journal_lines",
-          "columnsFrom": [
-            "journal_line_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["journal_line_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -10943,12 +10056,8 @@
           "name": "bank_line_matches_matched_by_users_id_fk",
           "tableFrom": "bank_line_matches",
           "tableTo": "users",
-          "columnsFrom": [
-            "matched_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["matched_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -11104,12 +10213,8 @@
           "name": "bank_reconciliations_company_id_companies_id_fk",
           "tableFrom": "bank_reconciliations",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -11117,12 +10222,8 @@
           "name": "bank_reconciliations_bank_account_id_bank_accounts_id_fk",
           "tableFrom": "bank_reconciliations",
           "tableTo": "bank_accounts",
-          "columnsFrom": [
-            "bank_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["bank_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -11130,12 +10231,8 @@
           "name": "bank_reconciliations_statement_id_bank_statements_id_fk",
           "tableFrom": "bank_reconciliations",
           "tableTo": "bank_statements",
-          "columnsFrom": [
-            "statement_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["statement_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -11143,12 +10240,8 @@
           "name": "bank_reconciliations_completed_by_users_id_fk",
           "tableFrom": "bank_reconciliations",
           "tableTo": "users",
-          "columnsFrom": [
-            "completed_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["completed_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -11276,12 +10369,8 @@
           "name": "bank_statement_lines_statement_id_bank_statements_id_fk",
           "tableFrom": "bank_statement_lines",
           "tableTo": "bank_statements",
-          "columnsFrom": [
-            "statement_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["statement_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -11455,12 +10544,8 @@
           "name": "bank_statements_company_id_companies_id_fk",
           "tableFrom": "bank_statements",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -11468,12 +10553,8 @@
           "name": "bank_statements_bank_account_id_bank_accounts_id_fk",
           "tableFrom": "bank_statements",
           "tableTo": "bank_accounts",
-          "columnsFrom": [
-            "bank_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["bank_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -11481,12 +10562,8 @@
           "name": "bank_statements_imported_by_users_id_fk",
           "tableFrom": "bank_statements",
           "tableTo": "users",
-          "columnsFrom": [
-            "imported_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["imported_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -11710,12 +10787,8 @@
           "name": "bank_transactions_company_id_companies_id_fk",
           "tableFrom": "bank_transactions",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -11723,12 +10796,8 @@
           "name": "bank_transactions_bank_account_id_bank_accounts_id_fk",
           "tableFrom": "bank_transactions",
           "tableTo": "bank_accounts",
-          "columnsFrom": [
-            "bank_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["bank_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -11736,12 +10805,8 @@
           "name": "bank_transactions_counterparty_account_id_accounts_id_fk",
           "tableFrom": "bank_transactions",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "counterparty_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["counterparty_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -11749,12 +10814,8 @@
           "name": "bank_transactions_to_bank_account_id_bank_accounts_id_fk",
           "tableFrom": "bank_transactions",
           "tableTo": "bank_accounts",
-          "columnsFrom": [
-            "to_bank_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["to_bank_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -11762,12 +10823,8 @@
           "name": "bank_transactions_journal_entry_id_journal_entries_id_fk",
           "tableFrom": "bank_transactions",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "journal_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["journal_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -11775,12 +10832,8 @@
           "name": "bank_transactions_reversal_journal_entry_id_journal_entries_id_fk",
           "tableFrom": "bank_transactions",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "reversal_journal_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["reversal_journal_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -11788,12 +10841,8 @@
           "name": "bank_transactions_posted_by_users_id_fk",
           "tableFrom": "bank_transactions",
           "tableTo": "users",
-          "columnsFrom": [
-            "posted_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["posted_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -11801,12 +10850,8 @@
           "name": "bank_transactions_created_by_users_id_fk",
           "tableFrom": "bank_transactions",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -11864,12 +10909,8 @@
           "name": "banking_settings_company_id_companies_id_fk",
           "tableFrom": "banking_settings",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -12065,12 +11106,8 @@
           "name": "depreciation_runs_company_id_companies_id_fk",
           "tableFrom": "depreciation_runs",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -12078,12 +11115,8 @@
           "name": "depreciation_runs_fiscal_period_id_fiscal_periods_id_fk",
           "tableFrom": "depreciation_runs",
           "tableTo": "fiscal_periods",
-          "columnsFrom": [
-            "fiscal_period_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["fiscal_period_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -12091,12 +11124,8 @@
           "name": "depreciation_runs_journal_entry_id_journal_entries_id_fk",
           "tableFrom": "depreciation_runs",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "journal_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["journal_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -12104,12 +11133,8 @@
           "name": "depreciation_runs_reversal_journal_entry_id_journal_entries_id_fk",
           "tableFrom": "depreciation_runs",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "reversal_journal_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["reversal_journal_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -12117,12 +11142,8 @@
           "name": "depreciation_runs_posted_by_users_id_fk",
           "tableFrom": "depreciation_runs",
           "tableTo": "users",
-          "columnsFrom": [
-            "posted_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["posted_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -12130,12 +11151,8 @@
           "name": "depreciation_runs_created_by_users_id_fk",
           "tableFrom": "depreciation_runs",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -12184,12 +11201,8 @@
           "name": "fixed_asset_settings_company_id_companies_id_fk",
           "tableFrom": "fixed_asset_settings",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -12482,12 +11495,8 @@
           "name": "fixed_assets_company_id_companies_id_fk",
           "tableFrom": "fixed_assets",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -12495,12 +11504,8 @@
           "name": "fixed_assets_category_id_asset_categories_id_fk",
           "tableFrom": "fixed_assets",
           "tableTo": "asset_categories",
-          "columnsFrom": [
-            "category_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["category_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -12508,12 +11513,8 @@
           "name": "fixed_assets_branch_id_branches_id_fk",
           "tableFrom": "fixed_assets",
           "tableTo": "branches",
-          "columnsFrom": [
-            "branch_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["branch_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -12521,12 +11522,8 @@
           "name": "fixed_assets_vendor_id_vendors_id_fk",
           "tableFrom": "fixed_assets",
           "tableTo": "vendors",
-          "columnsFrom": [
-            "vendor_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["vendor_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -12534,12 +11531,8 @@
           "name": "fixed_assets_capitalization_journal_entry_id_journal_entries_id_fk",
           "tableFrom": "fixed_assets",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "capitalization_journal_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["capitalization_journal_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -12547,12 +11540,8 @@
           "name": "fixed_assets_disposal_journal_entry_id_journal_entries_id_fk",
           "tableFrom": "fixed_assets",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "disposal_journal_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["disposal_journal_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -12560,12 +11549,8 @@
           "name": "fixed_assets_created_by_users_id_fk",
           "tableFrom": "fixed_assets",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -12735,12 +11720,8 @@
           "name": "dimensions_company_id_companies_id_fk",
           "tableFrom": "dimensions",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -12748,12 +11729,8 @@
           "name": "dimensions_parent_id_dimensions_id_fk",
           "tableFrom": "dimensions",
           "tableTo": "dimensions",
-          "columnsFrom": [
-            "parent_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["parent_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -12761,12 +11738,8 @@
           "name": "dimensions_manager_user_id_users_id_fk",
           "tableFrom": "dimensions",
           "tableTo": "users",
-          "columnsFrom": [
-            "manager_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["manager_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -12936,12 +11909,8 @@
           "name": "tax_codes_company_id_companies_id_fk",
           "tableFrom": "tax_codes",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -12949,12 +11918,8 @@
           "name": "tax_codes_sales_account_id_accounts_id_fk",
           "tableFrom": "tax_codes",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "sales_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["sales_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -12962,12 +11927,8 @@
           "name": "tax_codes_purchase_account_id_accounts_id_fk",
           "tableFrom": "tax_codes",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "purchase_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["purchase_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -13061,12 +12022,8 @@
           "name": "tax_rates_tax_code_id_tax_codes_id_fk",
           "tableFrom": "tax_rates",
           "tableTo": "tax_codes",
-          "columnsFrom": [
-            "tax_code_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tax_code_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -13273,12 +12230,8 @@
           "name": "tax_transactions_company_id_companies_id_fk",
           "tableFrom": "tax_transactions",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -13286,12 +12239,8 @@
           "name": "tax_transactions_tax_code_id_tax_codes_id_fk",
           "tableFrom": "tax_transactions",
           "tableTo": "tax_codes",
-          "columnsFrom": [
-            "tax_code_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tax_code_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -13299,12 +12248,8 @@
           "name": "tax_transactions_journal_entry_id_journal_entries_id_fk",
           "tableFrom": "tax_transactions",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "journal_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["journal_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -13403,12 +12348,8 @@
           "name": "budget_lines_version_id_budget_versions_id_fk",
           "tableFrom": "budget_lines",
           "tableTo": "budget_versions",
-          "columnsFrom": [
-            "version_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["version_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -13416,12 +12357,8 @@
           "name": "budget_lines_account_id_accounts_id_fk",
           "tableFrom": "budget_lines",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -13429,12 +12366,8 @@
           "name": "budget_lines_fiscal_period_id_fiscal_periods_id_fk",
           "tableFrom": "budget_lines",
           "tableTo": "fiscal_periods",
-          "columnsFrom": [
-            "fiscal_period_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["fiscal_period_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -13442,12 +12375,8 @@
           "name": "budget_lines_department_id_dimensions_id_fk",
           "tableFrom": "budget_lines",
           "tableTo": "dimensions",
-          "columnsFrom": [
-            "department_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["department_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -13455,12 +12384,8 @@
           "name": "budget_lines_cost_center_id_dimensions_id_fk",
           "tableFrom": "budget_lines",
           "tableTo": "dimensions",
-          "columnsFrom": [
-            "cost_center_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["cost_center_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -13468,12 +12393,8 @@
           "name": "budget_lines_project_id_dimensions_id_fk",
           "tableFrom": "budget_lines",
           "tableTo": "dimensions",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -13617,12 +12538,8 @@
           "name": "budget_versions_budget_id_budgets_id_fk",
           "tableFrom": "budget_versions",
           "tableTo": "budgets",
-          "columnsFrom": [
-            "budget_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["budget_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -13630,12 +12547,8 @@
           "name": "budget_versions_approved_by_users_id_fk",
           "tableFrom": "budget_versions",
           "tableTo": "users",
-          "columnsFrom": [
-            "approved_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["approved_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -13643,12 +12556,8 @@
           "name": "budget_versions_created_by_users_id_fk",
           "tableFrom": "budget_versions",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -13784,12 +12693,8 @@
           "name": "budgets_company_id_companies_id_fk",
           "tableFrom": "budgets",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -13797,12 +12702,8 @@
           "name": "budgets_fiscal_year_id_fiscal_years_id_fk",
           "tableFrom": "budgets",
           "tableTo": "fiscal_years",
-          "columnsFrom": [
-            "fiscal_year_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["fiscal_year_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -13810,12 +12711,8 @@
           "name": "budgets_created_by_users_id_fk",
           "tableFrom": "budgets",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -13952,12 +12849,8 @@
           "name": "expense_claim_lines_claim_id_expense_claims_id_fk",
           "tableFrom": "expense_claim_lines",
           "tableTo": "expense_claims",
-          "columnsFrom": [
-            "claim_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["claim_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -13965,12 +12858,8 @@
           "name": "expense_claim_lines_account_id_accounts_id_fk",
           "tableFrom": "expense_claim_lines",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -13978,12 +12867,8 @@
           "name": "expense_claim_lines_department_id_dimensions_id_fk",
           "tableFrom": "expense_claim_lines",
           "tableTo": "dimensions",
-          "columnsFrom": [
-            "department_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["department_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -13991,12 +12876,8 @@
           "name": "expense_claim_lines_cost_center_id_dimensions_id_fk",
           "tableFrom": "expense_claim_lines",
           "tableTo": "dimensions",
-          "columnsFrom": [
-            "cost_center_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["cost_center_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -14004,12 +12885,8 @@
           "name": "expense_claim_lines_project_id_dimensions_id_fk",
           "tableFrom": "expense_claim_lines",
           "tableTo": "dimensions",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -14017,12 +12894,8 @@
           "name": "expense_claim_lines_tax_code_id_tax_codes_id_fk",
           "tableFrom": "expense_claim_lines",
           "tableTo": "tax_codes",
-          "columnsFrom": [
-            "tax_code_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tax_code_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -14309,12 +13182,8 @@
           "name": "expense_claims_company_id_companies_id_fk",
           "tableFrom": "expense_claims",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -14322,12 +13191,8 @@
           "name": "expense_claims_claimant_user_id_users_id_fk",
           "tableFrom": "expense_claims",
           "tableTo": "users",
-          "columnsFrom": [
-            "claimant_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["claimant_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -14335,12 +13200,8 @@
           "name": "expense_claims_branch_id_branches_id_fk",
           "tableFrom": "expense_claims",
           "tableTo": "branches",
-          "columnsFrom": [
-            "branch_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["branch_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -14348,12 +13209,8 @@
           "name": "expense_claims_journal_entry_id_journal_entries_id_fk",
           "tableFrom": "expense_claims",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "journal_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["journal_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -14361,12 +13218,8 @@
           "name": "expense_claims_payment_journal_entry_id_journal_entries_id_fk",
           "tableFrom": "expense_claims",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "payment_journal_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["payment_journal_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -14374,12 +13227,8 @@
           "name": "expense_claims_payment_bank_account_id_bank_accounts_id_fk",
           "tableFrom": "expense_claims",
           "tableTo": "bank_accounts",
-          "columnsFrom": [
-            "payment_bank_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["payment_bank_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -14387,12 +13236,8 @@
           "name": "expense_claims_approved_by_users_id_fk",
           "tableFrom": "expense_claims",
           "tableTo": "users",
-          "columnsFrom": [
-            "approved_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["approved_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -14400,12 +13245,8 @@
           "name": "expense_claims_posted_by_users_id_fk",
           "tableFrom": "expense_claims",
           "tableTo": "users",
-          "columnsFrom": [
-            "posted_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["posted_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -14413,12 +13254,8 @@
           "name": "expense_claims_paid_by_users_id_fk",
           "tableFrom": "expense_claims",
           "tableTo": "users",
-          "columnsFrom": [
-            "paid_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["paid_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -14426,12 +13263,8 @@
           "name": "expense_claims_created_by_users_id_fk",
           "tableFrom": "expense_claims",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -14552,12 +13385,8 @@
           "name": "approval_decisions_request_id_approval_requests_id_fk",
           "tableFrom": "approval_decisions",
           "tableTo": "approval_requests",
-          "columnsFrom": [
-            "request_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["request_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -14565,12 +13394,8 @@
           "name": "approval_decisions_decided_by_users_id_fk",
           "tableFrom": "approval_decisions",
           "tableTo": "users",
-          "columnsFrom": [
-            "decided_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["decided_by"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -14754,12 +13579,8 @@
           "name": "approval_requests_company_id_companies_id_fk",
           "tableFrom": "approval_requests",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -14767,12 +13588,8 @@
           "name": "approval_requests_workflow_id_approval_workflows_id_fk",
           "tableFrom": "approval_requests",
           "tableTo": "approval_workflows",
-          "columnsFrom": [
-            "workflow_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workflow_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -14780,12 +13597,8 @@
           "name": "approval_requests_requested_by_users_id_fk",
           "tableFrom": "approval_requests",
           "tableTo": "users",
-          "columnsFrom": [
-            "requested_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["requested_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -14929,12 +13742,8 @@
           "name": "approval_workflows_company_id_companies_id_fk",
           "tableFrom": "approval_workflows",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -14942,12 +13751,8 @@
           "name": "approval_workflows_created_by_users_id_fk",
           "tableFrom": "approval_workflows",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -15092,12 +13897,8 @@
           "name": "attachments_company_id_companies_id_fk",
           "tableFrom": "attachments",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -15105,12 +13906,8 @@
           "name": "attachments_uploaded_by_users_id_fk",
           "tableFrom": "attachments",
           "tableTo": "users",
-          "columnsFrom": [
-            "uploaded_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["uploaded_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -15242,12 +14039,8 @@
           "name": "exchange_rates_organization_id_organizations_id_fk",
           "tableFrom": "exchange_rates",
           "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -15255,12 +14048,8 @@
           "name": "exchange_rates_created_by_users_id_fk",
           "tableFrom": "exchange_rates",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -15400,12 +14189,8 @@
           "name": "fx_adjustments_company_id_companies_id_fk",
           "tableFrom": "fx_adjustments",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -15413,12 +14198,8 @@
           "name": "fx_adjustments_journal_entry_id_journal_entries_id_fk",
           "tableFrom": "fx_adjustments",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "journal_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["journal_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -15572,12 +14353,8 @@
           "name": "fx_revaluations_company_id_companies_id_fk",
           "tableFrom": "fx_revaluations",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -15585,12 +14362,8 @@
           "name": "fx_revaluations_journal_entry_id_journal_entries_id_fk",
           "tableFrom": "fx_revaluations",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "journal_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["journal_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -15598,12 +14371,8 @@
           "name": "fx_revaluations_reversal_journal_entry_id_journal_entries_id_fk",
           "tableFrom": "fx_revaluations",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "reversal_journal_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["reversal_journal_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -15611,12 +14380,8 @@
           "name": "fx_revaluations_created_by_users_id_fk",
           "tableFrom": "fx_revaluations",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -15854,12 +14619,8 @@
           "name": "intercompany_transactions_organization_id_organizations_id_fk",
           "tableFrom": "intercompany_transactions",
           "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -15867,12 +14628,8 @@
           "name": "intercompany_transactions_from_company_id_companies_id_fk",
           "tableFrom": "intercompany_transactions",
           "tableTo": "companies",
-          "columnsFrom": [
-            "from_company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["from_company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -15880,12 +14637,8 @@
           "name": "intercompany_transactions_to_company_id_companies_id_fk",
           "tableFrom": "intercompany_transactions",
           "tableTo": "companies",
-          "columnsFrom": [
-            "to_company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["to_company_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -15893,12 +14646,8 @@
           "name": "intercompany_transactions_from_account_id_accounts_id_fk",
           "tableFrom": "intercompany_transactions",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "from_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["from_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -15906,12 +14655,8 @@
           "name": "intercompany_transactions_to_account_id_accounts_id_fk",
           "tableFrom": "intercompany_transactions",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "to_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["to_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -15919,12 +14664,8 @@
           "name": "intercompany_transactions_from_journal_entry_id_journal_entries_id_fk",
           "tableFrom": "intercompany_transactions",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "from_journal_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["from_journal_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -15932,12 +14673,8 @@
           "name": "intercompany_transactions_to_journal_entry_id_journal_entries_id_fk",
           "tableFrom": "intercompany_transactions",
           "tableTo": "journal_entries",
-          "columnsFrom": [
-            "to_journal_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["to_journal_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -15945,12 +14682,8 @@
           "name": "intercompany_transactions_posted_by_users_id_fk",
           "tableFrom": "intercompany_transactions",
           "tableTo": "users",
-          "columnsFrom": [
-            "posted_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["posted_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -15958,12 +14691,8 @@
           "name": "intercompany_transactions_created_by_users_id_fk",
           "tableFrom": "intercompany_transactions",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -16013,27 +14742,17 @@
     "public.entity_status": {
       "name": "entity_status",
       "schema": "public",
-      "values": [
-        "ACTIVE",
-        "INACTIVE"
-      ]
+      "values": ["ACTIVE", "INACTIVE"]
     },
     "public.sod_enforcement": {
       "name": "sod_enforcement",
       "schema": "public",
-      "values": [
-        "BLOCK",
-        "WARN"
-      ]
+      "values": ["BLOCK", "WARN"]
     },
     "public.user_status": {
       "name": "user_status",
       "schema": "public",
-      "values": [
-        "ACTIVE",
-        "INACTIVE",
-        "LOCKED"
-      ]
+      "values": ["ACTIVE", "INACTIVE", "LOCKED"]
     },
     "public.account_mapping_key": {
       "name": "account_mapping_key",
@@ -16103,14 +14822,7 @@
     "public.account_type": {
       "name": "account_type",
       "schema": "public",
-      "values": [
-        "ASSET",
-        "LIABILITY",
-        "EQUITY",
-        "REVENUE",
-        "COST_OF_SALES",
-        "EXPENSE"
-      ]
+      "values": ["ASSET", "LIABILITY", "EQUITY", "REVENUE", "COST_OF_SALES", "EXPENSE"]
     },
     "public.document_type": {
       "name": "document_type",
@@ -16147,136 +14859,72 @@
     "public.fiscal_period_status": {
       "name": "fiscal_period_status",
       "schema": "public",
-      "values": [
-        "OPEN",
-        "CLOSED"
-      ]
+      "values": ["OPEN", "CLOSED"]
     },
     "public.fiscal_year_status": {
       "name": "fiscal_year_status",
       "schema": "public",
-      "values": [
-        "OPEN",
-        "CLOSED"
-      ]
+      "values": ["OPEN", "CLOSED"]
     },
     "public.journal_status": {
       "name": "journal_status",
       "schema": "public",
-      "values": [
-        "DRAFT",
-        "SUBMITTED",
-        "APPROVED",
-        "POSTED",
-        "LOCKED",
-        "REJECTED",
-        "REVERSED"
-      ]
+      "values": ["DRAFT", "SUBMITTED", "APPROVED", "POSTED", "LOCKED", "REJECTED", "REVERSED"]
     },
     "public.journal_type": {
       "name": "journal_type",
       "schema": "public",
-      "values": [
-        "GENERAL",
-        "ADJUSTING",
-        "REVERSAL",
-        "CLOSING",
-        "OPENING"
-      ]
+      "values": ["GENERAL", "ADJUSTING", "REVERSAL", "CLOSING", "OPENING"]
     },
     "public.normal_balance": {
       "name": "normal_balance",
       "schema": "public",
-      "values": [
-        "DEBIT",
-        "CREDIT"
-      ]
+      "values": ["DEBIT", "CREDIT"]
     },
     "public.accounting_status": {
       "name": "accounting_status",
       "schema": "public",
-      "values": [
-        "UNPOSTED",
-        "POSTED",
-        "REVERSED"
-      ]
+      "values": ["UNPOSTED", "POSTED", "REVERSED"]
     },
     "public.match_status": {
       "name": "match_status",
       "schema": "public",
-      "values": [
-        "NOT_REQUIRED",
-        "MATCHED",
-        "EXCEPTION",
-        "REVIEWED"
-      ]
+      "values": ["NOT_REQUIRED", "MATCHED", "EXCEPTION", "REVIEWED"]
     },
     "public.payment_method": {
       "name": "payment_method",
       "schema": "public",
-      "values": [
-        "CASH",
-        "BANK_TRANSFER",
-        "CHECK",
-        "CARD",
-        "ONLINE",
-        "OTHER"
-      ]
+      "values": ["CASH", "BANK_TRANSFER", "CHECK", "CARD", "ONLINE", "OTHER"]
     },
     "public.payment_status": {
       "name": "payment_status",
       "schema": "public",
-      "values": [
-        "DRAFT",
-        "POSTED",
-        "VOID"
-      ]
+      "values": ["DRAFT", "POSTED", "VOID"]
     },
     "public.payment_type": {
       "name": "payment_type",
       "schema": "public",
-      "values": [
-        "PAYMENT",
-        "REFUND"
-      ]
+      "values": ["PAYMENT", "REFUND"]
     },
     "public.subledger_document_status": {
       "name": "subledger_document_status",
       "schema": "public",
-      "values": [
-        "DRAFT",
-        "APPROVED",
-        "PARTIALLY_PAID",
-        "PAID",
-        "VOID"
-      ]
+      "values": ["DRAFT", "APPROVED", "PARTIALLY_PAID", "PAID", "VOID"]
     },
     "public.subledger_document_type": {
       "name": "subledger_document_type",
       "schema": "public",
-      "values": [
-        "INVOICE",
-        "CREDIT_NOTE",
-        "DEBIT_NOTE"
-      ]
+      "values": ["INVOICE", "CREDIT_NOTE", "DEBIT_NOTE"]
     },
     "public.fulfillment_status": {
       "name": "fulfillment_status",
       "schema": "public",
-      "values": [
-        "NONE",
-        "PARTIAL",
-        "FULL"
-      ]
+      "values": ["NONE", "PARTIAL", "FULL"]
     },
     "public.goods_receipt_status": {
       "name": "goods_receipt_status",
       "schema": "public",
-      "values": [
-        "DRAFT",
-        "CONFIRMED",
-        "CANCELLED"
-      ]
+      "values": ["DRAFT", "CONFIRMED", "CANCELLED"]
     },
     "public.order_status": {
       "name": "order_status",
@@ -16296,51 +14944,27 @@
     "public.order_type": {
       "name": "order_type",
       "schema": "public",
-      "values": [
-        "QUOTATION",
-        "SALES_ORDER",
-        "PURCHASE_REQUEST",
-        "PURCHASE_ORDER"
-      ]
+      "values": ["QUOTATION", "SALES_ORDER", "PURCHASE_REQUEST", "PURCHASE_ORDER"]
     },
     "public.return_status": {
       "name": "return_status",
       "schema": "public",
-      "values": [
-        "DRAFT",
-        "APPROVED",
-        "CREDITED",
-        "CANCELLED"
-      ]
+      "values": ["DRAFT", "APPROVED", "CREDITED", "CANCELLED"]
     },
     "public.return_type": {
       "name": "return_type",
       "schema": "public",
-      "values": [
-        "SALES",
-        "PURCHASE"
-      ]
+      "values": ["SALES", "PURCHASE"]
     },
     "public.adjustment_reason": {
       "name": "adjustment_reason",
       "schema": "public",
-      "values": [
-        "DAMAGE",
-        "SHRINKAGE",
-        "EXPIRY",
-        "COUNT_VARIANCE",
-        "CORRECTION",
-        "FOUND",
-        "OTHER"
-      ]
+      "values": ["DAMAGE", "SHRINKAGE", "EXPIRY", "COUNT_VARIANCE", "CORRECTION", "FOUND", "OTHER"]
     },
     "public.costing_method": {
       "name": "costing_method",
       "schema": "public",
-      "values": [
-        "FIFO",
-        "WEIGHTED_AVERAGE"
-      ]
+      "values": ["FIFO", "WEIGHTED_AVERAGE"]
     },
     "public.movement_source_type": {
       "name": "movement_source_type",
@@ -16374,53 +14998,32 @@
     "public.product_type": {
       "name": "product_type",
       "schema": "public",
-      "values": [
-        "GOODS",
-        "SERVICE"
-      ]
+      "values": ["GOODS", "SERVICE"]
     },
     "public.serial_status": {
       "name": "serial_status",
       "schema": "public",
-      "values": [
-        "IN_STOCK",
-        "ISSUED"
-      ]
+      "values": ["IN_STOCK", "ISSUED"]
     },
     "public.stock_direction": {
       "name": "stock_direction",
       "schema": "public",
-      "values": [
-        "IN",
-        "OUT"
-      ]
+      "values": ["IN", "OUT"]
     },
     "public.stock_document_status": {
       "name": "stock_document_status",
       "schema": "public",
-      "values": [
-        "DRAFT",
-        "POSTED",
-        "CANCELLED"
-      ]
+      "values": ["DRAFT", "POSTED", "CANCELLED"]
     },
     "public.stock_document_type": {
       "name": "stock_document_type",
       "schema": "public",
-      "values": [
-        "ADJUSTMENT",
-        "TRANSFER",
-        "COUNT"
-      ]
+      "values": ["ADJUSTMENT", "TRANSFER", "COUNT"]
     },
     "public.tracking_mode": {
       "name": "tracking_mode",
       "schema": "public",
-      "values": [
-        "NONE",
-        "LOT",
-        "SERIAL"
-      ]
+      "values": ["NONE", "LOT", "SERIAL"]
     },
     "public.asset_event_type": {
       "name": "asset_event_type",
@@ -16438,187 +15041,102 @@
     "public.asset_status": {
       "name": "asset_status",
       "schema": "public",
-      "values": [
-        "DRAFT",
-        "ACTIVE",
-        "FULLY_DEPRECIATED",
-        "DISPOSED",
-        "WRITTEN_OFF"
-      ]
+      "values": ["DRAFT", "ACTIVE", "FULLY_DEPRECIATED", "DISPOSED", "WRITTEN_OFF"]
     },
     "public.bank_transaction_status": {
       "name": "bank_transaction_status",
       "schema": "public",
-      "values": [
-        "DRAFT",
-        "POSTED",
-        "VOID"
-      ]
+      "values": ["DRAFT", "POSTED", "VOID"]
     },
     "public.bank_transaction_type": {
       "name": "bank_transaction_type",
       "schema": "public",
-      "values": [
-        "DEPOSIT",
-        "WITHDRAWAL",
-        "TRANSFER",
-        "BANK_FEE",
-        "INTEREST"
-      ]
+      "values": ["DEPOSIT", "WITHDRAWAL", "TRANSFER", "BANK_FEE", "INTEREST"]
     },
     "public.depreciation_method": {
       "name": "depreciation_method",
       "schema": "public",
-      "values": [
-        "STRAIGHT_LINE",
-        "DECLINING_BALANCE"
-      ]
+      "values": ["STRAIGHT_LINE", "DECLINING_BALANCE"]
     },
     "public.depreciation_run_status": {
       "name": "depreciation_run_status",
       "schema": "public",
-      "values": [
-        "DRAFT",
-        "POSTED",
-        "REVERSED"
-      ]
+      "values": ["DRAFT", "POSTED", "REVERSED"]
     },
     "public.match_kind": {
       "name": "match_kind",
       "schema": "public",
-      "values": [
-        "AUTO",
-        "MANUAL"
-      ]
+      "values": ["AUTO", "MANUAL"]
     },
     "public.reconciliation_status": {
       "name": "reconciliation_status",
       "schema": "public",
-      "values": [
-        "IN_PROGRESS",
-        "COMPLETED"
-      ]
+      "values": ["IN_PROGRESS", "COMPLETED"]
     },
     "public.statement_line_status": {
       "name": "statement_line_status",
       "schema": "public",
-      "values": [
-        "UNMATCHED",
-        "MATCHED",
-        "DUPLICATE",
-        "EXCEPTION",
-        "RECONCILED"
-      ]
+      "values": ["UNMATCHED", "MATCHED", "DUPLICATE", "EXCEPTION", "RECONCILED"]
     },
     "public.statement_status": {
       "name": "statement_status",
       "schema": "public",
-      "values": [
-        "OPEN",
-        "RECONCILED"
-      ]
+      "values": ["OPEN", "RECONCILED"]
     },
     "public.dimension_type": {
       "name": "dimension_type",
       "schema": "public",
-      "values": [
-        "DEPARTMENT",
-        "COST_CENTER",
-        "PROJECT"
-      ]
+      "values": ["DEPARTMENT", "COST_CENTER", "PROJECT"]
     },
     "public.tax_applies_to": {
       "name": "tax_applies_to",
       "schema": "public",
-      "values": [
-        "SALES",
-        "PURCHASES",
-        "BOTH"
-      ]
+      "values": ["SALES", "PURCHASES", "BOTH"]
     },
     "public.tax_kind": {
       "name": "tax_kind",
       "schema": "public",
-      "values": [
-        "SALES_TAX",
-        "WITHHOLDING"
-      ]
+      "values": ["SALES_TAX", "WITHHOLDING"]
     },
     "public.tax_reporting_category": {
       "name": "tax_reporting_category",
       "schema": "public",
-      "values": [
-        "TAXABLE",
-        "ZERO_RATED",
-        "EXEMPT",
-        "WITHHOLDING"
-      ]
+      "values": ["TAXABLE", "ZERO_RATED", "EXEMPT", "WITHHOLDING"]
     },
     "public.tax_side": {
       "name": "tax_side",
       "schema": "public",
-      "values": [
-        "SALES",
-        "PURCHASES"
-      ]
+      "values": ["SALES", "PURCHASES"]
     },
     "public.tax_source_type": {
       "name": "tax_source_type",
       "schema": "public",
-      "values": [
-        "AR_DOCUMENT",
-        "AP_DOCUMENT",
-        "EXPENSE_CLAIM"
-      ]
+      "values": ["AR_DOCUMENT", "AP_DOCUMENT", "EXPENSE_CLAIM"]
     },
     "public.budget_status": {
       "name": "budget_status",
       "schema": "public",
-      "values": [
-        "DRAFT",
-        "ACTIVE",
-        "ARCHIVED"
-      ]
+      "values": ["DRAFT", "ACTIVE", "ARCHIVED"]
     },
     "public.budget_version_status": {
       "name": "budget_version_status",
       "schema": "public",
-      "values": [
-        "DRAFT",
-        "APPROVED",
-        "SUPERSEDED"
-      ]
+      "values": ["DRAFT", "APPROVED", "SUPERSEDED"]
     },
     "public.expense_claim_status": {
       "name": "expense_claim_status",
       "schema": "public",
-      "values": [
-        "DRAFT",
-        "SUBMITTED",
-        "APPROVED",
-        "REJECTED",
-        "POSTED",
-        "PAID",
-        "CANCELLED"
-      ]
+      "values": ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED", "POSTED", "PAID", "CANCELLED"]
     },
     "public.approval_decision": {
       "name": "approval_decision",
       "schema": "public",
-      "values": [
-        "APPROVE",
-        "REJECT"
-      ]
+      "values": ["APPROVE", "REJECT"]
     },
     "public.approval_request_status": {
       "name": "approval_request_status",
       "schema": "public",
-      "values": [
-        "PENDING",
-        "APPROVED",
-        "REJECTED",
-        "CANCELLED"
-      ]
+      "values": ["PENDING", "APPROVED", "REJECTED", "CANCELLED"]
     },
     "public.attachment_entity_type": {
       "name": "attachment_entity_type",
@@ -16640,47 +15158,27 @@
     "public.exchange_rate_source": {
       "name": "exchange_rate_source",
       "schema": "public",
-      "values": [
-        "MANUAL",
-        "IMPORT",
-        "SYSTEM"
-      ]
+      "values": ["MANUAL", "IMPORT", "SYSTEM"]
     },
     "public.fx_adjustment_type": {
       "name": "fx_adjustment_type",
       "schema": "public",
-      "values": [
-        "REALIZED",
-        "REVALUATION",
-        "REVALUATION_REVERSAL"
-      ]
+      "values": ["REALIZED", "REVALUATION", "REVALUATION_REVERSAL"]
     },
     "public.fx_side": {
       "name": "fx_side",
       "schema": "public",
-      "values": [
-        "AR",
-        "AP"
-      ]
+      "values": ["AR", "AP"]
     },
     "public.intercompany_status": {
       "name": "intercompany_status",
       "schema": "public",
-      "values": [
-        "DRAFT",
-        "POSTED",
-        "REVERSED"
-      ]
+      "values": ["DRAFT", "POSTED", "REVERSED"]
     },
     "public.workflow_document_type": {
       "name": "workflow_document_type",
       "schema": "public",
-      "values": [
-        "JOURNAL_ENTRY",
-        "VENDOR_PAYMENT",
-        "PURCHASE_ORDER",
-        "EXPENSE_CLAIM"
-      ]
+      "values": ["JOURNAL_ENTRY", "VENDOR_PAYMENT", "PURCHASE_ORDER", "EXPENSE_CLAIM"]
     }
   },
   "schemas": {},

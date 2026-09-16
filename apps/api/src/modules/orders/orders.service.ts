@@ -19,6 +19,7 @@ import {
   type DocumentType,
   type OrderStatus,
   type OrderType,
+  type OutboundEventType,
   type PaginatedResult,
   type PermissionKey,
 } from '@accounting/types';
@@ -55,6 +56,8 @@ import { VendorsService } from '@/modules/payables/vendors.service';
 import { SodService, type SodConflict } from '@/modules/rbac/sod.service';
 import { AuthorityService } from '@/modules/delegations/authority.service';
 import { CustomersService } from '@/modules/receivables/customers.service';
+import { CreditService } from '@/modules/receivables/credit.service';
+import { OutboxService } from '@/modules/integrations/events/outbox.service';
 import { InvoicesService } from '@/modules/receivables/invoices.service';
 import { DocumentStockService } from '@/modules/inventory/document-stock.service';
 import { ApprovalsService } from '@/modules/workflows/approvals.service';
@@ -80,6 +83,13 @@ const MODULE_OF: Record<OrderType, 'SALES' | 'PURCHASING'> = {
   SALES_ORDER: 'SALES',
   PURCHASE_REQUEST: 'PURCHASING',
   PURCHASE_ORDER: 'PURCHASING',
+};
+/** Outbound webhook events raised by sales-order transitions (Prompt #6). */
+const SO_EVENTS: Partial<Record<OrderAction, OutboundEventType>> = {
+  submit: 'sales_order.submitted',
+  approve: 'sales_order.approved',
+  confirm: 'sales_order.confirmed',
+  cancel: 'sales_order.cancelled',
 };
 /** Document-level segregation of duties: who created it may not approve it. */
 const SOD_PAIR: Partial<Record<OrderType, [string, string]>> = {
@@ -143,6 +153,8 @@ export class OrdersService {
     private readonly matching: MatchingService,
     private readonly stock: DocumentStockService,
     private readonly approvals: ApprovalsService,
+    private readonly credit: CreditService,
+    private readonly outbox: OutboxService,
   ) {}
 
   // ----------------------------------------------------------------- queries
@@ -258,6 +270,9 @@ export class OrdersService {
           subtotal: computed.subtotal.toString(),
           discountTotal: computed.discountTotal.toString(),
           total: computed.total.toString(),
+          paymentTermId: input.paymentTermId ?? party.paymentTermId ?? null,
+          salespersonId: input.salespersonId ?? party.salespersonId ?? null,
+          warehouseId: input.warehouseId ?? null,
           idempotencyKey: input.idempotencyKey ?? null,
           createdBy: actor.id,
         })
@@ -281,6 +296,21 @@ export class OrdersService {
         },
         tx,
       );
+      if (type === 'SALES_ORDER') {
+        await this.outbox.enqueue(tx, {
+          eventType: 'sales_order.created',
+          companyId,
+          dedupeKey: 'sales_order.created:' + created.id,
+          payload: {
+            salesOrderId: created.id,
+            documentNumber,
+            customerId: created.customerId,
+            total: created.total,
+            currency,
+            status: created.status,
+          },
+        });
+      }
       return created.id;
     });
     return this.get(companyId, type, id);
@@ -341,6 +371,11 @@ export class OrdersService {
           reference: input.reference === undefined ? existing.reference : input.reference,
           description: input.description === undefined ? existing.description : input.description,
           notes: input.notes === undefined ? existing.notes : input.notes,
+          paymentTermId:
+            input.paymentTermId === undefined ? existing.paymentTermId : input.paymentTermId,
+          salespersonId:
+            input.salespersonId === undefined ? existing.salespersonId : input.salespersonId,
+          warehouseId: input.warehouseId === undefined ? existing.warehouseId : input.warehouseId,
           ...totals,
         })
         .where(eq(orders.id, id));
@@ -393,13 +428,59 @@ export class OrdersService {
     await this.db.transaction(async (tx) => {
       const existing = await this.lock(tx, companyId, type, id);
       const to = nextStatus(type, action, existing.status);
-      if (type === 'PURCHASE_ORDER' && (action === 'cancel' || action === 'reject')) {
-        await this.approvals.cancelFor(tx, 'PURCHASE_ORDER', id);
+      const workflowType: 'PURCHASE_ORDER' | 'SALES_ORDER' | null =
+        type === 'PURCHASE_ORDER'
+          ? 'PURCHASE_ORDER'
+          : type === 'SALES_ORDER'
+            ? 'SALES_ORDER'
+            : null;
+      if (workflowType && (action === 'cancel' || action === 'reject')) {
+        await this.approvals.cancelFor(tx, workflowType, id);
       }
-      if (type === 'PURCHASE_ORDER' && (action === 'submit' || action === 'approve')) {
+      // Sales orders: the credit policy runs before any approval workflow (Prompt #6).
+      let creditCheck: Record<string, unknown> | undefined;
+      if (
+        type === 'SALES_ORDER' &&
+        (action === 'submit' || action === 'approve') &&
+        existing.customerId
+      ) {
+        const customer = await this.customersService.getOrThrow(companyId, existing.customerId, tx);
+        const result = await this.credit.check(
+          tx,
+          companyId,
+          customer,
+          'SALES_ORDER',
+          existing.total,
+          { excludeOrderId: id },
+        );
+        creditCheck = {
+          checkedAt: new Date().toISOString(),
+          action,
+          outcome: result.outcome,
+          findings: result.findings,
+          summary: result.summary,
+        };
+        if (action === 'approve' && result.outcome === 'REQUIRE_APPROVAL') {
+          // A credit finding that requires approval can only be cleared by someone holding
+          // sales-order.approve (natively or by delegation - AuthorityService verifies the grant).
+          const mayApprove =
+            actor.permissions.has(P['sales-order.approve']) ||
+            (actor.delegations ?? []).some((d) => d.permission === 'sales-order.approve');
+          if (!mayApprove) {
+            throw new BusinessRuleError(
+              ErrorCodes.CREDIT_CHECK_FAILED,
+              'Credit policy requires approval by a sales-order approver: ' +
+                result.findings.map((f) => f.message).join(' '),
+              { findings: result.findings },
+            );
+          }
+        }
+        await this.credit.notifyOverLimit(tx, companyId, customer, result.summary);
+      }
+      if (workflowType && (action === 'submit' || action === 'approve')) {
         const ref = {
           companyId,
-          documentType: 'PURCHASE_ORDER' as const,
+          documentType: workflowType,
           documentId: id,
           documentNumber: existing.documentNumber,
           amount: existing.total,
@@ -468,6 +549,8 @@ export class OrdersService {
           ...(action === 'approve' || action === 'accept'
             ? { approvedBy: actor.id, approvedAt: new Date() }
             : {}),
+          ...(action === 'confirm' ? { confirmedBy: actor.id, confirmedAt: new Date() } : {}),
+          ...(creditCheck ? { creditCheck } : {}),
           ...(action === 'reject' ? { rejectionReason: reason ?? null } : {}),
           ...(action === 'cancel' ? { cancelReason: reason ?? null } : {}),
           ...(action === 'close' ? { closedAt: new Date() } : {}),
@@ -490,11 +573,30 @@ export class OrdersService {
           entityId: id,
           previousValue: { status: existing.status },
           newValue: { status: to, reason, sodWarnings: warnings.length ? warnings : undefined },
-          metadata: { documentNumber: existing.documentNumber, ...delegatedAudit },
+          metadata: {
+            documentNumber: existing.documentNumber,
+            ...delegatedAudit,
+            ...(creditCheck ? { creditOutcome: creditCheck.outcome } : {}),
+          },
           companyId,
         },
         tx,
       );
+      if (type === 'SALES_ORDER' && SO_EVENTS[action]) {
+        await this.outbox.enqueue(tx, {
+          eventType: SO_EVENTS[action]!,
+          companyId,
+          dedupeKey: SO_EVENTS[action] + ':' + id,
+          payload: {
+            salesOrderId: id,
+            documentNumber: existing.documentNumber,
+            customerId: existing.customerId,
+            total: existing.total,
+            currency: existing.currency,
+            status: to,
+          },
+        });
+      }
     });
     return { ...(await this.get(companyId, type, id)), sodWarnings: warnings };
   }
@@ -800,7 +902,12 @@ export class OrdersService {
     type: OrderType,
     input: { customerId?: string; vendorId?: string | null },
     tx: DbExecutor,
-  ): Promise<{ customerId: string | null; vendorId: string | null }> {
+  ): Promise<{
+    customerId: string | null;
+    vendorId: string | null;
+    paymentTermId?: string | null;
+    salespersonId?: string | null;
+  }> {
     const rule = ORDER_RULES[type].party;
     if (rule === 'CUSTOMER') {
       if (!input.customerId)
@@ -811,7 +918,12 @@ export class OrdersService {
           ErrorCodes.PARTY_INACTIVE,
           `Customer ${customer.code} is inactive.`,
         );
-      return { customerId: customer.id, vendorId: null };
+      return {
+        customerId: customer.id,
+        vendorId: null,
+        paymentTermId: customer.paymentTermId,
+        salespersonId: customer.salespersonId,
+      };
     }
     if (!input.vendorId) {
       if (rule === 'VENDOR')

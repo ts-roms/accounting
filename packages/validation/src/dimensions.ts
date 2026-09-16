@@ -15,4 +15,3 @@ export const lineTaxSchema = z.object({
   withholdingTaxCodeId: uuidSchema.nullable().optional(),
 });
 export type LineTaxInput = z.infer<typeof lineTaxSchema>;
-

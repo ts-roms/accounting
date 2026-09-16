@@ -151,6 +151,10 @@ export const ACCOUNT_MAPPING_KEYS = [
   'OPENING_BALANCE_EQUITY',
   /** Default suspense / clearing account monitored by the suspense dashboard. */
   'SUSPENSE',
+  'BAD_DEBT_EXPENSE',
+  'ALLOWANCE_FOR_DOUBTFUL_ACCOUNTS',
+  'AR_WRITE_OFF',
+  'BAD_DEBT_RECOVERY',
 ] as const;
 export type AccountMappingKey = (typeof ACCOUNT_MAPPING_KEYS)[number];
 
@@ -182,6 +186,13 @@ export const DOCUMENT_TYPES = [
   'EXP',
   'ICT',
   'FXR',
+  'DLV',
+  'WO',
+  'COL',
+  'DSP',
+  'RFD',
+  'PRV',
+  'STMT',
 ] as const;
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
 

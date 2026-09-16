@@ -37,6 +37,8 @@ import { VendorsImporter } from './sync/importers/vendors.importer';
 import { CustomersImporter } from './sync/importers/customers.importer';
 import { InvoicesImporter } from './sync/importers/invoices.importer';
 import { PaymentsImporter } from './sync/importers/payments.importer';
+import { SalesOrdersImporter } from './sync/importers/sales-orders.importer';
+import { OrdersModule } from '@/modules/orders/orders.module';
 import { SyncService } from './sync/sync.service';
 import { InboundWebhooksService } from './webhooks/inbound-webhooks.service';
 import { OutboundWebhooksService } from './webhooks/outbound-webhooks.service';
@@ -59,6 +61,7 @@ import { WebhooksController } from './webhooks/webhooks.controller';
     NotificationsModule,
     AccountingModule,
     ReceivablesModule,
+    OrdersModule,
     BankingModule,
     PayablesModule,
     InventoryModule,
@@ -80,6 +83,7 @@ import { WebhooksController } from './webhooks/webhooks.controller';
     VendorsImporter,
     BillsImporter,
     ProductsImporter,
+    SalesOrdersImporter,
     CustomersExporter,
     VendorsExporter,
     ProductsExporter,

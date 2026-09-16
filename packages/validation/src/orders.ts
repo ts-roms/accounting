@@ -38,7 +38,13 @@ const orderBase = z.object({
 });
 
 /** Quotations and sales orders belong to a customer. */
-export const createSalesDocumentSchema = orderBase.extend({ customerId: uuidSchema });
+export const createSalesDocumentSchema = orderBase.extend({
+  customerId: uuidSchema,
+  /** Prompt #6: named payment term, salesperson and shipping warehouse carried to deliveries / invoices. */
+  paymentTermId: uuidSchema.nullable().optional(),
+  salespersonId: uuidSchema.nullable().optional(),
+  warehouseId: uuidSchema.nullable().optional(),
+});
 export type CreateSalesDocumentInput = z.infer<typeof createSalesDocumentSchema>;
 
 /** Purchase requests may not have a vendor yet; purchase orders must. */
@@ -54,6 +60,9 @@ export type CreatePurchaseOrderInput = z.infer<typeof createPurchaseOrderSchema>
 export const createOrderSchema = orderBase.extend({
   customerId: uuidSchema.optional(),
   vendorId: uuidSchema.nullable().optional(),
+  paymentTermId: uuidSchema.nullable().optional(),
+  salespersonId: uuidSchema.nullable().optional(),
+  warehouseId: uuidSchema.nullable().optional(),
 });
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export const updateOrderSchema = createOrderSchema.omit({ idempotencyKey: true }).partial();

@@ -37,22 +37,22 @@ with `journals:create` can draft a journal; posting needs a person with
 
 ## Components
 
-| Directory        | Responsibility                                                                                    |
-| ---------------- | ------------------------------------------------------------------------------------------------- |
-| `core/`          | Connector contract, registry, integration registry service, encrypted credentials, provider HTTP  |
-| `connectors/`    | One class per provider (demo bank, payment gateway, e-commerce, tax authority, OAuth CRM)          |
-| `api-keys/`      | Internal API keys, scopes, rotation, per-key rate limit                                            |
-| `oauth/`         | Authorisation-code + PKCE flow, state, refresh, revoke                                             |
-| `webhooks/`      | Inbound receiver (signature, dedupe, async processing) and outbound subscriptions / deliveries    |
-| `events/`        | Transactional outbox (`OutboxService`, global module)                                             |
-| `sync/`          | Sync jobs, pull -> map -> import engine, cursors, scheduling, retries; importers per entity        |
-| `mapping/`       | Pure field-mapping engine, per-integration mapping storage, external references                   |
-| `retries/`       | Retry policy by error code (pure)                                                                  |
-| `idempotency/`   | `Idempotency-Key` interceptor and storage                                                          |
-| `logs/`          | Redacted integration log (DB + structured pino line)                                              |
-| `health/`        | Measured health score (pure `health.logic.ts`) and the periodic check                             |
+| Directory        | Responsibility                                                                                   |
+| ---------------- | ------------------------------------------------------------------------------------------------ |
+| `core/`          | Connector contract, registry, integration registry service, encrypted credentials, provider HTTP |
+| `connectors/`    | One class per provider (demo bank, payment gateway, e-commerce, tax authority, OAuth CRM)        |
+| `api-keys/`      | Internal API keys, scopes, rotation, per-key rate limit                                          |
+| `oauth/`         | Authorisation-code + PKCE flow, state, refresh, revoke                                           |
+| `webhooks/`      | Inbound receiver (signature, dedupe, async processing) and outbound subscriptions / deliveries   |
+| `events/`        | Transactional outbox (`OutboxService`, global module)                                            |
+| `sync/`          | Sync jobs, pull -> map -> import engine, cursors, scheduling, retries; importers per entity      |
+| `mapping/`       | Pure field-mapping engine, per-integration mapping storage, external references                  |
+| `retries/`       | Retry policy by error code (pure)                                                                |
+| `idempotency/`   | `Idempotency-Key` interceptor and storage                                                        |
+| `logs/`          | Redacted integration log (DB + structured pino line)                                             |
+| `health/`        | Measured health score (pure `health.logic.ts`) and the periodic check                            |
 | `notifications/` | In-app notifications with per-organization policies (global module)                              |
-| `jobs/`          | Cleanup job (the generic `JobRunnerService` lives in `modules/jobs`)                              |
+| `jobs/`          | Cleanup job (the generic `JobRunnerService` lives in `modules/jobs`)                             |
 
 ## Boundaries
 

@@ -42,16 +42,16 @@ the modules that will emit them.
 
 Reliability:
 
-| Concern         | Mechanism                                                                   |
-| --------------- | --------------------------------------------------------------------------- |
-| Lost events     | Outbox row written in the business transaction; dispatcher sweeps PENDING   |
-| Duplicates      | `dedupe_key` per event, unique `(webhook, event)` delivery                  |
-| Retries         | `retry-policy.ts`: exponential backoff with full jitter, `Retry-After` honoured |
-| Timeout         | `WEBHOOK_TIMEOUT_MS` (default 10 s)                                          |
-| Exhaustion      | `EXHAUSTED` after `maxAttempts`, `WEBHOOK_FAILING` notification              |
-| Replay          | `POST /webhooks/:id/replay` (all failed, or selected delivery ids)           |
-| Test            | `POST /webhooks/:id/test` sends `webhook.test` and returns the delivery      |
-| History         | `GET /webhooks/deliveries` with payload, status, attempts, HTTP status, error |
+| Concern     | Mechanism                                                                       |
+| ----------- | ------------------------------------------------------------------------------- |
+| Lost events | Outbox row written in the business transaction; dispatcher sweeps PENDING       |
+| Duplicates  | `dedupe_key` per event, unique `(webhook, event)` delivery                      |
+| Retries     | `retry-policy.ts`: exponential backoff with full jitter, `Retry-After` honoured |
+| Timeout     | `WEBHOOK_TIMEOUT_MS` (default 10 s)                                             |
+| Exhaustion  | `EXHAUSTED` after `maxAttempts`, `WEBHOOK_FAILING` notification                 |
+| Replay      | `POST /webhooks/:id/replay` (all failed, or selected delivery ids)              |
+| Test        | `POST /webhooks/:id/test` sends `webhook.test` and returns the delivery         |
+| History     | `GET /webhooks/deliveries` with payload, status, attempts, HTTP status, error   |
 
 ## Inbound (others notify us)
 

@@ -123,9 +123,10 @@ export default function DashboardPage() {
   const overdue = (report: typeof arAging.data) =>
     report
       ? Money.sum(
-          (['days1to30', 'days31to60', 'days61to90', 'over90'] as const).map((k) =>
-            Money.of(report.totals[k], report.currency),
-          ),
+          // Everything past the first (current) bucket is overdue; buckets are configurable per company.
+          report.buckets
+            .slice(1)
+            .map((b) => Money.of(report.totals[b.key] ?? '0', report.currency)),
           report.currency,
         ).toString()
       : undefined;

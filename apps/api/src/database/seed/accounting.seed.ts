@@ -14,6 +14,7 @@ import { seedAssetsBanking } from './assets-banking.seed';
 import { seedBudgetingTax } from './budgeting-tax.seed';
 import { seedInventory } from './inventory.seed';
 import { seedOrders } from './orders.seed';
+import { seedReceivables } from './receivables.seed';
 import { seedSubledgers } from './subledger.seed';
 
 type Log = (m: string) => void;
@@ -214,6 +215,13 @@ const CHART: CoaRow[] = [
     parent: '4000',
     subtype: 'OTHER_INCOME',
   },
+  {
+    code: '4940',
+    name: 'Bad Debt Recoveries',
+    type: 'REVENUE',
+    parent: '4000',
+    subtype: 'OTHER_INCOME',
+  },
   { code: '5000', name: 'Cost of Sales', type: 'COST_OF_SALES', header: true },
   {
     code: '5100',
@@ -332,6 +340,21 @@ const CHART: CoaRow[] = [
     subtype: 'OTHER_EXPENSE',
   },
   { code: '6150', name: 'Project Consulting Fees', type: 'EXPENSE', parent: '6000' },
+  // Accounts receivable controls (Prompt #6)
+  {
+    code: '6710',
+    name: 'Bad Debt Expense',
+    type: 'EXPENSE',
+    parent: '6000',
+    subtype: 'OTHER_EXPENSE',
+  },
+  {
+    code: '6720',
+    name: 'Receivable Write-Offs and Adjustments',
+    type: 'EXPENSE',
+    parent: '6000',
+    subtype: 'OTHER_EXPENSE',
+  },
 ];
 
 const MAPPINGS: Array<[AccountMappingKey, string]> = [
@@ -365,6 +388,10 @@ const MAPPINGS: Array<[AccountMappingKey, string]> = [
   ['BANK_CHARGES', '6600'],
   ['OPENING_BALANCE_EQUITY', '3900'],
   ['SUSPENSE', '1900'],
+  ['BAD_DEBT_EXPENSE', '6710'],
+  ['ALLOWANCE_FOR_DOUBTFUL_ACCOUNTS', '1250'],
+  ['AR_WRITE_OFF', '6720'],
+  ['BAD_DEBT_RECOVERY', '4940'],
 ];
 
 interface SampleLine {
@@ -488,6 +515,7 @@ export async function seedAccounting(
       await ensureSampleEntries(tx, company, codeToId, adminUserId, log);
     }
     await seedSubledgers(tx, company, codeToId, adminUserId, log);
+    await seedReceivables(tx, company, codeToId, adminUserId, log);
     await seedOrders(tx, company, codeToId, adminUserId, log);
     await seedInventory(tx, company, adminUserId, log);
     await seedAssetsBanking(tx, company, codeToId, adminUserId, log);

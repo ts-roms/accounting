@@ -2,7 +2,7 @@ import { P, type OrderStatus, type OrderType, type PermissionKey } from '@accoun
 import { AP_CONFIG, AR_CONFIG, type SubledgerConfig } from '@/lib/subledger/config';
 
 export type OrderUiAction =
-  'submit' | 'send' | 'accept' | 'approve' | 'reject' | 'close' | 'cancel';
+  'submit' | 'send' | 'accept' | 'approve' | 'reject' | 'confirm' | 'close' | 'cancel';
 
 /**
  * Everything that differs between quotations, sales orders, purchase requests
@@ -111,16 +111,42 @@ export const SALES_ORDER_CONFIG: OrderConfig = {
   },
   actions: [
     {
+      action: 'submit',
+      from: ['DRAFT', 'REJECTED'],
+      label: 'Submit (credit check)',
+      permission: P['sales-order.create'],
+      primary: true,
+    },
+    {
       action: 'approve',
-      from: ['DRAFT'],
+      from: ['DRAFT', 'SUBMITTED'],
       label: 'Approve',
       permission: P['sales-order.approve'],
       primary: true,
     },
-    { action: 'close', from: ['APPROVED'], label: 'Close', permission: P['sales-order.create'] },
+    {
+      action: 'reject',
+      from: ['SUBMITTED'],
+      label: 'Reject',
+      permission: P['sales-order.approve'],
+      needsReason: true,
+    },
+    {
+      action: 'confirm',
+      from: ['APPROVED'],
+      label: 'Confirm with customer',
+      permission: P['sales-order.create'],
+      primary: true,
+    },
+    {
+      action: 'close',
+      from: ['APPROVED', 'CONFIRMED'],
+      label: 'Close',
+      permission: P['sales-order.create'],
+    },
     {
       action: 'cancel',
-      from: ['DRAFT', 'APPROVED'],
+      from: ['DRAFT', 'SUBMITTED', 'APPROVED', 'CONFIRMED', 'REJECTED'],
       label: 'Cancel',
       permission: P['sales-order.create'],
       needsReason: true,

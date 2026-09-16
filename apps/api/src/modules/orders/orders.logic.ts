@@ -79,7 +79,7 @@ export interface OrderTypeRules {
 }
 
 export type OrderAction =
-  'submit' | 'send' | 'accept' | 'approve' | 'reject' | 'convert' | 'close' | 'cancel';
+  'submit' | 'send' | 'accept' | 'approve' | 'reject' | 'confirm' | 'convert' | 'close' | 'cancel';
 
 export const ORDER_RULES: Record<OrderType, OrderTypeRules> = {
   QUOTATION: {
@@ -98,9 +98,17 @@ export const ORDER_RULES: Record<OrderType, OrderTypeRules> = {
   SALES_ORDER: {
     party: 'CUSTOMER',
     transitions: {
-      approve: { from: ['DRAFT'], to: 'APPROVED' },
-      close: { from: ['APPROVED'], to: 'CLOSED' },
-      cancel: { from: ['DRAFT', 'APPROVED'], to: 'CANCELLED' },
+      /** Prompt #6: submit runs the credit check and opens the approval workflow. */
+      submit: { from: ['DRAFT', 'REJECTED'], to: 'SUBMITTED' },
+      approve: { from: ['DRAFT', 'SUBMITTED'], to: 'APPROVED' },
+      reject: { from: ['SUBMITTED'], to: 'REJECTED' },
+      /** Confirmed with the customer; still open for delivery and invoicing. */
+      confirm: { from: ['APPROVED'], to: 'CONFIRMED' },
+      close: { from: ['APPROVED', 'CONFIRMED'], to: 'CLOSED' },
+      cancel: {
+        from: ['DRAFT', 'SUBMITTED', 'APPROVED', 'CONFIRMED', 'REJECTED'],
+        to: 'CANCELLED',
+      },
     },
     tracksReceipts: false,
     tracksBilling: true,
@@ -165,6 +173,7 @@ function pastTense(action: OrderAction): string {
     accept: 'accepted',
     approve: 'approved',
     reject: 'rejected',
+    confirm: 'confirmed',
     convert: 'converted',
     close: 'closed',
     cancel: 'cancelled',

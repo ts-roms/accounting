@@ -60,6 +60,7 @@ Only one job per integration may be queued or running (`422 SYNC_IN_PROGRESS`).
 | `vendors`           | `VendorsService.create/update`               | Matches by external reference, then by vendor code                                                                                                                 |
 | `bills`             | `BillsService.create` (+approve/post)        | Always DRAFT; expense account = line / `config.expenseAccountId` / vendor default / `DEFAULT_EXPENSE`; approve + post only with `bills:post` and `config.autoPost` |
 | `products`          | `CatalogService.createProduct/updateProduct` | Matches by external reference, then by SKU; never moves stock                                                                                                      |
+| `sales-orders`      | `OrdersService.create` (+submit)             | Always DRAFT; `config.autoSubmit` submits it (credit policy + approval workflow), never approves; product / revenue account from line, product default or `config` |
 
 Importers enforce the integration's scopes explicitly (`assertScope`) because
 jobs do not pass through the HTTP guards, and they run inside a
