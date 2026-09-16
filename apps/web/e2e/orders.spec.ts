@@ -60,7 +60,8 @@ test.describe('sales & purchasing', () => {
     // Fully invoiced order auto-closes.
     await page.getByRole('link', { name: 'View order' }).click();
     await expect(page.getByText('CLOSED', { exact: true })).toBeVisible();
-    await expect(page.getByText('Invoiced: full')).toBeVisible();
+    // Scope to the badge: Next's route announcer repeats the heading text while navigating.
+    await expect(page.locator('[data-tone]', { hasText: 'Invoiced: full' })).toBeVisible();
   });
 
   test('purchase order -> partial receipt -> bill with match exceptions -> review', async ({
