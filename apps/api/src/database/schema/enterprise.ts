@@ -27,7 +27,7 @@ import {
 } from '@accounting/types';
 import { entityStatusEnum, primaryId, timestamps } from './_shared';
 import { accounts, journalEntries, money } from './accounting';
-import { companies, organizations } from './organizations';
+import { branches, companies, organizations } from './organizations';
 import { users } from './users';
 
 export const exchangeRateSourceEnum = pgEnum('exchange_rate_source', EXCHANGE_RATE_SOURCES);
@@ -35,7 +35,10 @@ export const fxSideEnum = pgEnum('fx_side', FX_SIDES);
 export const fxAdjustmentTypeEnum = pgEnum('fx_adjustment_type', FX_ADJUSTMENT_TYPES);
 export const intercompanyStatusEnum = pgEnum('intercompany_status', INTERCOMPANY_STATUSES);
 export const workflowDocumentTypeEnum = pgEnum('workflow_document_type', WORKFLOW_DOCUMENT_TYPES);
-export const approvalRequestStatusEnum = pgEnum('approval_request_status', APPROVAL_REQUEST_STATUSES);
+export const approvalRequestStatusEnum = pgEnum(
+  'approval_request_status',
+  APPROVAL_REQUEST_STATUSES,
+);
 export const approvalDecisionEnum = pgEnum('approval_decision', APPROVAL_DECISIONS);
 export const attachmentEntityTypeEnum = pgEnum('attachment_entity_type', ATTACHMENT_ENTITY_TYPES);
 
@@ -62,7 +65,12 @@ export const exchangeRates = pgTable(
     ...timestamps,
   },
   (t) => [
-    uniqueIndex('exchange_rates_pair_date_uq').on(t.organizationId, t.fromCurrency, t.toCurrency, t.rateDate),
+    uniqueIndex('exchange_rates_pair_date_uq').on(
+      t.organizationId,
+      t.fromCurrency,
+      t.toCurrency,
+      t.rateDate,
+    ),
     check('exchange_rates_rate_chk', sql`${t.rate} > 0 AND ${t.fromCurrency} <> ${t.toCurrency}`),
   ],
 );
@@ -127,7 +135,9 @@ export const fxRevaluations = pgTable(
       .default([]),
     unrealizedGain: money('unrealized_gain').notNull().default('0'),
     unrealizedLoss: money('unrealized_loss').notNull().default('0'),
-    journalEntryId: uuid('journal_entry_id').references(() => journalEntries.id, { onDelete: 'restrict' }),
+    journalEntryId: uuid('journal_entry_id').references(() => journalEntries.id, {
+      onDelete: 'restrict',
+    }),
     reversalJournalEntryId: uuid('reversal_journal_entry_id').references(() => journalEntries.id, {
       onDelete: 'restrict',
     }),
@@ -192,7 +202,10 @@ export const intercompanyTransactions = pgTable(
     uniqueIndex('intercompany_idempotency_uq').on(t.organizationId, t.idempotencyKey),
     index('intercompany_from_idx').on(t.fromCompanyId, t.transactionDate),
     index('intercompany_to_idx').on(t.toCompanyId, t.transactionDate),
-    check('intercompany_amount_chk', sql`${t.amount} > 0 AND ${t.fromCompanyId} <> ${t.toCompanyId}`),
+    check(
+      'intercompany_amount_chk',
+      sql`${t.amount} > 0 AND ${t.fromCompanyId} <> ${t.toCompanyId}`,
+    ),
   ],
 );
 
@@ -219,6 +232,12 @@ export const approvalWorkflows = pgTable(
     maxAmount: money('max_amount'),
     priority: integer('priority').notNull().default(100),
     allowSelfApproval: boolean('allow_self_approval').notNull().default(false),
+    /** Restricts the workflow to documents of one branch; NULL = every branch. */
+    branchId: uuid('branch_id').references(() => branches.id, { onDelete: 'restrict' }),
+    /** Hours a request may stay pending before it is overdue. */
+    deadlineHours: integer('deadline_hours'),
+    /** Holders of this permission may decide an overdue request in place of the step approvers. */
+    escalationPermission: text('escalation_permission'),
     steps: jsonb('steps').$type<WorkflowStep[]>().notNull().default([]),
     status: entityStatusEnum('status').notNull().default('ACTIVE'),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
@@ -226,7 +245,10 @@ export const approvalWorkflows = pgTable(
   },
   (t) => [
     index('approval_workflows_company_type_idx').on(t.companyId, t.documentType, t.status),
-    check('approval_workflows_band_chk', sql`${t.minAmount} >= 0 AND (${t.maxAmount} IS NULL OR ${t.maxAmount} > ${t.minAmount})`),
+    check(
+      'approval_workflows_band_chk',
+      sql`${t.minAmount} >= 0 AND (${t.maxAmount} IS NULL OR ${t.maxAmount} > ${t.minAmount})`,
+    ),
   ],
 );
 
@@ -250,6 +272,11 @@ export const approvalRequests = pgTable(
     currentStep: integer('current_step').notNull().default(0),
     status: approvalRequestStatusEnum('status').notNull().default('PENDING'),
     requestedBy: uuid('requested_by').references(() => users.id, { onDelete: 'set null' }),
+    branchId: uuid('branch_id').references(() => branches.id, { onDelete: 'restrict' }),
+    /** Deadline copied from the workflow at request time; NULL = no deadline. */
+    dueAt: timestamp('due_at', { withTimezone: true }),
+    /** Set when the request was found overdue and opened to the escalation approvers. */
+    escalatedAt: timestamp('escalated_at', { withTimezone: true }),
     completedAt: timestamp('completed_at', { withTimezone: true }),
     ...timestamps,
   },

@@ -25,6 +25,7 @@ export const WORKFLOW_DOCUMENT_TYPES = [
   'VENDOR_PAYMENT',
   'PURCHASE_ORDER',
   'EXPENSE_CLAIM',
+  'VENDOR_BILL',
 ] as const;
 export type WorkflowDocumentType = (typeof WORKFLOW_DOCUMENT_TYPES)[number];
 
@@ -119,5 +120,12 @@ export const CLOSE_AUTO_CHECKS = [
   'OPEN_RECONCILIATION_EXCEPTIONS',
   'TRIAL_BALANCE',
   'INTEGRITY',
+  'SUSPENSE_BALANCES',
 ] as const;
 export type CloseAutoCheck = (typeof CLOSE_AUTO_CHECKS)[number];
+
+// ------------------------------------------------------------------ enterprise controls (H5)
+
+/** Suspense / clearing account monitor status, decided by company policy. */
+export const SUSPENSE_STATUSES = ['CLEAR', 'WITHIN_POLICY', 'REQUIRES_INVESTIGATION'] as const;
+export type SuspenseStatus = (typeof SUSPENSE_STATUSES)[number];

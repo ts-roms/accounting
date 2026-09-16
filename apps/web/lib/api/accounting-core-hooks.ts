@@ -32,7 +32,7 @@ import type {
   RecurringJournalDetail,
   RecurringRunResult,
   ResolvedPostingRule,
-  SuspenseReport,
+  SuspenseMonitor,
 } from './types';
 
 const company = () => getActiveCompanyId() ?? 'none';
@@ -72,10 +72,10 @@ export const useCashFlow = (query: CashFlowQuery, enabled = true) =>
     enabled,
   });
 
-export const useSuspenseReport = (asOf: string) =>
+export const useSuspenseMonitor = (asOf: string) =>
   useQuery({
     queryKey: coreKeys.suspense(asOf),
-    queryFn: () => api.get<SuspenseReport>('/accounting/suspense', { query: { asOf } }),
+    queryFn: () => api.get<SuspenseMonitor>('/accounting/suspense', { query: { asOf } }),
   });
 
 // --------------------------------------------------------- opening balances

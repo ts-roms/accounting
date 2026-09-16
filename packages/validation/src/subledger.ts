@@ -117,7 +117,11 @@ export const createInvoiceSchema = documentBase.extend({
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;
 export const updateInvoiceSchema = createInvoiceSchema
   .omit({ idempotencyKey: true, documentType: true })
-  .partial();
+  .partial()
+  .extend({
+    /** Why the document changed - kept with the field-level history. */
+    changeReason: optionalText(500),
+  });
 export type UpdateInvoiceInput = z.infer<typeof updateInvoiceSchema>;
 
 export const createBillSchema = documentBase.extend({
@@ -131,7 +135,11 @@ export const createBillSchema = documentBase.extend({
 export type CreateBillInput = z.infer<typeof createBillSchema>;
 export const updateBillSchema = createBillSchema
   .omit({ idempotencyKey: true, documentType: true })
-  .partial();
+  .partial()
+  .extend({
+    /** Why the document changed - kept with the field-level history. */
+    changeReason: optionalText(500),
+  });
 export type UpdateBillInput = z.infer<typeof updateBillSchema>;
 
 export const voidDocumentSchema = z.object({

@@ -17,6 +17,9 @@ import { IntegrationLogsService } from '../logs/integration-logs.service';
 import { MappingsService } from '../mapping/mappings.service';
 import { SyncService } from '../sync/sync.service';
 import { BankTransactionsImporter } from '../sync/importers/bank-transactions.importer';
+import { BillsImporter } from '../sync/importers/bills.importer';
+import { ProductsImporter } from '../sync/importers/products.importer';
+import { VendorsImporter } from '../sync/importers/vendors.importer';
 import { CustomersImporter } from '../sync/importers/customers.importer';
 import type { Importer } from '../sync/importers/importer';
 import { InvoicesImporter } from '../sync/importers/invoices.importer';
@@ -57,10 +60,16 @@ export class InboundWebhooksService implements OnModuleInit {
     invoices: InvoicesImporter,
     payments: PaymentsImporter,
     bankTransactions: BankTransactionsImporter,
+    vendors: VendorsImporter,
+    bills: BillsImporter,
+    products: ProductsImporter,
   ) {
     this.logger.setContext(InboundWebhooksService.name);
     this.importers = new Map(
-      [customers, invoices, payments, bankTransactions].map((i) => [i.entity, i]),
+      [customers, invoices, payments, bankTransactions, vendors, bills, products].map((i) => [
+        i.entity,
+        i,
+      ]),
     );
   }
 

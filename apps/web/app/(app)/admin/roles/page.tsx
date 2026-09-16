@@ -22,6 +22,7 @@ import {
 } from '@accounting/ui';
 import { describeError } from '@/lib/api/client';
 import { usePermissions, useRoles, useSetRolePermissions, useSodPolicies } from '@/lib/api/hooks';
+import { useSodConflicts } from '@/lib/api/controls-hooks';
 import type { Permission, Role } from '@/lib/api/types';
 import { useSession } from '@/lib/auth/session';
 import { titleCase } from '@/lib/format';
@@ -32,6 +33,7 @@ export default function RolesPage() {
   const roles = useRoles();
   const permissions = usePermissions();
   const sod = useSodPolicies();
+  const conflicts = useSodConflicts();
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [createOpen, setCreateOpen] = React.useState(false);
 
@@ -131,6 +133,43 @@ export default function RolesPage() {
                 <EmptyState
                   title="No policies"
                   description="Segregation-of-duties policies are seeded per organization."
+                />
+              )}
+            </CardContent>
+          </Card>
+          <Card className="mt-4">
+            <CardHeader>
+              <CardTitle>Current conflicts</CardTitle>
+              <CardDescription>
+                Users who hold both sides of an active policy right now, per company scope. WARN
+                conflicts are tolerated but every override on a document is audited.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {conflicts.data?.length ? (
+                conflicts.data.map((c) => (
+                  <div
+                    key={`${c.userId}-${c.policyId}-${c.companyId ?? 'all'}`}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
+                    data-testid="sod-conflict"
+                  >
+                    <div>
+                      <div className="font-medium">
+                        {c.userName} <span className="text-muted-foreground">({c.userEmail})</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {c.policyName} · {c.companyName ?? 'every company'}
+                      </div>
+                    </div>
+                    <Badge variant={c.enforcement === 'BLOCK' ? 'destructive' : 'warning'}>
+                      {c.enforcement}
+                    </Badge>
+                  </div>
+                ))
+              ) : conflicts.isLoading ? null : (
+                <EmptyState
+                  title="No conflicts"
+                  description="No active user holds both sides of a policy."
                 />
               )}
             </CardContent>

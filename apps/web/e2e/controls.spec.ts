@@ -95,7 +95,7 @@ test.describe('accounting controls', () => {
     await login(page);
     await page.goto('/accounting/integrity');
     await expect(page.getByTestId('integrity-status')).toBeVisible();
-    await expect(page.getByTestId('integrity-check')).toHaveCount(14);
+    await expect(page.getByTestId('integrity-check')).toHaveCount(16);
     await expect(page.getByText('Posted journals balance')).toBeVisible();
     await expect(page.getByRole('row').filter({ hasText: 'UNBALANCED_JOURNAL' })).toContainText(
       'PASS',
@@ -221,7 +221,7 @@ test.describe('financial close', () => {
     await page.getByTestId('close-start-confirm').click();
     await expect(page).toHaveURL(/\/accounting\/financial-close\/[0-9a-f-]+$/);
     await expect(page.getByTestId('close-status')).toHaveText('IN PROGRESS');
-    await expect(page.getByTestId('close-task')).toHaveCount(17);
+    await expect(page.getByTestId('close-task')).toHaveCount(18);
 
     // Work every required manual task.
     for (const key of [

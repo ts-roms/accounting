@@ -34,29 +34,32 @@ start / finish time, duration, start / last / next cursor.
 
 ## Modes and triggers
 
-| Mode          | Meaning                                                            |
-| ------------- | ------------------------------------------------------------------ |
+| Mode          | Meaning                                                             |
+| ------------- | ------------------------------------------------------------------- |
 | `INCREMENTAL` | Continue from the stored cursor (provider `updated_at`, page token) |
 | `FULL`        | Ignore the cursor; existing records are updated, not duplicated     |
 
-| Trigger     | Origin                                                              |
-| ----------- | ------------------------------------------------------------------- |
-| `MANUAL`    | `POST /integrations/:id/sync`                                       |
-| `SCHEDULED` | `syncSchedule` cron (5-field) evaluated every minute by `sync-due`  |
-| `RETRY`     | Automatic re-queue after a transient failure (max 3, backoff)       |
+| Trigger     | Origin                                                                  |
+| ----------- | ----------------------------------------------------------------------- |
+| `MANUAL`    | `POST /integrations/:id/sync`                                           |
+| `SCHEDULED` | `syncSchedule` cron (5-field) evaluated every minute by `sync-due`      |
+| `RETRY`     | Automatic re-queue after a transient failure (max 3, backoff)           |
 | `RESUME`    | `POST /integrations/:id/sync` with `resumeJobId` of a failed/paused job |
-| `WEBHOOK`   | A connector asked for a sync after an inbound event                 |
+| `WEBHOOK`   | A connector asked for a sync after an inbound event                     |
 
 Only one job per integration may be queued or running (`422 SYNC_IN_PROGRESS`).
 
 ## Importers (`sync/importers/`)
 
-| Entity              | Domain service                          | Notes                                                        |
-| ------------------- | --------------------------------------- | ------------------------------------------------------------ |
-| `customers`         | `CustomersService.create/update`        | Matches by external reference, then by customer code         |
-| `invoices`          | `InvoicesService.create` (+approve/post) | Always DRAFT; approve + post only with `invoices:post` and `config.autoPost` |
-| `payments`          | `CustomerPaymentsService.create` (+post) | Cash account from `config.cashAccountId`; allocates to the referenced invoice when open |
-| `bank-transactions` | `StatementsService.import`              | A statement with lines; reconciliation happens in banking, never a journal |
+| Entity              | Domain service                               | Notes                                                                                                                                                              |
+| ------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `customers`         | `CustomersService.create/update`             | Matches by external reference, then by customer code                                                                                                               |
+| `invoices`          | `InvoicesService.create` (+approve/post)     | Always DRAFT; approve + post only with `invoices:post` and `config.autoPost`                                                                                       |
+| `payments`          | `CustomerPaymentsService.create` (+post)     | Cash account from `config.cashAccountId`; allocates to the referenced invoice when open                                                                            |
+| `bank-transactions` | `StatementsService.import`                   | A statement with lines; reconciliation happens in banking, never a journal                                                                                         |
+| `vendors`           | `VendorsService.create/update`               | Matches by external reference, then by vendor code                                                                                                                 |
+| `bills`             | `BillsService.create` (+approve/post)        | Always DRAFT; expense account = line / `config.expenseAccountId` / vendor default / `DEFAULT_EXPENSE`; approve + post only with `bills:post` and `config.autoPost` |
+| `products`          | `CatalogService.createProduct/updateProduct` | Matches by external reference, then by SKU; never moves stock                                                                                                      |
 
 Importers enforce the integration's scopes explicitly (`assertScope`) because
 jobs do not pass through the HTTP guards, and they run inside a

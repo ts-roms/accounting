@@ -59,7 +59,7 @@ docs                Architecture, accounting engine, database, API, security, pe
 | ---------------------------------------------------------- | ----------------------------------------------------------------------- |
 | `pnpm dev` / `pnpm build`                                  | Run / build everything through Turborepo                                |
 | `pnpm lint` / `pnpm typecheck` / `pnpm test`               | Quality gates across the workspace                                      |
-| `pnpm --filter @accounting/api test:e2e`                   | API integration tests against `accounting_test` (needs `pnpm infra:up`) |
+| `pnpm --filter @accounting/api test:e2e`                   | API integration tests against `accounting_test` (needs `pnpm infra:up`); worktrees use `accounting_test_<worktree>`, or set `TEST_DATABASE_SUFFIX` |
 | `pnpm --filter @accounting/web test:e2e`                   | Playwright against a running stack                                      |
 | `pnpm db:generate` / `db:migrate` / `db:seed` / `db:reset` | Drizzle migrations and seed                                             |
 | `pnpm infra:up` / `infra:down` / `infra:logs`              | Docker infrastructure                                                   |

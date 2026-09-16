@@ -35,7 +35,7 @@ effective permissions = permissions(scopes) ∩ owner's permissions in the selec
   (`422 SCOPE_NOT_GRANTABLE` otherwise).
 - If the owner later loses a permission (or is deactivated), the key loses it too.
 - No scope maps to approval or posting authority unless it is an explicit
-  `:post` scope (`invoices:post`, `payments:post`). `journals:create` only
+  `:post` scope (`invoices:post`, `bills:post`, `payments:post`). `journals:create` only
   drafts. Keys never receive delegated authority and never hold roles.
 
 ## Scopes
@@ -48,6 +48,7 @@ effective permissions = permissions(scopes) ∩ owner's permissions in the selec
 | `invoices:read/write`  | invoice.view, customer.view (+ invoice.create)                       |
 | `invoices:post`        | invoice.view, invoice.approve, invoice.post                          |
 | `bills:read/write`     | bill.view, vendor.view (+ bill.create)                               |
+| `bills:post`           | bill.view, bill.approve, bill.post                                   |
 | `payments:read/write`  | invoice.view, bill.view / customer-payment.create                    |
 | `payments:post`        | invoice.view, customer-payment.post                                  |
 | `products:read/write`  | product.view (+ product.manage)                                      |

@@ -58,6 +58,7 @@ import {
 } from '@/components/accounting/operation-dialog';
 import { documentTimeline } from '@/components/accounting/timelines';
 import { AttachmentsPanel } from '@/components/enterprise/attachments-panel';
+import { HistoryPanel } from '@/components/enterprise/history-panel';
 import { Amount, today } from '@/components/accounting/primitives';
 import { MatchCard } from '@/components/orders/match-card';
 import { DocumentStatusBadge } from './badges';
@@ -499,6 +500,7 @@ export function DocumentDetailPage({ cfg, id }: { cfg: SubledgerConfig; id: stri
             <FollowUpCard cfg={cfg} document={d} />
           ) : null}
           <AttachmentsPanel entityType={cfg.side === 'AR' ? 'INVOICE' : 'BILL'} entityId={d.id} />
+          <HistoryPanel entityType={cfg.side === 'AR' ? 'Invoice' : 'VendorBill'} entityId={d.id} />
         </div>
       </div>
 

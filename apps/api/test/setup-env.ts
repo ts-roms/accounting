@@ -1,10 +1,11 @@
 /* Loaded by jest before the e2e suite: points the app at the test database. */
 import '../src/config/load-env';
+import { resolveTestDatabaseUrl } from './test-database';
 
 process.env.NODE_ENV = 'test';
-process.env.DATABASE_URL =
-  process.env.TEST_DATABASE_URL ??
-  'postgres://accounting:accounting@localhost:5433/accounting_test';
+// Per-checkout database: worktrees (and TEST_DATABASE_SUFFIX) get their own,
+// created by global-setup.ts, so parallel e2e runs never drop each other's schema.
+process.env.DATABASE_URL = resolveTestDatabaseUrl();
 process.env.LOG_LEVEL = process.env.TEST_LOG_LEVEL ?? 'silent';
 process.env.STORAGE_DIR = process.env.TEST_STORAGE_DIR ?? './storage-test';
 process.env.AI_PROVIDER = 'HEURISTIC';

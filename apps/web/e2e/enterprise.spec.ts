@@ -37,6 +37,20 @@ test.describe('enterprise: FX, intercompany, workflows, attachments', () => {
     page,
   }) => {
     await login(page);
+    // An interrupted earlier run may have left its workflow active: it would capture this run's journal.
+    const me = await page.request.get('/api/v1/auth/me');
+    const headers = {
+      'x-requested-with': 'XMLHttpRequest',
+      'x-company-id': (await me.json()).companies[0].id as string,
+    };
+    const existing = await page.request.get('/api/v1/approval-workflows', { headers });
+    for (const w of (await existing.json()) as { id: string; name: string; status: string }[]) {
+      if (w.name.startsWith('Large journals') && w.status === 'ACTIVE')
+        await page.request.patch(`/api/v1/approval-workflows/${w.id}`, {
+          data: { status: 'INACTIVE' },
+          headers,
+        });
+    }
     // Workflow: journals >= 50,000 need one journal.approve decision.
     await page.goto('/admin/workflows');
     await page.getByTestId('new-workflow').click();

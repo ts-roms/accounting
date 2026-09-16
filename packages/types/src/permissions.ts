@@ -83,6 +83,8 @@ export const PERMISSION_DEFINITIONS = [
   define('close.view', 'ACCOUNTING', 'View financial close checklists'),
   define('close.manage', 'ACCOUNTING', 'Start closes, work checklist tasks'),
   define('close.approve', 'ACCOUNTING', 'Give management approval to a financial close'),
+  define('controls.view', 'ACCOUNTING', 'View the financial control dashboard and suspense monitor'),
+  define('history.view', 'ACCOUNTING', 'View field-level change history of financial records'),
 
   // Sales / AR
   define('customer.view', 'SALES', 'View customers'),

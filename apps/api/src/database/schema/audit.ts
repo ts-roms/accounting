@@ -1,4 +1,14 @@
-import { bigserial, index, inet, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import {
+  bigint,
+  bigserial,
+  index,
+  inet,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { auditActionEnum } from './_shared';
 import { companies, organizations } from './organizations';
 import { users } from './users';
@@ -42,5 +52,39 @@ export const auditLogs = pgTable(
   ],
 );
 
+/**
+ * Field-level change history of financial records, derived from audit events
+ * that carry a before / after value: one row per changed field. Immutable like
+ * the audit trail (trigger in migration `0015_enterprise_controls`).
+ */
+export const fieldChanges = pgTable(
+  'field_changes',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    auditLogId: bigint('audit_log_id', { mode: 'number' })
+      .notNull()
+      .references(() => auditLogs.id, { onDelete: 'restrict' }),
+    organizationId: uuid('organization_id').references(() => organizations.id, {
+      onDelete: 'restrict',
+    }),
+    companyId: uuid('company_id').references(() => companies.id, { onDelete: 'restrict' }),
+    entityType: text('entity_type').notNull(),
+    entityId: text('entity_id').notNull(),
+    field: text('field').notNull(),
+    previousValue: jsonb('previous_value'),
+    newValue: jsonb('new_value'),
+    changedBy: uuid('changed_by').references(() => users.id, { onDelete: 'set null' }),
+    changedByEmail: text('changed_by_email'),
+    reason: text('reason'),
+    correlationId: text('correlation_id'),
+    changedAt: timestamp('changed_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('field_changes_entity_idx').on(t.entityType, t.entityId, t.changedAt),
+    index('field_changes_company_idx').on(t.companyId, t.changedAt),
+  ],
+);
+
 export type AuditLog = typeof auditLogs.$inferSelect;
+export type FieldChange = typeof fieldChanges.$inferSelect;
 export type NewAuditLog = typeof auditLogs.$inferInsert;

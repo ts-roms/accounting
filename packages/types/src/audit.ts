@@ -41,6 +41,8 @@ export const AUDIT_ACTIONS = [
   'RECOGNIZE',
   'PAUSE',
   'RESUME',
+  'ESCALATE',
+  'SOD_WARNING',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

@@ -2,7 +2,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { RefreshCw } from 'lucide-react';
-import { P } from '@accounting/types';
+import { P, type SuspenseStatus } from '@accounting/types';
 import {
   Badge,
   Button,
@@ -21,25 +21,35 @@ import {
   TableRow,
 } from '@accounting/ui';
 import { describeError } from '@/lib/api/client';
-import { useSuspenseReport } from '@/lib/api/accounting-core-hooks';
+import { useSuspenseMonitor } from '@/lib/api/accounting-core-hooks';
 import { useSession } from '@/lib/auth/session';
 import { EmptyState, PageHeader } from '@/components/ui-ext/page';
 import { Amount, today } from '@/components/accounting/primitives';
 import { Stat } from '@/components/fixed-assets/shared';
 
-/** Suspense monitor: balances that still need explaining, how old they are and who owns them. */
+const STATUS_VARIANT: Record<SuspenseStatus, 'success' | 'secondary' | 'warning'> = {
+  CLEAR: 'success',
+  WITHIN_POLICY: 'secondary',
+  REQUIRES_INVESTIGATION: 'warning',
+};
+
+/**
+ * Suspense / clearing account monitor: what is parked in each account, since
+ * when, who owns it and whether the company policy (materiality, max age)
+ * requires investigation. Clearing is a reclassification journal.
+ */
 export function SuspensePage() {
   const { hasPermission } = useSession();
   const [asOf, setAsOf] = React.useState(today());
-  const report = useSuspenseReport(asOf);
+  const report = useSuspenseMonitor(asOf);
   const r = report.data;
-  const unresolved = r?.accounts.reduce((n, a) => n + a.unresolvedCount, 0) ?? 0;
-  const oldest = r?.accounts.reduce((n, a) => Math.max(n, a.oldestAgeDays), 0) ?? 0;
+  const open = r?.accounts.reduce((n, a) => n + a.openTransactions, 0) ?? 0;
+  const oldest = r?.accounts.reduce((n, a) => Math.max(n, a.ageDays), 0) ?? 0;
   return (
     <>
       <PageHeader
         title="Suspense accounts"
-        description="Every suspense / clearing account with its balance, the postings not yet explained and their age. Clear a balance with a reclassification journal - never by editing history."
+        description="Suspense and clearing accounts are expected to return to zero. The monitor shows the postings not yet explained, their age, the owner and whether the company policy requires investigation. Clear a balance with a reclassification journal - never by editing history."
         actions={
           <div className="flex items-end gap-2">
             <div className="space-y-1">
@@ -49,6 +59,7 @@ export function SuspensePage() {
                 type="date"
                 value={asOf}
                 onChange={(e) => setAsOf(e.target.value)}
+                data-testid="suspense-asof"
               />
             </div>
             <Button
@@ -74,34 +85,38 @@ export function SuspensePage() {
           <div className="grid gap-3 md:grid-cols-4" data-testid="suspense-stats">
             <Stat
               label="Suspense balance (absolute)"
-              value={
-                <Amount value={r.totalAbsoluteBalance} currency={r.currency} className="inline" />
-              }
-              danger={r.totalAbsoluteBalance !== '0.0000'}
+              value={<Amount value={r.totalBalance} currency={r.currency} className="inline" />}
+              hint={`Materiality ${r.materiality} · max age ${r.maxAgeDays} days`}
+              danger={r.totalBalance !== '0.0000'}
             />
-            <Stat label="Unresolved postings" value={unresolved} danger={unresolved > 0} />
-            <Stat label="Oldest item" value={`${oldest} days`} danger={oldest > 30} />
-            <Stat label="Accounts monitored" value={r.accounts.length} />
+            <Stat
+              label="Requires investigation"
+              value={<span data-testid="suspense-flagged">{r.requiresInvestigation}</span>}
+              danger={r.requiresInvestigation > 0}
+            />
+            <Stat label="Open postings" value={open} danger={open > 0} />
+            <Stat label="Oldest item" value={`${oldest} days`} danger={oldest > r.maxAgeDays} />
           </div>
           {r.accounts.length === 0 ? (
             <EmptyState
               title="No suspense accounts"
-              description="Give an account the SUSPENSE subtype (or map SUSPENSE) to monitor it here."
+              description="Give an account the SUSPENSE subtype (or map SUSPENSE / FIXED_ASSET_CLEARING / GOODS_RECEIVED_NOT_INVOICED) to monitor it here."
             />
           ) : (
             r.accounts.map((a) => (
-              <Card key={a.accountId} data-testid={`suspense-${a.code}`}>
+              <Card key={a.accountId} data-testid="suspense-account" data-code={a.code}>
                 <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
                   <CardTitle className="flex items-center gap-2 text-base">
                     <span className="font-mono text-xs text-muted-foreground">{a.code}</span>
                     {a.name}
-                    {a.unresolvedCount > 0 ? (
-                      <Badge variant={a.oldestAgeDays > 30 ? 'destructive' : 'warning'}>
-                        {a.unresolvedCount} open · {a.oldestAgeDays}d
-                      </Badge>
-                    ) : (
-                      <Badge variant="success">Clear</Badge>
-                    )}
+                    <Badge variant={STATUS_VARIANT[a.status]} data-testid="suspense-status">
+                      {a.status}
+                    </Badge>
+                    {a.openTransactions > 0 ? (
+                      <span className="text-xs text-muted-foreground">
+                        {a.openTransactions} open · {a.ageDays}d
+                      </span>
+                    ) : null}
                   </CardTitle>
                   <div className="flex items-center gap-3 text-sm">
                     <span className="text-muted-foreground">
@@ -115,7 +130,7 @@ export function SuspensePage() {
                         Ledger
                       </Link>
                     </Button>
-                    {hasPermission(P['journal.create']) && a.unresolvedCount > 0 ? (
+                    {hasPermission(P['journal.create']) && a.openTransactions > 0 ? (
                       <Button size="sm" asChild>
                         <Link
                           href={`/accounting/journal-entries/new?journalType=RECLASSIFICATION&accountId=${a.accountId}&description=${encodeURIComponent(`Clear suspense ${a.code}`)}`}
@@ -126,6 +141,11 @@ export function SuspensePage() {
                     ) : null}
                   </div>
                 </CardHeader>
+                {a.reasons.length > 0 ? (
+                  <CardContent className="pt-0 text-xs text-muted-foreground">
+                    {a.reasons.join(' · ')}
+                  </CardContent>
+                ) : null}
                 {a.lines.length > 0 ? (
                   <CardContent className="p-0">
                     <Table>

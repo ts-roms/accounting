@@ -140,6 +140,12 @@ export const createWorkflowSchema = z
     priority: z.coerce.number().int().min(0).max(1000).default(100),
     /** Whether the requester may also act as an approver on their own document. */
     allowSelfApproval: z.boolean().default(false),
+    /** Restrict the workflow to documents of one branch; null = every branch. */
+    branchId: z.string().uuid().nullable().optional(),
+    /** Hours a request may stay pending before it is overdue and escalates. */
+    deadlineHours: z.coerce.number().int().min(1).max(24 * 90).nullable().optional(),
+    /** Permission whose holders may decide an overdue request in place of the step approvers. */
+    escalationPermission: z.string().trim().min(3).max(100).nullable().optional(),
     steps: z.array(workflowStepSchema).min(1, 'At least one step').max(10),
   })
   .refine((w) => w.maxAmount === null || w.maxAmount === undefined || Number(w.maxAmount) > Number(w.minAmount), {
@@ -155,6 +161,9 @@ export const updateWorkflowSchema = z.object({
   maxAmount: amountSchema.nullable().optional(),
   priority: z.coerce.number().int().min(0).max(1000).optional(),
   allowSelfApproval: z.boolean().optional(),
+  branchId: z.string().uuid().nullable().optional(),
+  deadlineHours: z.coerce.number().int().min(1).max(24 * 90).nullable().optional(),
+  escalationPermission: z.string().trim().min(3).max(100).nullable().optional(),
   steps: z.array(workflowStepSchema).min(1).max(10).optional(),
   status: z.enum(ENTITY_STATUSES).optional(),
 });
@@ -165,6 +174,11 @@ export const listApprovalsQuerySchema = paginationQuerySchema.extend({
   documentType: z.enum(WORKFLOW_DOCUMENT_TYPES).optional(),
   /** Only requests the acting user can decide on right now. */
   mine: z
+    .union([z.boolean(), z.string()])
+    .transform((v) => v === true || v === 'true' || v === '1')
+    .optional(),
+  /** Only pending requests past their deadline. */
+  overdue: z
     .union([z.boolean(), z.string()])
     .transform((v) => v === true || v === 'true' || v === '1')
     .optional(),
@@ -241,6 +255,8 @@ export const closePolicySchema = z.object({
   closeBlockOnOpenExceptions: z.boolean().optional(),
   closeRequireIntegrityOk: z.boolean().optional(),
   closeLockOnComplete: z.boolean().optional(),
+  /** A material or aged suspense balance blocks the close. */
+  closeBlockOnSuspense: z.boolean().optional(),
 });
 export type ClosePolicyInput = z.infer<typeof closePolicySchema>;
 
@@ -250,6 +266,10 @@ export const updateAccountingPolicySchema = closePolicySchema.extend({
   reconciliationMateriality: amountSchema.optional(),
   /** A reconciliation older than this many days is considered stale. */
   reconciliationStaleDays: z.coerce.number().int().min(1).max(365).optional(),
+  /** Absolute suspense balance (base currency) above which investigation is required. */
+  suspenseMateriality: amountSchema.optional(),
+  /** Days a suspense balance may stay open before investigation is required. */
+  suspenseMaxAgeDays: z.coerce.number().int().min(1).max(365).optional(),
 });
 export type UpdateAccountingPolicyInput = z.infer<typeof updateAccountingPolicySchema>;
 
@@ -291,3 +311,16 @@ export const closeDecisionSchema = z.object({
 export type CloseDecisionInput = z.infer<typeof closeDecisionSchema>;
 
 
+
+// ------------------------------------------------ hardening: enterprise controls
+
+export const controlsQuerySchema = z.object({ asOf: isoDateSchema.optional() });
+export type ControlsQuery = z.infer<typeof controlsQuerySchema>;
+
+export const fieldHistoryQuerySchema = z.object({
+  entityType: z.string().trim().min(1).max(100),
+  entityId: z.string().uuid(),
+  /** Restrict to one field. */
+  field: z.string().trim().min(1).max(100).optional(),
+});
+export type FieldHistoryQuery = z.infer<typeof fieldHistoryQuerySchema>;

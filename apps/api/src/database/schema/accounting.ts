@@ -78,7 +78,10 @@ export const accounts = pgTable(
     /** Accountable person for clearing / reconciling the balance. */
     ownerUserId: uuid('owner_user_id').references(() => users.id, { onDelete: 'set null' }),
     /** Branch applicability: empty = every branch may post to the account. */
-    allowedBranchIds: uuid('allowed_branch_ids').array().notNull().default(sql`'{}'::uuid[]`),
+    allowedBranchIds: uuid('allowed_branch_ids')
+      .array()
+      .notNull()
+      .default(sql`'{}'::uuid[]`),
     description: text('description'),
     status: entityStatusEnum('status').notNull().default('ACTIVE'),
     ...timestamps,

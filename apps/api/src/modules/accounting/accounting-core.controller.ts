@@ -237,7 +237,7 @@ export class SuspenseController {
   @RequirePermissions(P['journal.view'])
   @ApiOperation({ summary: 'Suspense balances, unresolved postings, age and owner' })
   report(@CurrentUser() user: AuthenticatedUser, @Query() query: SuspenseQueryDto) {
-    return this.service.report(
+    return this.service.monitor(
       user.companyId!,
       query.asOf ?? new Date().toISOString().slice(0, 10),
     );

@@ -1,0 +1,1 @@
+ALTER TYPE "public"."integration_category" ADD VALUE 'PROCUREMENT' BEFORE 'TAX';

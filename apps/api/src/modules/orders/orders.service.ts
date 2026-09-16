@@ -405,6 +405,7 @@ export class OrdersService {
           amount: existing.total,
           currency: existing.currency,
           requestedBy: existing.createdBy ?? actor.id,
+          branchId: existing.branchId,
         };
         if (action === 'submit') await this.approvals.open(tx, { ...ref, requestedBy: actor.id });
         else await this.approvals.assertApproved(tx, ref);

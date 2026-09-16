@@ -29,6 +29,9 @@ import { MappingsService } from '../mapping/mappings.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { decideRetry } from '../retries/retry-policy';
 import { BankTransactionsImporter } from './importers/bank-transactions.importer';
+import { BillsImporter } from './importers/bills.importer';
+import { ProductsImporter } from './importers/products.importer';
+import { VendorsImporter } from './importers/vendors.importer';
 import { CustomersImporter } from './importers/customers.importer';
 import type { Importer } from './importers/importer';
 import { InvoicesImporter } from './importers/invoices.importer';
@@ -67,10 +70,16 @@ export class SyncService implements OnModuleInit {
     invoices: InvoicesImporter,
     payments: PaymentsImporter,
     bankTransactions: BankTransactionsImporter,
+    vendors: VendorsImporter,
+    bills: BillsImporter,
+    products: ProductsImporter,
   ) {
     this.logger.setContext(SyncService.name);
     this.importers = new Map<SyncEntity, Importer>(
-      [customers, invoices, payments, bankTransactions].map((i) => [i.entity, i]),
+      [customers, invoices, payments, bankTransactions, vendors, bills, products].map((i) => [
+        i.entity,
+        i,
+      ]),
     );
   }
 

@@ -490,7 +490,7 @@ export async function seedAccounting(
     await seedSubledgers(tx, company, codeToId, adminUserId, log);
     await seedOrders(tx, company, codeToId, adminUserId, log);
     await seedInventory(tx, company, adminUserId, log);
-    await seedAssetsBanking(tx, company, codeToId, log);
+    await seedAssetsBanking(tx, company, codeToId, adminUserId, log);
     await seedBudgetingTax(tx, company, codeToId, adminUserId, log);
     await seedAccountingCore(tx, company, codeToId, adminUserId, log);
   }

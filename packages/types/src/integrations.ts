@@ -11,6 +11,7 @@ export const INTEGRATION_CATEGORIES = [
   'BANKING',
   'PAYMENT',
   'ECOMMERCE',
+  'PROCUREMENT',
   'TAX',
   'PAYROLL',
   'CRM',
@@ -225,6 +226,11 @@ export const API_SCOPE_DEFINITIONS = [
   ],
   ['bills:read', 'Read vendor bills', ['bill.view', 'vendor.view']],
   ['bills:write', 'Create draft vendor bills', ['bill.view', 'vendor.view', 'bill.create']],
+  [
+    'bills:post',
+    'Approve and post vendor bills (explicit - never granted by default)',
+    ['bill.view', 'bill.approve', 'bill.post'],
+  ],
   ['payments:read', 'Read customer and vendor payments', ['invoice.view', 'bill.view']],
   [
     'payments:write',

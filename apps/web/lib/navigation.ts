@@ -96,7 +96,8 @@ export const NAVIGATION: NavSection[] = [
         P['reconciliation.view'],
       ]),
       item('Integrity', '/accounting/integrity', ShieldCheck, [P['integrity.check']]),
-      item('Suspense Accounts', '/accounting/suspense', Siren, [P['journal.view']]),
+      item('Control Center', '/accounting/control-center', LayoutDashboard, [P['controls.view']]),
+      item('Suspense Accounts', '/accounting/suspense', Siren, [P['controls.view']]),
       item('Recurring Journals', '/accounting/recurring-journals', Workflow, [
         P['recurring-journal.view'],
       ]),
