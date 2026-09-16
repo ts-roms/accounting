@@ -256,6 +256,8 @@ export const PERMISSION_DEFINITIONS = [
 
   // Reporting & audit
   define('reports.view', 'REPORTING', 'View financial reports'),
+  define('report-definition.manage', 'REPORTING', 'Create and edit report definitions'),
+  define('trace.view', 'REPORTING', 'Trace a financial figure to its source document and audit trail'),
   define('reports.export', 'REPORTING', 'Export reports and lists as files'),
   define('numbering.view', 'ADMINISTRATION', 'View document numbering rules'),
   define('numbering.manage', 'ADMINISTRATION', 'Configure document numbering rules'),

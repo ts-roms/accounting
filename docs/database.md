@@ -219,6 +219,15 @@ Migration: `0017_enterprise_controls.sql` (also installs the `field_changes` imm
 Enum additions: `audit_action` += `IMPORT`, `EXPORT`; `adjustment_reason` += `OPENING`.
 Migration: `0021_data_infrastructure.sql`.
 
+## Hardening phase 7 (reporting engine)
+
+| Table                | Purpose                                                                                                                                                                                                                               |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `report_definitions` | Report layouts as JSON (rows / columns / filters) per company; `code` unique per company; enums `report_category` (FINANCIAL / MANAGEMENT / CUSTOM), `report_basis` (PERIOD / AS_OF); `is_system` marks the seeded, read-only layouts |
+
+The engine stores no figures: runs read `journal_lines` through the ledger
+service and `budget_lines` of approved versions. Migration: `0023_reporting_engine.sql`.
+
 ## Posted-journal immutability
 
 Migration `0003_posted_journal_immutability.sql` installs triggers that reject

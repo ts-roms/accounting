@@ -53,7 +53,7 @@ test.describe('enterprise controls', () => {
     await expect(page).toHaveURL(/\/sales\/invoices\/[0-9a-f-]+$/);
     await expect(page.getByTestId('history-panel')).toContainText('No field changes recorded');
     // Edit the price and give a reason.
-    await page.getByRole('link', { name: 'Edit' }).click();
+    await page.getByRole('link', { name: 'Edit', exact: true }).click();
     await expect(page).toHaveURL(/\/edit$/);
     const editPrice = page.locator('input[inputmode="decimal"]').nth(1);
     await editPrice.fill('1100');

@@ -212,6 +212,15 @@ export const listJournalEntriesQuerySchema = paginationQuerySchema.extend({
   to: isoDateSchema.optional(),
   fiscalPeriodId: uuidSchema.optional(),
   accountId: uuidSchema.optional(),
+  // Journal control center filters (H7).
+  branchId: uuidSchema.optional(),
+  /** Source module (`sourceType`); `MANUAL` selects entries without a source. */
+  sourceType: z.string().trim().min(1).max(60).optional(),
+  createdBy: uuidSchema.optional(),
+  approvedBy: uuidSchema.optional(),
+  postedBy: uuidSchema.optional(),
+  minAmount: amountSchema.optional(),
+  maxAmount: amountSchema.optional(),
 });
 export type ListJournalEntriesQuery = z.infer<typeof listJournalEntriesQuerySchema>;
 

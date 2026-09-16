@@ -187,3 +187,32 @@ export const DEFAULT_NUMBERING_FORMAT = '{PREFIX}-{YEAR}-{SEQ}';
 /** Subledger areas an opening balance can be loaded into. */
 export const OPENING_BALANCE_AREAS = ['AR', 'AP', 'INVENTORY', 'FIXED_ASSETS'] as const;
 export type OpeningBalanceArea = (typeof OPENING_BALANCE_AREAS)[number];
+
+// ------------------------------------------------------------------ reporting engine (H7)
+
+/** How a report column derives its date window from the run's current period. */
+export const REPORT_COLUMN_KINDS = [
+  'CURRENT',
+  'PRIOR_PERIOD',
+  'YEAR_TO_DATE',
+  'PRIOR_YEAR',
+  'BUDGET',
+  'VARIANCE',
+  'VARIANCE_PCT',
+  'CUSTOM_RANGE',
+] as const;
+export type ReportColumnKind = (typeof REPORT_COLUMN_KINDS)[number];
+
+export const REPORT_ROW_KINDS = ['HEADER', 'ACCOUNTS', 'FORMULA', 'DIMENSION_GROUP'] as const;
+export type ReportRowKind = (typeof REPORT_ROW_KINDS)[number];
+
+/** PERIOD rows report movement in the window; AS_OF rows report the balance at the window end. */
+export const REPORT_BASES = ['PERIOD', 'AS_OF'] as const;
+export type ReportBasis = (typeof REPORT_BASES)[number];
+
+export const REPORT_CATEGORIES = ['FINANCIAL', 'MANAGEMENT', 'CUSTOM'] as const;
+export type ReportCategory = (typeof REPORT_CATEGORIES)[number];
+
+/** Presentation sign of a row: the account's natural side, or forced debit / credit positive. */
+export const REPORT_SIGNS = ['NATURAL', 'DEBIT', 'CREDIT'] as const;
+export type ReportSign = (typeof REPORT_SIGNS)[number];

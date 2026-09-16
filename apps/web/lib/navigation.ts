@@ -106,6 +106,7 @@ export const NAVIGATION: NavSection[] = [
       ]),
       item('Integrity', '/accounting/integrity', ShieldCheck, [P['integrity.check']]),
       item('Control Center', '/accounting/control-center', LayoutDashboard, [P['controls.view']]),
+      item('Journal Control', '/accounting/journal-control', ScrollText, [P['journal.view']]),
       item('Suspense Accounts', '/accounting/suspense', Siren, [P['controls.view']]),
       item('Recurring Journals', '/accounting/recurring-journals', Workflow, [
         P['recurring-journal.view'],
@@ -313,6 +314,7 @@ export const NAVIGATION: NavSection[] = [
     icon: BarChart3,
     items: [
       item('Financial Statements', '/reports/financial-statements', FileText, [P['reports.view']]),
+      item('Custom Reports', '/reports/custom', SlidersHorizontal, [P['reports.view']]),
       item('AR Aging', '/reports/ar-aging', ClipboardList, [P['reports.view']]),
       item('AP Aging', '/reports/ap-aging', ClipboardList, [P['reports.view']]),
       item('General Ledger Report', '/reports/general-ledger', BookOpenText, [P['reports.view']]),

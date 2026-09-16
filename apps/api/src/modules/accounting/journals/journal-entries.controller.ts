@@ -48,6 +48,16 @@ export class JournalEntriesController {
     return this.service.list(user.companyId!, query);
   }
 
+  @Get('summary')
+  @RequirePermissions(P['journal.view'])
+  @ApiOperation({
+    summary:
+      'Journal control center: counts and totals per status and source for the filtered population',
+  })
+  summary(@CurrentUser() user: AuthenticatedUser, @Query() query: ListJournalEntriesQueryDto) {
+    return this.service.summary(user.companyId!, query);
+  }
+
   @Get(':id')
   @RequirePermissions(P['journal.view'])
   get(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {

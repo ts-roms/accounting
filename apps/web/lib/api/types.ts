@@ -1,4 +1,5 @@
 /* API response shapes used by the web client (mirrors the NestJS views). */
+import type { ReportLayoutInput } from '@accounting/validation';
 import type {
   AssetEventType,
   AssetStatus,
@@ -2581,4 +2582,149 @@ export interface OpeningBalanceReport {
   openingEquity: { accountId: string; code: string; balance: string };
   trialBalanceBalanced: boolean;
   reconciled: boolean;
+}
+
+// ------------------------------------------------------- reporting engine (H7)
+
+export interface ReportDefinitionView {
+  id: string;
+  companyId: string;
+  code: string;
+  name: string;
+  description: string | null;
+  category: 'FINANCIAL' | 'MANAGEMENT' | 'CUSTOM';
+  basis: 'PERIOD' | 'AS_OF';
+  layout: ReportLayoutInput;
+  isSystem: boolean;
+  status: 'ACTIVE' | 'INACTIVE';
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReportColumnResult {
+  key: string;
+  label: string;
+  kind: string;
+  from: string | null;
+  to: string | null;
+}
+
+export interface ReportLineResult {
+  key: string;
+  label: string;
+  kind: 'HEADER' | 'ACCOUNTS' | 'FORMULA' | 'DIMENSION_GROUP' | 'ACCOUNT' | 'DIMENSION_VALUE';
+  level: number;
+  bold: boolean;
+  values: Record<string, string | null>;
+  accountId?: string;
+  dimensionId?: string;
+}
+
+export interface ReportResult {
+  definition: { id: string | null; code: string; name: string; basis: 'PERIOD' | 'AS_OF' };
+  currency: string;
+  params: {
+    from: string;
+    to: string;
+    branchId?: string | null;
+    budgetId?: string;
+    includeZero: boolean;
+  };
+  columns: ReportColumnResult[];
+  rows: ReportLineResult[];
+  generatedAt: string;
+}
+
+export interface JournalControlSummary {
+  total: {
+    count: number;
+    totalDebit: string;
+    reversals: number;
+    reversed: number;
+    manual: number;
+    awaitingApproval: number;
+    selfPosted: number;
+  };
+  byStatus: Array<{ status: string; count: number; totalDebit: string }>;
+  bySource: Array<{ sourceType: string; count: number; posted: number; totalDebit: string }>;
+}
+
+export interface TraceActor {
+  id: string | null;
+  email: string | null;
+  name: string | null;
+}
+
+export interface TraceJournal {
+  id: string;
+  documentNumber: string;
+  status: string;
+  entryDate: string;
+  journalType: string;
+  sourceType: string | null;
+  totalDebit: string;
+  relation: 'THIS' | 'ORIGINAL' | 'REVERSAL' | 'CORRECTED' | 'CORRECTION' | 'SAME_SOURCE';
+}
+
+export interface JournalTrace {
+  journal: {
+    id: string;
+    documentNumber: string;
+    status: string;
+    journalType: string;
+    entryDate: string;
+    description: string;
+    reference: string | null;
+    totalDebit: string;
+    totalCredit: string;
+    sourceType: string | null;
+    sourceId: string | null;
+    branchId: string | null;
+    createdBy: TraceActor;
+    approvedBy: TraceActor;
+    postedBy: TraceActor;
+    createdAt: string;
+    approvedAt: string | null;
+    postedAt: string | null;
+    lineCount: number;
+    accountIds: string[];
+  };
+  source: {
+    sourceType: string;
+    event: string;
+    id: string;
+    documentNumber: string | null;
+    status: string | null;
+    amount: string | null;
+    path: string;
+    entityType: string;
+    workflowDocumentType: string | null;
+  } | null;
+  party: {
+    kind: 'CUSTOMER' | 'VENDOR' | 'EMPLOYEE';
+    id: string;
+    code: string | null;
+    name: string;
+    path: string;
+  } | null;
+  related: TraceJournal[];
+  approvals: Array<{
+    id: string;
+    documentType: string;
+    documentNumber: string;
+    status: string;
+    amount: string;
+    createdAt: string;
+  }>;
+  audit: Array<{
+    id: number;
+    occurredAt: string;
+    action: string;
+    module: string;
+    entityType: string;
+    entityId: string | null;
+    user: TraceActor;
+    metadata: unknown;
+  }>;
 }
