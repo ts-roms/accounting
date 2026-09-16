@@ -57,7 +57,8 @@ import {
   StepTimeline,
   type TimelineStep,
 } from '@accounting/ui';
-import { describeError } from '@/lib/api/client';
+import { describeError, getActiveCompanyId } from '@/lib/api/client';
+import { useBranches } from '@/lib/api/hooks';
 import { DelegatedAuthorityNotice } from '@/components/delegations/delegated-authority-notice';
 import {
   useApproval,
@@ -82,6 +83,7 @@ const DOCUMENT_PATH: Record<WorkflowDocumentType, string> = {
   VENDOR_PAYMENT: '/purchasing/payments',
   PURCHASE_ORDER: '/purchasing/orders',
   EXPENSE_CLAIM: '/budgeting/expense-claims',
+  VENDOR_BILL: '/purchasing/bills',
 };
 const STATUS_VARIANT: Record<
   ApprovalRequestStatus,
@@ -230,6 +232,9 @@ function WorkflowDialog({
       maxAmount: workflow?.maxAmount ?? null,
       priority: workflow?.priority ?? 100,
       allowSelfApproval: workflow?.allowSelfApproval ?? false,
+      branchId: workflow?.branchId ?? null,
+      deadlineHours: workflow?.deadlineHours ?? null,
+      escalationPermission: workflow?.escalationPermission ?? null,
       steps: workflow?.steps ?? [
         { name: 'Finance review', requiredPermission: 'journal.approve', minApprovers: 1 },
       ],
@@ -257,6 +262,7 @@ function WorkflowDialog({
     }
   });
   const permissionOptions = PERMISSION_DEFINITIONS.map((p) => p.key).sort();
+  const branches = useBranches(getActiveCompanyId() ?? undefined);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -378,6 +384,93 @@ function WorkflowDialog({
                     <FormLabel className="!mt-0">
                       Requester may approve their own document
                     </FormLabel>
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <FormField
+                control={form.control}
+                name="branchId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Branch</FormLabel>
+                    <Select
+                      value={field.value ?? '__all__'}
+                      onValueChange={(v) => field.onChange(v === '__all__' ? null : v)}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="workflow-branch">
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="__all__">Every branch</SelectItem>
+                        {(branches.data ?? []).map((b) => (
+                          <SelectItem key={b.id} value={b.id}>
+                            {b.code} {b.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>A branch workflow beats a company-wide one.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="deadlineHours"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Deadline (hours)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={
+                          field.value === null || field.value === undefined
+                            ? ''
+                            : String(field.value)
+                        }
+                        placeholder="No deadline"
+                        onChange={(e) =>
+                          field.onChange(e.target.value === '' ? null : e.target.value)
+                        }
+                        data-testid="workflow-deadline"
+                      />
+                    </FormControl>
+                    <FormDescription>Requests past it are overdue and escalate.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="escalationPermission"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Escalate to</FormLabel>
+                    <Select
+                      value={field.value ?? '__none__'}
+                      onValueChange={(v) => field.onChange(v === '__none__' ? null : v)}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="workflow-escalation">
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="__none__">Nobody</SelectItem>
+                        {permissionOptions.map((p) => (
+                          <SelectItem key={p} value={p} className="font-mono text-xs">
+                            {p}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>Holders may decide an overdue request.</FormDescription>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -552,6 +645,13 @@ export function ApprovalsPage() {
             {row.original.status === 'PENDING'
               ? `${row.original.steps[row.original.currentStep]?.name ?? '-'} (${row.original.currentStep + 1}/${row.original.steps.length})`
               : titleCase(row.original.status)}
+            {row.original.overdue ? (
+              <StatusBadge tone="warning" className="ml-2" data-testid="approval-overdue">
+                Overdue
+              </StatusBadge>
+            ) : row.original.dueAt && row.original.status === 'PENDING' ? (
+              <div className="text-muted-foreground">due {formatDateTime(row.original.dueAt)}</div>
+            ) : null}
           </span>
         ),
       },
@@ -747,7 +847,12 @@ function ApprovalDialog({
                 }),
                 {
                   key: 'done',
-                  label: r.status === 'REJECTED' ? 'Rejected' : r.status === 'CANCELLED' ? 'Cancelled' : 'Approved',
+                  label:
+                    r.status === 'REJECTED'
+                      ? 'Rejected'
+                      : r.status === 'CANCELLED'
+                        ? 'Cancelled'
+                        : 'Approved',
                   state:
                     r.status === 'APPROVED'
                       ? 'complete'

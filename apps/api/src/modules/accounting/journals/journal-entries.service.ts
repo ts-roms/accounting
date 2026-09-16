@@ -550,6 +550,7 @@ export class JournalEntriesService {
         amount: entry.totalDebit,
         currency: entry.currency,
         requestedBy: actor.id,
+        branchId: entry.branchId,
       });
       await tx
         .update(journalEntries)
@@ -584,6 +585,7 @@ export class JournalEntriesService {
         amount: entry.totalDebit,
         currency: entry.currency,
         requestedBy: entry.createdBy ?? actor.id,
+        branchId: entry.branchId,
       });
       const conflict = await this.sod.checkActorSeparation(
         actor.organizationId,

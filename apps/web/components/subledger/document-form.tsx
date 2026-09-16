@@ -159,7 +159,7 @@ export function DocumentForm({
   /** Company base currency; the document itself is in the party's currency. */
   currency: string;
   submitting: boolean;
-  onSubmit: (values: DocumentInput) => Promise<void>;
+  onSubmit: (values: DocumentInput & { changeReason?: string }) => Promise<void>;
   onCancel: () => void;
 }) {
   const schema = cfg.side === 'AR' ? createInvoiceSchema : createBillSchema;
@@ -230,8 +230,14 @@ export function DocumentForm({
     return () => window.removeEventListener('beforeunload', handler);
   }, [form.formState.isDirty, submitting]);
 
+  // Edits carry a reason that is kept with the field-level change history (H5).
+  const [changeReason, setChangeReason] = React.useState('');
   const submit = form.handleSubmit(async (values) => {
-    await onSubmit(values as DocumentInput);
+    await onSubmit(
+      document
+        ? { ...(values as DocumentInput), changeReason: changeReason.trim() || undefined }
+        : (values as DocumentInput),
+    );
   });
 
   const typeLabel = (t: (typeof SUBLEDGER_DOCUMENT_TYPES)[number]) =>
@@ -430,6 +436,20 @@ export function DocumentForm({
                 </FormItem>
               )}
             />
+            {document ? (
+              <FormItem className="md:col-span-4">
+                <FormLabel>Reason for change</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="Kept with the change history, e.g. Additional approved service"
+                    value={changeReason}
+                    onChange={(e) => setChangeReason(e.target.value)}
+                    maxLength={500}
+                    data-testid="doc-change-reason"
+                  />
+                </FormControl>
+              </FormItem>
+            ) : null}
           </CardContent>
         </Card>
 

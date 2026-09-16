@@ -16,7 +16,7 @@ const policy = (overrides: Partial<SodPolicy>): SodPolicy => ({
 });
 
 describe('SodService.evaluate', () => {
-  const service = new SodService({} as never, {} as never);
+  const service = new SodService({} as never, {} as never, {} as never);
 
   it('flags a conflict only when both permissions are held', () => {
     const result = service.evaluate(new Set(['journal.create']), [policy({})]);

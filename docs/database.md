@@ -195,6 +195,19 @@ Migration: `0012_reconciliation.sql` (also adds `RECONCILIATION` to `attachment_
 `accounting_policies` gains the close policy booleans (`close_require_*`,
 `close_block_on_*`, `close_lock_on_complete`). Migration: `0014_financial_close.sql`.
 
+## Hardening phase 5 (enterprise controls)
+
+| Table / column                                                                                                 | Purpose                                                                   |
+| -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `field_changes`                                                                                                | Field-level history derived from audit events; append-only (triggers)     |
+| `accounts.subtype = SUSPENSE` (+ `SUSPENSE` / `FIXED_ASSET_CLEARING` / `GOODS_RECEIVED_NOT_INVOICED` mappings) | Watched by the suspense monitor; `accounts.owner_user_id` names the owner |
+| `accounting_policies.suspense_materiality / suspense_max_age_days / close_block_on_suspense`                   | Suspense policy                                                           |
+| `approval_workflows.branch_id / deadline_hours / escalation_permission`                                        | Branch scope, deadline and escalation of a workflow                       |
+| `approval_requests.branch_id / due_at / escalated_at`                                                          | Request deadline state                                                    |
+
+Enum additions: `audit_action` += `ESCALATE`, `SOD_WARNING`; `workflow_document_type` += `VENDOR_BILL`.
+Migration: `0017_enterprise_controls.sql` (also installs the `field_changes` immutability triggers).
+
 ## Posted-journal immutability
 
 Migration `0003_posted_journal_immutability.sql` installs triggers that reject

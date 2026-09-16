@@ -58,6 +58,12 @@ export const accountingPolicies = pgTable('accounting_policies', {
   closeRequireIntegrityOk: boolean('close_require_integrity_ok').notNull().default(true),
   /** Lock the period as the final step of a completed close. */
   closeLockOnComplete: boolean('close_lock_on_complete').notNull().default(false),
+  /** A suspense balance requiring investigation blocks the close. */
+  closeBlockOnSuspense: boolean('close_block_on_suspense').notNull().default(true),
+  /** Absolute suspense balance above which investigation is required (0 = any balance). */
+  suspenseMateriality: money('suspense_materiality').notNull().default('0'),
+  /** Days a suspense balance may stay open before investigation is required. */
+  suspenseMaxAgeDays: integer('suspense_max_age_days').notNull().default(30),
   ...timestamps,
 });
 

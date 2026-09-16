@@ -41,6 +41,8 @@ describe('navigation', () => {
         'general-ledger',
         'trial-balance',
         'period-closing',
+        'control-center',
+        'suspense',
       ].map((p) => `/accounting/${p}`),
       '/reports/financial-statements',
       '/reports/general-ledger',

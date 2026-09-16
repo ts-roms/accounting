@@ -33,6 +33,8 @@ import { AccountsService } from '@/modules/accounting/accounts/accounts.service'
 import { AccountingPostingService } from '@/modules/accounting/journals/posting.service';
 import { DocumentNumberingService } from '@/modules/accounting/numbering/document-numbering.service';
 import { AuditService } from '@/modules/audit/audit.service';
+import { SodService } from '@/modules/rbac/sod.service';
+import { ApprovalsService } from '@/modules/workflows/approvals.service';
 import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { BusinessRuleError, NotFoundError } from '@/common/errors/app-error';
 import { ErrorCodes } from '@/common/errors/error-codes';
@@ -132,6 +134,8 @@ export class BillsService {
     private readonly rates: ExchangeRatesService,
     private readonly fx: FxService,
     private readonly authority: AuthorityService,
+    private readonly sod: SodService,
+    private readonly approvals: ApprovalsService,
   ) {}
 
   // ----------------------------------------------------------------- queries
@@ -510,9 +514,39 @@ export class BillsService {
           module: MODULE,
           entityType: 'VendorBill',
           entityId: id,
-          previousValue: { total: existing.total, documentDate: existing.documentDate },
-          newValue: { total: totals.total, documentDate },
-          metadata: { documentNumber: existing.documentNumber, editor: actor.email },
+          // Header before / after: the audit service derives the field-level history from it.
+          previousValue: {
+            vendorId: existing.vendorId,
+            branchId: existing.branchId,
+            documentDate: existing.documentDate,
+            dueDate: existing.dueDate,
+            reference: existing.reference,
+            description: existing.description,
+            vendorInvoiceNumber: existing.vendorInvoiceNumber,
+            subtotal: existing.subtotal,
+            taxTotal: existing.taxTotal,
+            total: existing.total,
+          },
+          newValue: {
+            vendorId: vendor.id,
+            branchId: input.branchId === undefined ? existing.branchId : input.branchId,
+            documentDate,
+            dueDate,
+            reference: input.reference === undefined ? existing.reference : input.reference,
+            description: input.description === undefined ? existing.description : input.description,
+            vendorInvoiceNumber:
+              input.vendorInvoiceNumber === undefined
+                ? existing.vendorInvoiceNumber
+                : input.vendorInvoiceNumber,
+            subtotal: totals.subtotal,
+            taxTotal: totals.taxTotal,
+            total: totals.total,
+          },
+          metadata: {
+            documentNumber: existing.documentNumber,
+            editor: actor.email,
+            reason: input.changeReason ?? null,
+          },
           companyId,
         },
         tx,
@@ -564,6 +598,30 @@ export class BillsService {
         createdBy: existing.createdBy,
         action: 'Approved vendor bill',
       });
+      // Workflow-gated: a matching approval chain must be complete before the bill is approved.
+      await this.approvals.assertApproved(tx, {
+        companyId,
+        documentType: 'VENDOR_BILL',
+        documentId: id,
+        documentNumber: existing.documentNumber,
+        amount: existing.total,
+        currency: existing.currency,
+        requestedBy: existing.createdBy ?? actor.id,
+        branchId: existing.branchId,
+      });
+      await this.sod.checkActorSeparation(
+        actor.organizationId,
+        [P['bill.create'], P['bill.approve']],
+        existing.createdBy,
+        actor.id,
+        tx,
+        {
+          companyId,
+          entityType: 'VendorBill',
+          entityId: id,
+          documentNumber: existing.documentNumber,
+        },
+      );
       await tx
         .update(vendorBills)
         .set({ status: 'APPROVED', approvedBy: actor.id, approvedAt: new Date() })
@@ -723,6 +781,7 @@ export class BillsService {
     await this.db.transaction(async (tx) => {
       const existing = await this.lock(tx, companyId, id);
       this.assertStatus(existing, ['DRAFT', 'APPROVED', 'PARTIALLY_PAID', 'PAID'], 'voided');
+      await this.approvals.cancelFor(tx, 'VENDOR_BILL', id);
       if (!Money.of(existing.allocatedAmount, existing.currency).isZero()) {
         throw new BusinessRuleError(
           ErrorCodes.DOCUMENT_HAS_ALLOCATIONS,

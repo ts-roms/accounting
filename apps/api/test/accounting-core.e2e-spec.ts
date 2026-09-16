@@ -590,8 +590,9 @@ describe('Accounting core extensions (e2e)', () => {
     ).expect(200);
     const suspense = report.body.accounts.find((a: { code: string }) => a.code === '1900');
     expect(suspense.balance).toBe('-700.0000');
-    expect(suspense.unresolvedCount).toBe(1);
-    expect(suspense.oldestAgeDays).toBe(28);
+    expect(suspense.openTransactions).toBe(1);
+    expect(suspense.ageDays).toBe(28);
+    expect(suspense.status).toBe('REQUIRES_INVESTIGATION');
     expect(suspense.ownerEmail).toBe(FINANCE.email);
 
     const clearing = await as(accountant, http().post('/api/v1/journal-entries'))
@@ -612,7 +613,8 @@ describe('Accounting core extensions (e2e)', () => {
     ).expect(200);
     const after = cleared.body.accounts.find((a: { code: string }) => a.code === '1900');
     expect(after.balance).toBe('0.0000');
-    expect(after.unresolvedCount).toBe(0);
+    expect(after.openTransactions).toBe(0);
+    expect(after.status).toBe('CLEAR');
   });
 
   it('passes the extended integrity checks', async () => {

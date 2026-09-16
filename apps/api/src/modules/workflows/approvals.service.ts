@@ -40,6 +40,10 @@ export interface ApprovalRequestView extends ApprovalRequest {
   pendingApprovals: number;
   /** Whether the acting user can decide the current step right now. */
   canDecide: boolean;
+  /** Pending past its deadline. */
+  overdue: boolean;
+  /** Permission that may decide the request while it is overdue (from the workflow). */
+  escalationPermission: string | null;
 }
 
 export interface ApprovalRequestDetail extends ApprovalRequestView {
@@ -62,6 +66,8 @@ export interface DocumentRef {
   amount: string;
   currency: string;
   requestedBy: string;
+  /** Branch of the document, for branch-specific workflows. */
+  branchId?: string | null;
 }
 
 /**
@@ -116,6 +122,9 @@ export class ApprovalsService {
           maxAmount: input.maxAmount ?? null,
           priority: input.priority,
           allowSelfApproval: input.allowSelfApproval,
+          branchId: input.branchId ?? null,
+          deadlineHours: input.deadlineHours ?? null,
+          escalationPermission: input.escalationPermission ?? null,
           steps: input.steps,
           createdBy: actor.id,
         })
@@ -169,6 +178,13 @@ export class ApprovalsService {
           maxAmount,
           priority: input.priority ?? existing.priority,
           allowSelfApproval: input.allowSelfApproval ?? existing.allowSelfApproval,
+          branchId: input.branchId === undefined ? existing.branchId : input.branchId,
+          deadlineHours:
+            input.deadlineHours === undefined ? existing.deadlineHours : input.deadlineHours,
+          escalationPermission:
+            input.escalationPermission === undefined
+              ? existing.escalationPermission
+              : input.escalationPermission,
           steps: input.steps ?? existing.steps,
           status: input.status ?? existing.status,
         })
@@ -191,12 +207,17 @@ export class ApprovalsService {
     });
   }
 
-  /** The active workflow governing a document: amount band match, lowest priority number wins. */
+  /**
+   * The active workflow governing a document: amount band match, lowest
+   * priority number wins; a workflow scoped to the document's branch beats a
+   * company-wide one of equal priority.
+   */
   async match(
     tx: DbExecutor,
     companyId: string,
     documentType: WorkflowDocumentType,
     amount: string,
+    branchId?: string | null,
   ): Promise<ApprovalWorkflow | null> {
     const rows = await tx
       .select()
@@ -210,11 +231,18 @@ export class ApprovalsService {
       )
       .orderBy(asc(approvalWorkflows.priority), asc(approvalWorkflows.minAmount));
     const value = Number(amount);
+    const candidates = rows.filter(
+      (w) =>
+        value >= Number(w.minAmount) &&
+        (w.maxAmount === null || value < Number(w.maxAmount)) &&
+        (w.branchId === null || w.branchId === (branchId ?? null)),
+    );
     return (
-      rows.find(
-        (w) =>
-          value >= Number(w.minAmount) && (w.maxAmount === null || value < Number(w.maxAmount)),
-      ) ?? null
+      candidates.sort((a, b) =>
+        a.priority !== b.priority
+          ? a.priority - b.priority
+          : Number(b.branchId !== null) - Number(a.branchId !== null),
+      )[0] ?? null
     );
   }
 
@@ -222,7 +250,13 @@ export class ApprovalsService {
 
   /** Opens a request when a workflow applies and none is pending. Returns the open request or null. */
   async open(tx: DbExecutor, doc: DocumentRef): Promise<ApprovalRequest | null> {
-    const workflow = await this.match(tx, doc.companyId, doc.documentType, doc.amount);
+    const workflow = await this.match(
+      tx,
+      doc.companyId,
+      doc.documentType,
+      doc.amount,
+      doc.branchId,
+    );
     if (!workflow) return null;
     const [pending] = await tx
       .select()
@@ -247,6 +281,10 @@ export class ApprovalsService {
         currency: doc.currency,
         steps: workflow.steps,
         requestedBy: doc.requestedBy,
+        branchId: doc.branchId ?? null,
+        dueAt: workflow.deadlineHours
+          ? new Date(Date.now() + workflow.deadlineHours * 3_600_000)
+          : null,
       })
       .returning();
     await this.audit.record(
@@ -274,7 +312,13 @@ export class ApprovalsService {
    * raises APPROVAL_REQUIRED with its id.
    */
   async assertApproved(tx: DbExecutor, doc: DocumentRef): Promise<void> {
-    const workflow = await this.match(tx, doc.companyId, doc.documentType, doc.amount);
+    const workflow = await this.match(
+      tx,
+      doc.companyId,
+      doc.documentType,
+      doc.amount,
+      doc.branchId,
+    );
     if (!workflow) return;
     const [latest] = await tx
       .select()
@@ -292,7 +336,9 @@ export class ApprovalsService {
       Money.of(latest.amount, doc.currency).equals(Money.of(doc.amount, doc.currency))
     )
       return;
-    const request = latest?.status === 'PENDING' ? latest : await this.open(tx, doc);
+    // The caller's transaction is about to roll back with APPROVAL_REQUIRED, so the
+    // request is opened on its own connection - otherwise it would vanish with it.
+    const request = latest?.status === 'PENDING' ? latest : await this.open(this.db, doc);
     throw new BusinessRuleError(
       ErrorCodes.APPROVAL_REQUIRED,
       `${doc.documentNumber} needs approval through "${workflow.name}" (step ${(request?.currentStep ?? 0) + 1} of ${workflow.steps.length}).`,
@@ -327,10 +373,13 @@ export class ApprovalsService {
     actor: AuthenticatedUser,
     query: ListApprovalsQuery,
   ): Promise<PaginatedResult<ApprovalRequestView>> {
+    await this.escalateOverdue(companyId);
     const filters: SQL[] = [eq(approvalRequests.companyId, companyId)];
     if (query.status) filters.push(eq(approvalRequests.status, query.status));
     if (query.documentType) filters.push(eq(approvalRequests.documentType, query.documentType));
     if (query.mine) filters.push(eq(approvalRequests.status, 'PENDING'));
+    if (query.overdue)
+      filters.push(eq(approvalRequests.status, 'PENDING'), sql`${approvalRequests.dueAt} < now()`);
     if (query.search)
       filters.push(sql`${approvalRequests.documentNumber} ilike ${`%${query.search}%`}`);
     const where = and(...filters);
@@ -439,10 +488,17 @@ export class ApprovalsService {
           'The request has no open step.',
         );
       const access = await this.resolver.resolve(actor.id, companyId, tx);
-      // The step's permission may be held natively or lent by an active delegation
-      // (scope, amount ceiling and SoD are enforced and the use is recorded).
+      const overdue = request.dueAt !== null && request.dueAt.getTime() < Date.now();
+      const escalated =
+        overdue &&
+        workflow?.escalationPermission !== null &&
+        workflow?.escalationPermission !== undefined &&
+        access.permissions.has(workflow.escalationPermission);
+      // The step's permission may be held natively, exercised through escalation
+      // once the request is overdue, or lent by an active delegation (scope,
+      // amount ceiling and SoD are enforced and the use is recorded).
       let delegatedAudit: Record<string, unknown> | undefined;
-      if (!access.permissions.has(step.requiredPermission)) {
+      if (!access.permissions.has(step.requiredPermission) && !escalated) {
         const grants = actor.delegations ?? [];
         if (!grants.some((g) => g.permission === step.requiredPermission))
           throw new BusinessRuleError(
@@ -465,6 +521,12 @@ export class ApprovalsService {
           },
         );
         delegatedAudit = authority.audit;
+      }
+      if (escalated && request.escalatedAt === null) {
+        await tx
+          .update(approvalRequests)
+          .set({ escalatedAt: new Date() })
+          .where(eq(approvalRequests.id, id));
       }
       if (!workflow?.allowSelfApproval && request.requestedBy === actor.id) {
         throw new BusinessRuleError(
@@ -512,6 +574,7 @@ export class ApprovalsService {
             decision: input.decision,
             status,
             comment: input.comment ?? null,
+            escalated,
           },
           metadata: {
             actor: actor.email,
@@ -526,6 +589,52 @@ export class ApprovalsService {
     return this.get(companyId, actor, id);
   }
 
+  /**
+   * Marks pending requests past their deadline as escalated (once) and audits
+   * it, so the escalation approvers see them and the trail shows when the
+   * deadline was missed. Called lazily from the list and by the dashboard.
+   */
+  async escalateOverdue(companyId: string): Promise<number> {
+    const rows = await this.db
+      .update(approvalRequests)
+      .set({ escalatedAt: new Date() })
+      .where(
+        and(
+          eq(approvalRequests.companyId, companyId),
+          eq(approvalRequests.status, 'PENDING'),
+          sql`${approvalRequests.dueAt} < now()`,
+          sql`${approvalRequests.escalatedAt} is null`,
+        ),
+      )
+      .returning({ id: approvalRequests.id, documentNumber: approvalRequests.documentNumber });
+    for (const r of rows) {
+      await this.audit.record({
+        action: 'ESCALATE',
+        module: MODULE,
+        entityType: 'ApprovalRequest',
+        entityId: r.id,
+        newValue: { documentNumber: r.documentNumber, reason: 'Approval deadline passed' },
+        companyId,
+      });
+    }
+    return rows.length;
+  }
+
+  /** Pending / overdue counts for the control dashboard. */
+  async pendingSummary(companyId: string): Promise<{ pending: number; overdue: number }> {
+    await this.escalateOverdue(companyId);
+    const [row] = await this.db
+      .select({
+        pending: sql<number>`count(*)::int`,
+        overdue: sql<number>`count(*) filter (where ${approvalRequests.dueAt} < now())::int`,
+      })
+      .from(approvalRequests)
+      .where(
+        and(eq(approvalRequests.companyId, companyId), eq(approvalRequests.status, 'PENDING')),
+      );
+    return { pending: row?.pending ?? 0, overdue: row?.overdue ?? 0 };
+  }
+
   // ----------------------------------------------------------------- helpers
 
   private enrich(
@@ -533,6 +642,7 @@ export class ApprovalsService {
       workflowName: string;
       requestedByName: string | null;
       allowSelfApproval: boolean;
+      escalationPermission: string | null;
     },
     decisions: ReadonlyArray<{ step: number; decidedBy: string }>,
     actorId: string,
@@ -542,15 +652,22 @@ export class ApprovalsService {
     const step: WorkflowStep | undefined = row.steps[row.currentStep];
     const approvalsSoFar = decisions.filter((d) => d.step === row.currentStep).length;
     const pendingApprovals = step ? Math.max(step.minApprovers - approvalsSoFar, 0) : 0;
-    const canDecide =
-      row.status === 'PENDING' &&
+    const overdue =
+      row.status === 'PENDING' && row.dueAt !== null && row.dueAt.getTime() < Date.now();
+    const eligible =
       Boolean(step) &&
       (permissions.has(step!.requiredPermission) ||
-        delegations.some((d) => d.permission === step!.requiredPermission)) &&
+        delegations.some((d) => d.permission === step!.requiredPermission) ||
+        (overdue &&
+          row.escalationPermission !== null &&
+          permissions.has(row.escalationPermission)));
+    const canDecide =
+      row.status === 'PENDING' &&
+      eligible &&
       (row.allowSelfApproval || row.requestedBy !== actorId) &&
       !decisions.some((d) => d.decidedBy === actorId);
     const { allowSelfApproval: _a, ...rest } = row;
-    return { ...rest, pendingApprovals, canDecide };
+    return { ...rest, pendingApprovals, canDecide, overdue };
   }
 
   private viewQuery(executor: DbExecutor) {
@@ -559,6 +676,7 @@ export class ApprovalsService {
         ...getTableColumns(approvalRequests),
         workflowName: approvalWorkflows.name,
         allowSelfApproval: approvalWorkflows.allowSelfApproval,
+        escalationPermission: approvalWorkflows.escalationPermission,
         requestedByName: sql<
           string | null
         >`(select u.first_name || ' ' || u.last_name from users u where u.id = ${sql.raw('"approval_requests"."requested_by"')})`,

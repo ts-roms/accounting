@@ -144,6 +144,9 @@ export class ReconciliationsService {
             input.closeBlockOnOpenExceptions ?? before.closeBlockOnOpenExceptions,
           closeRequireIntegrityOk: input.closeRequireIntegrityOk ?? before.closeRequireIntegrityOk,
           closeLockOnComplete: input.closeLockOnComplete ?? before.closeLockOnComplete,
+          closeBlockOnSuspense: input.closeBlockOnSuspense ?? before.closeBlockOnSuspense,
+          suspenseMateriality: input.suspenseMateriality ?? before.suspenseMateriality,
+          suspenseMaxAgeDays: input.suspenseMaxAgeDays ?? before.suspenseMaxAgeDays,
         })
         .where(eq(accountingPolicies.companyId, companyId))
         .returning();

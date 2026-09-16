@@ -31,13 +31,17 @@ The same invariants are asserted by the e2e suites after every scenario.
 ## Suspense monitoring
 
 `GET /api/v1/accounting/suspense?asOf=` (`journal.view`), page
-`/accounting/suspense`. Accounts with subtype `SUSPENSE` (or the `SUSPENSE`
-mapping) are listed with:
+`/accounting/suspense`. Accounts with subtype `SUSPENSE` (or the `SUSPENSE`,
+`FIXED_ASSET_CLEARING`, `GOODS_RECEIVED_NOT_INVOICED` mappings) are listed with:
 
 - balance (signed by normal side) and the total absolute suspense balance;
 - unresolved postings: every ledger line since the balance was last zero;
 - age of the oldest unresolved item;
-- responsible person (`accounts.owner_user_id`).
+- responsible person (`accounts.owner_user_id`);
+- a policy status - `CLEAR`, `WITHIN_POLICY` or `REQUIRES_INVESTIGATION` when the
+  balance exceeds `accounting_policies.suspense_materiality` or is older than
+  `suspense_max_age_days` (feeds the `SUSPENSE_BALANCE` integrity check, the
+  `SUSPENSE_BALANCES` close task and the control dashboard).
 
 Clearing is a `RECLASSIFICATION` journal (the "Clear" button pre-fills one) -
 never an edit. The month-end checklist carries a manual "Suspense review" task.

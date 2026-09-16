@@ -76,6 +76,7 @@ import { SuspenseService } from './suspense/suspense.service';
     PostingRulesService,
     RecurringJournalsService,
     PrepaymentsService,
+    SuspenseService,
   ],
 })
 export class AccountingModule {}

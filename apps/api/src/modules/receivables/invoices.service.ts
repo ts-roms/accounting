@@ -33,6 +33,7 @@ import { AccountsService } from '@/modules/accounting/accounts/accounts.service'
 import { AccountingPostingService } from '@/modules/accounting/journals/posting.service';
 import { DocumentNumberingService } from '@/modules/accounting/numbering/document-numbering.service';
 import { AuditService } from '@/modules/audit/audit.service';
+import { SodService } from '@/modules/rbac/sod.service';
 import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { BusinessRuleError, NotFoundError } from '@/common/errors/app-error';
 import { ErrorCodes } from '@/common/errors/error-codes';
@@ -132,6 +133,7 @@ export class InvoicesService {
     private readonly fx: FxService,
     private readonly authority: AuthorityService,
     private readonly outbox: OutboxService,
+    private readonly sod: SodService,
   ) {}
 
   // ----------------------------------------------------------------- queries
@@ -482,9 +484,34 @@ export class InvoicesService {
           module: MODULE,
           entityType: 'Invoice',
           entityId: id,
-          previousValue: { total: existing.total, documentDate: existing.documentDate },
-          newValue: { total: totals.total, documentDate },
-          metadata: { documentNumber: existing.documentNumber, editor: actor.email },
+          // Header before / after: the audit service derives the field-level history from it.
+          previousValue: {
+            customerId: existing.customerId,
+            branchId: existing.branchId,
+            documentDate: existing.documentDate,
+            dueDate: existing.dueDate,
+            reference: existing.reference,
+            description: existing.description,
+            subtotal: existing.subtotal,
+            taxTotal: existing.taxTotal,
+            total: existing.total,
+          },
+          newValue: {
+            customerId: customer.id,
+            branchId: input.branchId === undefined ? existing.branchId : input.branchId,
+            documentDate,
+            dueDate,
+            reference: input.reference === undefined ? existing.reference : input.reference,
+            description: input.description === undefined ? existing.description : input.description,
+            subtotal: totals.subtotal,
+            taxTotal: totals.taxTotal,
+            total: totals.total,
+          },
+          metadata: {
+            documentNumber: existing.documentNumber,
+            editor: actor.email,
+            reason: input.changeReason ?? null,
+          },
           companyId,
         },
         tx,
@@ -536,6 +563,14 @@ export class InvoicesService {
         createdBy: existing.createdBy,
         action: 'Approved customer invoice',
       });
+      await this.sod.checkActorSeparation(
+        actor.organizationId,
+        [P['invoice.create'], P['invoice.approve']],
+        existing.createdBy,
+        actor.id,
+        tx,
+        { companyId, entityType: 'Invoice', entityId: id, documentNumber: existing.documentNumber },
+      );
       await tx
         .update(invoices)
         .set({ status: 'APPROVED', approvedBy: actor.id, approvedAt: new Date() })

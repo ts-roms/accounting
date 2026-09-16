@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, isNull, or, sql } from 'drizzle-orm';
 import type { SodEnforcement } from '@accounting/types';
 import type { UpsertSodPolicyInput } from '@accounting/validation';
 import { AuditService } from '@/modules/audit/audit.service';
@@ -7,7 +7,8 @@ import { BusinessRuleError, NotFoundError } from '@/common/errors/app-error';
 import { ErrorCodes } from '@/common/errors/error-codes';
 import { shallowDiff } from '@/common/utils/diff';
 import { DRIZZLE, type Database, type DbExecutor } from '@/database/database.types';
-import { sodPolicies, type SodPolicy } from '@/database/schema';
+import { companies, sodPolicies, userRoles, users, type SodPolicy } from '@/database/schema';
+import { PermissionResolverService } from './permission-resolver.service';
 
 export interface SodConflict {
   policyId: string;
@@ -22,6 +23,23 @@ export interface SodEvaluation {
   warnings: SodConflict[];
 }
 
+/** A user who currently holds both permissions of a policy in one company scope. */
+export interface SodUserConflict extends SodConflict {
+  userId: string;
+  userName: string;
+  userEmail: string;
+  companyId: string | null;
+  companyName: string | null;
+}
+
+/** Document-level context recorded with a warned conflict. */
+export interface SodDocumentRef {
+  companyId?: string | null;
+  entityType: string;
+  entityId: string;
+  documentNumber?: string | null;
+}
+
 /**
  * Segregation of duties. Policies are data owned by the organization; this
  * service evaluates them and never hard-codes a conflict pair.
@@ -31,6 +49,7 @@ export class SodService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly audit: AuditService,
+    private readonly resolver: PermissionResolverService,
   ) {}
 
   /**
@@ -95,6 +114,7 @@ export class SodService {
     previousActorId: string | null | undefined,
     actorId: string,
     executor: DbExecutor = this.db,
+    document?: SodDocumentRef,
   ): Promise<SodConflict | null> {
     if (!previousActorId || previousActorId !== actorId) return null;
     const policies = await this.listActive(organizationId, executor);
@@ -118,7 +138,71 @@ export class SodService {
         { conflicts: [conflict] },
       );
     }
+    // A warned conflict is still a control event: it goes on the trail so the
+    // control dashboard and auditors can see who overrode the separation.
+    await this.audit.record(
+      {
+        action: 'SOD_WARNING',
+        module: 'RBAC',
+        entityType: document?.entityType ?? 'Document',
+        entityId: document?.entityId ?? null,
+        newValue: { ...conflict, actorId, documentNumber: document?.documentNumber ?? null },
+        companyId: document?.companyId ?? undefined,
+      },
+      executor,
+    );
     return conflict;
+  }
+
+  /**
+   * Standing conflicts: every active user of the organization whose effective
+   * permissions in some company scope hold both sides of an active policy.
+   * Read-only; the control dashboard and the SoD screen show it.
+   */
+  async userConflicts(organizationId: string): Promise<SodUserConflict[]> {
+    const policies = await this.listActive(organizationId);
+    if (policies.length === 0) return [];
+    const scopes = await this.db
+      .selectDistinct({
+        userId: users.id,
+        userName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
+        userEmail: users.email,
+        companyId: userRoles.companyId,
+        companyName: companies.name,
+      })
+      .from(userRoles)
+      .innerJoin(users, eq(users.id, userRoles.userId))
+      .leftJoin(companies, eq(companies.id, userRoles.companyId))
+      .where(
+        and(
+          eq(users.organizationId, organizationId),
+          eq(users.status, 'ACTIVE'),
+          or(isNull(userRoles.companyId), eq(companies.organizationId, organizationId)),
+        ),
+      );
+    const out: SodUserConflict[] = [];
+    for (const scope of scopes) {
+      const access = await this.resolver.resolve(scope.userId, scope.companyId ?? undefined);
+      const { blocking, warnings } = this.evaluate(access.permissions, policies);
+      for (const c of [...blocking, ...warnings]) {
+        out.push({
+          ...c,
+          userId: scope.userId,
+          userName: scope.userName,
+          userEmail: scope.userEmail,
+          companyId: scope.companyId,
+          companyName: scope.companyName,
+        });
+      }
+    }
+    // Organization-wide roles conflict in every company: report each pair once per user.
+    const seen = new Set<string>();
+    return out.filter((c) => {
+      const key = `${c.userId}:${c.policyId}:${c.companyId ?? ''}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
 
   async listActive(organizationId: string, executor: DbExecutor = this.db): Promise<SodPolicy[]> {
