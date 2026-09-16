@@ -347,6 +347,12 @@ function ConnectDialog({
     'banking:read',
     'banking:write',
     'products:read',
+    'products:write',
+    'vendors:read',
+    'vendors:write',
+    'bills:read',
+    'bills:write',
+    'bills:post',
   ];
   const submit = () => {
     let parsed: Record<string, unknown>;

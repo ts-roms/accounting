@@ -68,7 +68,7 @@ const DEMO_INTEGRATIONS = [
     category: 'ECOMMERCE' as const,
     authType: 'BEARER' as const,
     capabilities: ['PULL', 'WEBHOOKS', 'INCREMENTAL_SYNC', 'TEST_CONNECTION'],
-    scopes: ['customers:write', 'invoices:write'],
+    scopes: ['customers:write', 'products:write', 'invoices:write'],
     secrets: {
       bearerToken: 'demo-shop-sandbox-token',
       webhookSecret: 'demo-shop-webhook-hmac-secret',
@@ -92,6 +92,23 @@ const DEMO_INTEGRATIONS = [
             address: { line1: '5 Port Rd', city: 'Cebu City', country: 'PH' },
           },
         ],
+        products: [
+          {
+            id: 'p_7001',
+            sku: 'CONSULT-HR',
+            title: 'Consulting hours',
+            product_type: 'SERVICE',
+            unit: 'hour',
+            price: '1500.00',
+          },
+          {
+            id: 'p_7002',
+            sku: 'ONBOARD-PKG',
+            title: 'Onboarding package',
+            product_type: 'SERVICE',
+            price: '4500.00',
+          },
+        ],
         orders: [
           {
             id: 'o_5001',
@@ -103,6 +120,48 @@ const DEMO_INTEGRATIONS = [
             line_items: [
               { title: 'Consulting hours', quantity: '10', price: '1500.00' },
               { title: 'Onboarding package', quantity: '1', price: '4500.00' },
+            ],
+          },
+        ],
+      },
+    }),
+  },
+  {
+    name: 'Demo Procurement Portal',
+    provider: 'DEMO_PROCUREMENT',
+    category: 'PROCUREMENT' as const,
+    authType: 'API_KEY' as const,
+    capabilities: ['PULL', 'WEBHOOKS', 'INCREMENTAL_SYNC', 'TEST_CONNECTION'],
+    scopes: ['vendors:write', 'bills:write'],
+    secrets: {
+      apiKey: 'demo-proc-sandbox-key',
+      webhookSecret: 'demo-proc-webhook-signing-secret',
+    },
+    config: () => ({
+      portalUrl: 'https://demo-portal.example',
+      autoPost: false,
+      fixture: {
+        suppliers: [
+          {
+            id: 's_3001',
+            name: 'Metro Office Supplies',
+            legal_name: 'Metro Office Supplies Corp.',
+            email: 'billing@metro-office.example',
+            address: { line1: '88 Ortigas Ave', city: 'Pasig City', country: 'PH' },
+            payment_terms_days: 30,
+          },
+        ],
+        invoices: [
+          {
+            id: 'si_9001',
+            invoice_number: 'MOS-2026-0017',
+            supplier_id: 's_3001',
+            issued_at: '2026-02-10T09:00:00Z',
+            due_at: '2026-03-12T09:00:00Z',
+            po_number: 'PO-1017',
+            currency: 'PHP',
+            lines: [
+              { description: 'Printer paper A4 (box)', quantity: '20', unit_price: '245.00' },
             ],
           },
         ],
@@ -194,15 +253,13 @@ export async function seedIntegrations(
       rows.push({ kind: 'BEARER', value: { bearerToken: secrets.bearerToken } });
     if (secrets.webhookSecret)
       rows.push({ kind: 'WEBHOOK_SECRET', value: { webhookSecret: secrets.webhookSecret } });
-    await tx
-      .insert(schema.integrationCredentials)
-      .values(
-        rows.map((r) => ({
-          integrationId: row!.id,
-          kind: r.kind,
-          ciphertext: cipher.encryptJson(r.value),
-        })),
-      );
+    await tx.insert(schema.integrationCredentials).values(
+      rows.map((r) => ({
+        integrationId: row!.id,
+        kind: r.kind,
+        ciphertext: cipher.encryptJson(r.value),
+      })),
+    );
     created += 1;
   }
   log(`demo integrations ensured (${created} created)`);

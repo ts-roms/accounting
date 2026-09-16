@@ -2,6 +2,8 @@ import { Module, type OnModuleInit } from '@nestjs/common';
 import { APP_INTERCEPTOR, ModuleRef } from '@nestjs/core';
 import { AccountingModule } from '@/modules/accounting/accounting.module';
 import { BankingModule } from '@/modules/banking/banking.module';
+import { InventoryModule } from '@/modules/inventory/inventory.module';
+import { PayablesModule } from '@/modules/payables/payables.module';
 import { JobsModule } from '@/modules/jobs/jobs.module';
 import { RbacModule } from '@/modules/rbac/rbac.module';
 import { ReceivablesModule } from '@/modules/receivables/receivables.module';
@@ -23,6 +25,9 @@ import { MappingsService } from './mapping/mappings.service';
 import { NotificationsModule } from './notifications/notifications.module';
 import { OAuthService } from './oauth/oauth.service';
 import { BankTransactionsImporter } from './sync/importers/bank-transactions.importer';
+import { BillsImporter } from './sync/importers/bills.importer';
+import { ProductsImporter } from './sync/importers/products.importer';
+import { VendorsImporter } from './sync/importers/vendors.importer';
 import { CustomersImporter } from './sync/importers/customers.importer';
 import { InvoicesImporter } from './sync/importers/invoices.importer';
 import { PaymentsImporter } from './sync/importers/payments.importer';
@@ -49,6 +54,8 @@ import { WebhooksController } from './webhooks/webhooks.controller';
     AccountingModule,
     ReceivablesModule,
     BankingModule,
+    PayablesModule,
+    InventoryModule,
   ],
   controllers: [IntegrationsController, IntegrationLogsController, WebhooksController],
   providers: [
@@ -64,6 +71,9 @@ import { WebhooksController } from './webhooks/webhooks.controller';
     InvoicesImporter,
     PaymentsImporter,
     BankTransactionsImporter,
+    VendorsImporter,
+    BillsImporter,
+    ProductsImporter,
     SyncService,
     InboundWebhooksService,
     OutboundWebhooksService,

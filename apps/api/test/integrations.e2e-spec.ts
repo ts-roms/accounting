@@ -107,6 +107,7 @@ describe('Integration platform (e2e)', () => {
         'DEMO_ECOMMERCE',
         'DEMO_TAX_AUTHORITY',
         'DEMO_OAUTH_CRM',
+        'DEMO_PROCUREMENT',
       ]),
     );
     expect(
@@ -126,10 +127,11 @@ describe('Integration platform (e2e)', () => {
         'Demo Payment Gateway',
         'Demo E-Commerce',
         'Demo Tax Provider',
+        'Demo Procurement Portal',
       ]),
     );
     for (const item of list.body.items) {
-      expect(JSON.stringify(item)).not.toMatch(/demo-(bank|pg|shop|tax)-/);
+      expect(JSON.stringify(item)).not.toMatch(/demo-(bank|pg|shop|proc|tax)-/);
       expect(item.credentials.every((c: { kind: string }) => !('ciphertext' in c))).toBe(true);
     }
   });
@@ -317,7 +319,7 @@ describe('Integration platform (e2e)', () => {
       .send({
         provider: 'DEMO_ECOMMERCE',
         name: 'E2E Store',
-        scopes: ['customers:write', 'invoices:write', 'invoices:post'],
+        scopes: ['customers:write', 'products:write', 'invoices:write', 'invoices:post'],
         credentials: {
           bearerToken: 'demo-shop-e2e-token',
           webhookSecret: 'shop-webhook-secret-e2e',
@@ -334,6 +336,24 @@ describe('Integration platform (e2e)', () => {
                 address: { line1: '1 Way', city: 'Davao City', country: 'ph' },
               },
               { id: 'c_2', name: 'Contoso', email: 'ap@contoso.example' },
+            ],
+            products: [
+              {
+                id: 'p_1',
+                sku: 'ec-plan',
+                title: ' Service plan ',
+                price: '1200',
+                cost: '700.5',
+                product_type: 'service',
+                unit: 'month',
+              },
+              {
+                id: 'p_2',
+                sku: 'EC-KIT',
+                title: 'Starter kit',
+                price: '99.99',
+                barcode: 4801234567890,
+              },
             ],
             orders: [
               {
@@ -385,8 +405,8 @@ describe('Integration platform (e2e)', () => {
       server().get(`/api/v1/integrations/${shopId}/sync-jobs/${queued.body.id}`),
     ).expect(200);
     expect(job.body.status).toBe('COMPLETED');
-    expect(job.body.recordsProcessed).toBe(5);
-    expect(job.body.recordsCreated).toBe(4);
+    expect(job.body.recordsProcessed).toBe(7);
+    expect(job.body.recordsCreated).toBe(6);
     expect(job.body.recordsFailed).toBe(1);
     expect(job.body.failures[0]).toMatchObject({ externalId: 'o_3', code: 'MAPPING_ERROR' });
 
@@ -396,6 +416,20 @@ describe('Integration platform (e2e)', () => {
       name: 'Northwind Traders',
       email: 'ap@northwind.example',
       country: 'PH',
+    });
+    // Products went through CatalogService: SKU normalised, decimals as strings, no stock movement.
+    const products = await as(server().get('/api/v1/products?search=EC-')).expect(200);
+    expect(products.body.items).toHaveLength(2);
+    expect(products.body.items.find((p: { sku: string }) => p.sku === 'EC-PLAN')).toMatchObject({
+      name: 'Service plan',
+      productType: 'SERVICE',
+      unitOfMeasure: 'month',
+      salePrice: '1200.0000',
+      purchasePrice: '700.5000',
+    });
+    expect(products.body.items.find((p: { sku: string }) => p.sku === 'EC-KIT')).toMatchObject({
+      productType: 'GOODS',
+      barcode: '4801234567890',
     });
     const invoices = await as(server().get('/api/v1/invoices?search=WEB-')).expect(200);
     expect(invoices.body.items).toHaveLength(2);
@@ -415,7 +449,7 @@ describe('Integration platform (e2e)', () => {
     ).expect(200);
     expect(job2.body.status).toBe('COMPLETED');
     expect(job2.body.recordsCreated).toBe(0);
-    expect(job2.body.recordsUpdated).toBe(2); // customers refreshed
+    expect(job2.body.recordsUpdated).toBe(4); // customers and products refreshed
     expect(job2.body.recordsSkipped).toBe(2); // invoices already imported
     expect(
       (await sql('select count(*)::int as n from invoices where reference like $1', ['WEB-%']))[0]!
@@ -430,6 +464,7 @@ describe('Integration platform (e2e)', () => {
     expect(cursors.body.map((c: { entity: string }) => c.entity).sort()).toEqual([
       'customers',
       'invoices',
+      'products',
     ]);
     const jobsList = await as(server().get(`/api/v1/integrations/${shopId}/sync-jobs`)).expect(200);
     expect(jobsList.body.total).toBe(2);
@@ -481,6 +516,168 @@ describe('Integration platform (e2e)', () => {
       ['DRAFT-1'],
     );
     expect(inv).toMatchObject({ status: 'DRAFT', accounting_status: 'UNPOSTED' });
+  });
+
+  let portalId: string;
+  const portalSecret = 'proc-webhook-secret-for-e2e';
+
+  it('pulls suppliers and supplier invoices into vendors and bills; bills post only with bills:post', async () => {
+    const created = await as(server().post('/api/v1/integrations'))
+      .send({
+        provider: 'DEMO_PROCUREMENT',
+        name: 'E2E Portal',
+        scopes: ['vendors:write', 'bills:write'],
+        credentials: { apiKey: 'demo-proc-e2e-key', webhookSecret: portalSecret },
+        config: {
+          autoPost: true,
+          fixture: {
+            suppliers: [
+              {
+                id: 's_1',
+                name: 'Fabrikam Supplies',
+                legal_name: 'Fabrikam Supplies Inc.',
+                tax_id: '123-456-789-000',
+                email: 'AR@Fabrikam.Example',
+                address: { line1: '9 Dock Rd', city: 'Cebu City', country: 'ph' },
+                payment_terms_days: 45,
+              },
+              { id: 's_2', name: 'Tailspin Toys' },
+            ],
+            invoices: [
+              {
+                id: 'si_1',
+                invoice_number: 'FAB-0001',
+                supplier_id: 's_1',
+                issued_at: '2026-03-05T08:00:00Z',
+                due_at: '2026-04-19T08:00:00Z',
+                po_number: 'PO-77',
+                currency: 'php',
+                lines: [{ description: 'Packaging', quantity: '10', unit_price: '150.00' }],
+              },
+              {
+                id: 'si_2',
+                invoice_number: 'TT-9',
+                supplier_id: 's_missing',
+                issued_at: '2026-03-05T08:00:00Z',
+                lines: [{ description: 'Orphan', unit_price: '1.00' }],
+              },
+            ],
+          },
+        },
+      })
+      .expect(201);
+    portalId = created.body.id;
+    expect(created.body.status).toBe('CONNECTED');
+    expect(JSON.stringify(created.body)).not.toContain('demo-proc-e2e-key');
+
+    const queued = await as(server().post(`/api/v1/integrations/${portalId}/sync`))
+      .send({ mode: 'FULL' })
+      .expect(202);
+    await drain();
+    const job = await as(
+      server().get(`/api/v1/integrations/${portalId}/sync-jobs/${queued.body.id}`),
+    ).expect(200);
+    expect(job.body.status).toBe('COMPLETED');
+    expect(job.body.recordsProcessed).toBe(4);
+    expect(job.body.recordsCreated).toBe(2);
+    expect(job.body.recordsFailed).toBe(2);
+    // si_1 was drafted, then the autoPost step was refused (no bills:post); si_2 has no vendor.
+    expect(
+      job.body.failures.map((f: { externalId: string; code: string }) => [f.externalId, f.code]),
+    ).toEqual([
+      ['si_1', 'AUTHORIZATION_ERROR'],
+      ['si_2', 'MAPPING_ERROR'],
+    ]);
+
+    const vendorsList = await as(server().get('/api/v1/vendors?search=PR-S_')).expect(200);
+    expect(vendorsList.body.items).toHaveLength(2);
+    expect(vendorsList.body.items.find((v: { code: string }) => v.code === 'PR-S_1')).toMatchObject(
+      {
+        name: 'Fabrikam Supplies',
+        legalName: 'Fabrikam Supplies Inc.',
+        email: 'ar@fabrikam.example',
+        country: 'PH',
+        paymentTermsDays: 45,
+      },
+    );
+    const bills = await as(server().get('/api/v1/bills?search=PO-77')).expect(200);
+    expect(bills.body.items).toHaveLength(1);
+    const bill = bills.body.items[0];
+    expect(bill.total).toBe('1500.0000');
+    expect(bill.vendorInvoiceNumber).toBe('FAB-0001');
+    expect(bill.dueDate).toBe('2026-04-19');
+    // Drafted through BillsService; never posted without the explicit bills:post scope.
+    expect(bill).toMatchObject({ status: 'DRAFT', accountingStatus: 'UNPOSTED' });
+    const [line] = await sql<{ account_id: string }>(
+      'select account_id from bill_lines where bill_id = $1',
+      [bill.id],
+    );
+    expect(line!.account_id).toBe(acc['6900']); // DEFAULT_EXPENSE mapping, not a hard-coded id
+
+    // Re-sync: vendors refreshed, bill skipped, nothing duplicated.
+    const again = await as(server().post(`/api/v1/integrations/${portalId}/sync`))
+      .send({ mode: 'FULL' })
+      .expect(202);
+    await drain();
+    const job2 = await as(
+      server().get(`/api/v1/integrations/${portalId}/sync-jobs/${again.body.id}`),
+    ).expect(200);
+    expect(job2.body).toMatchObject({ recordsCreated: 0, recordsUpdated: 2, recordsSkipped: 1 });
+    expect(
+      (await sql('select count(*)::int as n from vendor_bills where reference = $1', ['PO-77']))[0]!
+        .n,
+    ).toBe(1);
+
+    // Grant bills:post: a signed invoice.received webhook now drafts, approves and posts through BillsService.
+    await as(server().patch(`/api/v1/integrations/${portalId}`))
+      .send({ scopes: ['vendors:write', 'bills:write', 'bills:post'] })
+      .expect(200);
+    const event = {
+      id: 'evt_inv_001',
+      type: 'invoice.received',
+      data: {
+        id: 'si_3',
+        invoice_number: 'FAB-0002',
+        supplier: { id: 's_1', name: 'Fabrikam Supplies' },
+        issued_at: '2026-03-06T08:00:00Z',
+        po_number: 'PO-78',
+        lines: [{ description: 'Labels', quantity: '4', unit_price: '25.00' }],
+      },
+    };
+    const raw = JSON.stringify(event);
+    const ts = Math.floor(Date.now() / 1000);
+    const mac = createHmac('sha256', portalSecret).update(`${ts}.${raw}`).digest('hex');
+    const receipt = await server()
+      .post(`/api/v1/webhooks/inbound/${portalId}`)
+      .set('content-type', 'application/json')
+      .set('x-webhook-signature', `t=${ts},v1=${mac}`)
+      .send(raw)
+      .expect(202);
+    expect(receipt.body).toMatchObject({ accepted: true, duplicate: false });
+    await drain();
+    const posted = await as(server().get('/api/v1/bills?search=PO-78')).expect(200);
+    expect(posted.body.items).toHaveLength(1);
+    expect(posted.body.items[0]).toMatchObject({ total: '100.0000', accountingStatus: 'POSTED' });
+    expect(posted.body.items[0].journalNumber).toMatch(/^JE-/);
+    // GL: Dr expense / Cr AP written by AccountingPostingService with the bill as source document.
+    const lines = await sql<{ account_id: string; debit: string; credit: string }>(
+      'select l.account_id, l.debit, l.credit from journal_lines l join journal_entries e on e.id = l.journal_entry_id where e.source_type = $1 and e.source_id = $2 order by l.line_number',
+      ['AP_DOCUMENT', posted.body.items[0].id],
+    );
+    expect(lines).toHaveLength(2);
+    expect(lines.find((l) => l.account_id === acc['6900'])!.debit).toBe('100.0000');
+    expect(lines.find((l) => l.account_id === acc['2110'])!.credit).toBe('100.0000');
+    const ap = await as(server().get('/api/v1/reports/ap-reconciliation?asOf=2026-12-31')).expect(
+      200,
+    );
+    expect(ap.body.reconciled).toBe(true);
+    const refs = await as(
+      server().get(`/api/v1/integrations/${portalId}/external-references?entityType=bills`),
+    ).expect(200);
+    expect(refs.body.map((r: { externalId: string }) => r.externalId).sort()).toEqual([
+      'si_1',
+      'si_3',
+    ]);
   });
 
   it('records failures: bad credentials mark the integration ERROR with a redacted log entry', async () => {
@@ -735,6 +932,11 @@ describe('Integration platform (e2e)', () => {
     });
     await new Promise<void>((r) => receiver.listen(0, '127.0.0.1', r));
     receiverUrl = `http://127.0.0.1:${(receiver.address() as AddressInfo).port}/hook`;
+    // Settle the outbox first: events from earlier tests are nudged ~250ms after
+    // commit and must not fan out to the subscription created below.
+    await new Promise((r) => setTimeout(r, 400));
+    await outbound.dispatchPending();
+    await drain();
 
     const created = await as(server().post('/api/v1/webhooks'))
       .send({

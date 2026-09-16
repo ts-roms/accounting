@@ -90,8 +90,9 @@ export class AcmeBankConnector extends BaseConnector {
 
 ## Demo connectors
 
-`DEMO_BANK`, `DEMO_PAYMENT_GATEWAY`, `DEMO_ECOMMERCE`, `DEMO_TAX_AUTHORITY` and
-`DEMO_OAUTH_CRM` read their "provider data" from `config.fixture` and accept
+`DEMO_BANK`, `DEMO_PAYMENT_GATEWAY`, `DEMO_ECOMMERCE`, `DEMO_PROCUREMENT`,
+`DEMO_TAX_AUTHORITY` and `DEMO_OAUTH_CRM` read their "provider data" from
+`config.fixture` and accept
 demo-shaped credentials (`demo-bank-...`). They are flagged `demo: true` and
 exist to exercise the whole pipeline in tests and demos. No real provider API
 is assumed or invented.

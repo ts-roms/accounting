@@ -17,9 +17,10 @@ import { hmacHex, safeEqual } from '../webhooks/webhook-signature';
 import { fixtureArray, looksLikeDemoSecret, pageFromFixture, toRecords } from './demo-fixtures';
 
 /**
- * Demo e-commerce store (Shopify-like). Customers and orders are pulled with
+ * Demo e-commerce store (Shopify-like). Customers, products and orders are pulled with
  * a cursor; `order.created` webhooks (plain HMAC over the body) import the
- * order as a DRAFT invoice through InvoicesService. Orders never post by
+ * order as a DRAFT invoice through InvoicesService; `product.updated` upserts
+ * the catalogue record (stock never moves). Orders never post by
  * themselves.
  */
 @Injectable()
@@ -28,10 +29,11 @@ export class DemoEcommerceConnector extends BaseConnector {
     provider: 'DEMO_ECOMMERCE',
     category: 'ECOMMERCE',
     name: 'Demo E-Commerce Store',
-    description: 'Storefront simulator: customers and orders become customers and invoices.',
+    description:
+      'Storefront simulator: customers, products and orders become customers, products and invoices.',
     authType: 'BEARER',
     capabilities: ['PULL', 'WEBHOOKS', 'INCREMENTAL_SYNC', 'TEST_CONNECTION'],
-    entities: ['customers', 'invoices'],
+    entities: ['customers', 'products', 'invoices'],
     configSchema: z.object({
       storeUrl: z.string().url().optional(),
       /** Revenue account for order lines (defaults to the SALES_REVENUE mapping). */
@@ -41,6 +43,7 @@ export class DemoEcommerceConnector extends BaseConnector {
         .object({
           customers: z.array(z.record(z.string(), z.unknown())).max(500).optional(),
           orders: z.array(z.record(z.string(), z.unknown())).max(500).optional(),
+          products: z.array(z.record(z.string(), z.unknown())).max(500).optional(),
         })
         .optional(),
     }),
@@ -68,6 +71,26 @@ export class DemoEcommerceConnector extends BaseConnector {
           default: 'PH',
         },
         { target: 'paymentTermsDays', default: 0, transforms: [{ name: 'toInteger' }] },
+      ],
+      products: [
+        {
+          target: 'sku',
+          source: 'sku',
+          transforms: [{ name: 'trim' }, { name: 'upper' }],
+          required: true,
+        },
+        { target: 'name', source: 'title', transforms: [{ name: 'trim' }], required: true },
+        { target: 'description', source: 'body', transforms: [] },
+        { target: 'barcode', source: 'barcode', transforms: [{ name: 'toString' }] },
+        { target: 'salePrice', source: 'price', transforms: [{ name: 'toDecimal' }] },
+        { target: 'purchasePrice', source: 'cost', transforms: [{ name: 'toDecimal' }] },
+        {
+          target: 'productType',
+          source: 'product_type',
+          transforms: [{ name: 'trim' }, { name: 'upper' }],
+          default: 'GOODS',
+        },
+        { target: 'unitOfMeasure', source: 'unit', transforms: [{ name: 'trim' }], default: 'pc' },
       ],
       invoices: [
         {
@@ -140,9 +163,11 @@ export class DemoEcommerceConnector extends BaseConnector {
     const rows =
       req.entity === 'customers'
         ? fixtureArray(ctx.config, 'customers')
-        : req.entity === 'invoices'
-          ? fixtureArray(ctx.config, 'orders')
-          : [];
+        : req.entity === 'products'
+          ? fixtureArray(ctx.config, 'products')
+          : req.entity === 'invoices'
+            ? fixtureArray(ctx.config, 'orders')
+            : [];
     return pageFromFixture(toRecords(rows), req.cursor, req.limit);
   }
 
@@ -195,6 +220,19 @@ export class DemoEcommerceConnector extends BaseConnector {
       });
       return { imports };
     }
+    if (
+      event.eventType === 'product.created' ||
+      event.eventType === 'product.updated' ||
+      event.eventType === 'products/update'
+    )
+      return {
+        imports: [
+          {
+            entity: 'products',
+            record: { externalId: String(event.payload.id), data: event.payload },
+          },
+        ],
+      };
     if (event.eventType === 'customer.updated' || event.eventType === 'customers/update')
       return {
         imports: [
