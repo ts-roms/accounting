@@ -78,7 +78,8 @@ test.describe('ai assistance (advisory only)', () => {
       .filter({ hasText: /duplicate|round|person|backdated|control/i })
       .first();
     await expect(row).toBeVisible();
-    await row.click();
+    // The Document cell links to the flagged record; click the Flag cell so the row handler opens the detail.
+    await row.getByRole('cell').nth(1).click();
     await expect(page.getByTestId('flag-detail')).toBeVisible();
     await page.getByTestId('flag-accept').click();
     await expect(page.getByText('Flag confirmed')).toBeVisible();
