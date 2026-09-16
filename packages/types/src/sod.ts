@@ -102,6 +102,13 @@ export const DEFAULT_SOD_POLICIES: readonly SodPolicyDefinition[] = [
     enforcement: 'WARN',
   },
   {
+    name: 'Consolidation preparer vs approver',
+    description: 'A user who prepares a consolidation run should not finalize it.',
+    permissionA: P['consolidation.run'],
+    permissionB: P['consolidation.approve'],
+    enforcement: 'WARN',
+  },
+  {
     name: 'Petty cash preparer vs approver',
     description:
       'A user who prepares petty cash vouchers should not approve them above the fund limit.',

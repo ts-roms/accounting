@@ -2,13 +2,18 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, getTableColumns, or, sql, type SQL } from 'drizzle-orm';
 import { Money } from '@accounting/money';
 import { P, type PaginatedResult } from '@accounting/types';
-import type { CreateIntercompanyInput, ListIntercompanyQuery } from '@accounting/validation';
+import type {
+  CreateIntercompanyInput,
+  ListIntercompanyQuery,
+  SettleIntercompanyInput,
+} from '@accounting/validation';
 import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { BusinessRuleError, NotFoundError, PermissionDeniedError } from '@/common/errors/app-error';
 import { ErrorCodes } from '@/common/errors/error-codes';
 import { offsetFor, toPaginatedResult } from '@/common/pagination/pagination';
 import { DRIZZLE, type Database, type DbExecutor } from '@/database/database.types';
 import {
+  bankAccounts,
   companies,
   intercompanyTransactions,
   journalEntries,
@@ -21,6 +26,7 @@ import { AccountingPostingService } from '@/modules/accounting/journals/posting.
 import { DocumentNumberingService } from '@/modules/accounting/numbering/document-numbering.service';
 import { AuditService } from '@/modules/audit/audit.service';
 import { ExchangeRatesService } from '@/modules/fx/exchange-rates.service';
+import { OutboxService } from '@/modules/integrations/events/outbox.service';
 import { PermissionResolverService } from '@/modules/rbac/permission-resolver.service';
 
 const MODULE = 'INTERCOMPANY';
@@ -34,6 +40,8 @@ export interface IntercompanyView extends IntercompanyTransaction {
   toAccountCode: string;
   fromJournalNumber: string | null;
   toJournalNumber: string | null;
+  settlementFromJournalNumber: string | null;
+  settlementToJournalNumber: string | null;
 }
 
 /**
@@ -52,6 +60,7 @@ export class IntercompanyService {
     private readonly numbering: DocumentNumberingService,
     private readonly rates: ExchangeRatesService,
     private readonly resolver: PermissionResolverService,
+    private readonly outbox: OutboxService,
   ) {}
 
   async list(
@@ -381,6 +390,163 @@ export class IntercompanyService {
     return this.get(organizationId, id);
   }
 
+  /**
+   * Settle a posted charge with cash (Prompt #9): the originating company
+   * pays from its bank (Dr intercompany payable / Cr bank) and the receiving
+   * company banks it (Dr bank / Cr intercompany receivable), one transaction.
+   * Only a posted charge whose both legs are still open can be settled.
+   */
+  async settle(
+    organizationId: string,
+    actor: AuthenticatedUser,
+    id: string,
+    input: SettleIntercompanyInput,
+  ): Promise<IntercompanyView> {
+    await this.db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(intercompanyTransactions)
+        .where(
+          and(
+            eq(intercompanyTransactions.id, id),
+            eq(intercompanyTransactions.organizationId, organizationId),
+          ),
+        )
+        .for('update');
+      if (!existing) throw new NotFoundError('Intercompany transaction', id);
+      if (existing.status !== 'POSTED')
+        throw new BusinessRuleError(
+          ErrorCodes.DOCUMENT_INVALID_STATE,
+          `${existing.documentNumber} is ${existing.status.toLowerCase()}; only posted charges settle.`,
+        );
+      if (input.settlementDate < existing.transactionDate)
+        throw new BusinessRuleError(
+          ErrorCodes.VALIDATION_FAILED,
+          'Settlement cannot precede the transaction date.',
+        );
+      const from = await this.company(tx, organizationId, existing.fromCompanyId);
+      const to = await this.company(tx, organizationId, existing.toCompanyId);
+      await this.assertMember(actor, [from.id, to.id], 'intercompany.post', tx);
+      const fromBank = await this.bankAccount(tx, from.id, input.fromBankAccountId);
+      const toBank = await this.bankAccount(tx, to.id, input.toBankAccountId);
+      const payable = await this.accounts.resolveMapped(from.id, 'INTERCOMPANY_PAYABLE', tx);
+      const receivable = await this.accounts.resolveMapped(to.id, 'INTERCOMPANY_RECEIVABLE', tx);
+      const fromAmount = Money.of(existing.amount, existing.currency);
+      // The receiving side clears exactly what its receivable leg booked (same historical rate, no FX noise on settlement).
+      const [toLeg] = await tx
+        .select({ total: journalEntries.totalDebit })
+        .from(journalEntries)
+        .where(eq(journalEntries.id, existing.toJournalEntryId!));
+      const toAmount = Money.of(toLeg?.total ?? existing.amount, to.baseCurrency);
+      const reference = input.reference ?? existing.documentNumber;
+      const fromEntry = await this.posting.postEvent(
+        tx,
+        {
+          companyId: from.id,
+          entryDate: input.settlementDate,
+          description: `Settle intercompany ${existing.documentNumber} to ${to.code}`,
+          reference,
+          journalType: 'GENERAL',
+          sourceType: 'INTERCOMPANY_SETTLEMENT',
+          sourceId: existing.id,
+          actor,
+          lines: [
+            {
+              accountId: payable.id,
+              debit: fromAmount.toString(),
+              credit: '0',
+              description: `Due to ${to.code} settled`,
+            },
+            {
+              accountId: fromBank.glAccountId,
+              debit: '0',
+              credit: fromAmount.toString(),
+              description: `Paid from ${fromBank.code}`,
+            },
+          ],
+        },
+        { permission: P['intercompany.post'] },
+      );
+      const toEntry = await this.posting.postEvent(
+        tx,
+        {
+          companyId: to.id,
+          entryDate: input.settlementDate,
+          description: `Settle intercompany ${existing.documentNumber} from ${from.code}`,
+          reference,
+          journalType: 'GENERAL',
+          sourceType: 'INTERCOMPANY_SETTLEMENT',
+          sourceId: existing.id,
+          actor,
+          lines: [
+            {
+              accountId: toBank.glAccountId,
+              debit: toAmount.toString(),
+              credit: '0',
+              description: `Received into ${toBank.code}`,
+            },
+            {
+              accountId: receivable.id,
+              debit: '0',
+              credit: toAmount.toString(),
+              description: `Due from ${from.code} settled`,
+            },
+          ],
+        },
+        { permission: P['intercompany.post'] },
+      );
+      await tx
+        .update(intercompanyTransactions)
+        .set({
+          status: 'SETTLED',
+          settlementDate: input.settlementDate,
+          settlementFromJournalEntryId: fromEntry.id,
+          settlementToJournalEntryId: toEntry.id,
+          settledBy: actor.id,
+          settledAt: new Date(),
+        })
+        .where(eq(intercompanyTransactions.id, id));
+      await this.audit.record(
+        {
+          action: 'POST',
+          module: MODULE,
+          entityType: 'IntercompanyTransaction',
+          entityId: id,
+          previousValue: { status: 'POSTED' },
+          newValue: {
+            status: 'SETTLED',
+            settlementDate: input.settlementDate,
+            fromJournal: fromEntry.documentNumber,
+            toJournal: toEntry.documentNumber,
+          },
+          metadata: {
+            actor: actor.email,
+            documentNumber: existing.documentNumber,
+            reason: 'Settled in cash',
+          },
+          organizationId,
+          companyId: from.id,
+        },
+        tx,
+      );
+      await this.outbox.enqueue(tx, {
+        eventType: 'intercompany.settled',
+        companyId: from.id,
+        dedupeKey: 'intercompany.settled:' + id,
+        payload: {
+          intercompanyId: id,
+          documentNumber: existing.documentNumber,
+          fromCompany: from.code,
+          toCompany: to.code,
+          amount: existing.amount,
+          currency: existing.currency,
+          settlementDate: input.settlementDate,
+        },
+      });
+    });
+    return this.get(organizationId, id);
+  }
+
   async remove(organizationId: string, id: string): Promise<void> {
     await this.db.transaction(async (tx) => {
       const [existing] = await tx
@@ -429,6 +595,20 @@ export class IntercompanyService {
     return row;
   }
 
+  private async bankAccount(tx: DbExecutor, companyId: string, id: string) {
+    const [row] = await tx
+      .select()
+      .from(bankAccounts)
+      .where(and(eq(bankAccounts.id, id), eq(bankAccounts.companyId, companyId)));
+    if (!row) throw new NotFoundError('Bank account', id);
+    if (row.status !== 'ACTIVE')
+      throw new BusinessRuleError(
+        ErrorCodes.PARTY_INACTIVE,
+        `Bank account ${row.code} is inactive.`,
+      );
+    return row;
+  }
+
   private async assertPostable(
     companyId: string,
     accountId: string,
@@ -461,6 +641,12 @@ export class IntercompanyService {
         toJournalNumber: sql<
           string | null
         >`(select j.document_number from journal_entries j where j.id = ${sql.raw('"intercompany_transactions"."to_journal_entry_id"')})`,
+        settlementFromJournalNumber: sql<
+          string | null
+        >`(select j.document_number from journal_entries j where j.id = ${sql.raw('"intercompany_transactions"."settlement_from_journal_entry_id"')})`,
+        settlementToJournalNumber: sql<
+          string | null
+        >`(select j.document_number from journal_entries j where j.id = ${sql.raw('"intercompany_transactions"."settlement_to_journal_entry_id"')})`,
       })
       .from(intercompanyTransactions);
   }

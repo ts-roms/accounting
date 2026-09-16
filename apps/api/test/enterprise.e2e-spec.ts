@@ -400,7 +400,8 @@ describe('Enterprise: multi-currency, intercompany, workflows, attachments (e2e)
       ),
     ).expect(200);
     expect(single.body.companies).toHaveLength(1);
-    expect(single.body.totals.eliminationCheck).toBe('12000.0000'); // the mirror lives in the excluded company
+    // The mirrors live in the excluded company: this 12,000 receivable plus the seeded 60,000 intercompany management fee expense (Prompt #9 seed).
+    expect(single.body.totals.eliminationCheck).toBe('72000.0000');
 
     const reversed = await as(http().post(`/api/v1/intercompany/${intercompanyId}/reverse`))
       .send({ reason: 'Recharged twice' })

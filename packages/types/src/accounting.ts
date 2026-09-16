@@ -161,6 +161,15 @@ export const ACCOUNT_MAPPING_KEYS = [
   'ACCRUED_EXPENSE',
   /** Clearing account for money between two bank accounts (Prompt #8). */
   'CASH_IN_TRANSIT',
+  /** Group accounting (Prompt #9): parent's investment in subsidiaries / associates. */
+  'INVESTMENT_IN_SUBSIDIARIES',
+  'GOODWILL',
+  'NON_CONTROLLING_INTEREST',
+  'CUMULATIVE_TRANSLATION_ADJUSTMENT',
+  /** Residual when intercompany balances do not mirror exactly. */
+  'INTERCOMPANY_DIFFERENCE',
+  /** Equity-method share of associate results. */
+  'SHARE_OF_ASSOCIATE_PROFIT',
 ] as const;
 export type AccountMappingKey = (typeof ACCOUNT_MAPPING_KEYS)[number];
 
@@ -209,6 +218,8 @@ export const DOCUMENT_TYPES = [
   'PCV',
   /** Bank payment file (Prompt #8). */
   'PMF',
+  /** Consolidation run (Prompt #9). */
+  'CON',
 ] as const;
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
 

@@ -14,7 +14,7 @@ export type FxAdjustmentType = (typeof FX_ADJUSTMENT_TYPES)[number];
 
 // ---------------------------------------------------------------- intercompany
 
-export const INTERCOMPANY_STATUSES = ['DRAFT', 'POSTED', 'REVERSED'] as const;
+export const INTERCOMPANY_STATUSES = ['DRAFT', 'POSTED', 'SETTLED', 'REVERSED'] as const;
 export type IntercompanyStatus = (typeof INTERCOMPANY_STATUSES)[number];
 
 // ------------------------------------------------------------------ workflows
@@ -35,6 +35,7 @@ export const WORKFLOW_DOCUMENT_TYPES = [
   'VENDOR',
   'BANK_TRANSFER',
   'PETTY_CASH_VOUCHER',
+  'CONSOLIDATION_RUN',
 ] as const;
 export type WorkflowDocumentType = (typeof WORKFLOW_DOCUMENT_TYPES)[number];
 

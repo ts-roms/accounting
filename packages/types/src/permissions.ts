@@ -269,6 +269,17 @@ export const PERMISSION_DEFINITIONS = [
   define('exchange-rate.manage', 'ACCOUNTING', 'Maintain exchange rates'),
   define('fx.revalue', 'ACCOUNTING', 'Run and reverse foreign-currency revaluations'),
   define('consolidation.view', 'REPORTING', 'View consolidated group reports'),
+  define(
+    'consolidation.manage',
+    'REPORTING',
+    'Maintain consolidation groups, members and elimination rules',
+  ),
+  define(
+    'consolidation.run',
+    'REPORTING',
+    'Prepare consolidation runs and post consolidation adjustments',
+  ),
+  define('consolidation.approve', 'REPORTING', 'Finalize and reopen consolidation runs'),
   define('intercompany.view', 'ACCOUNTING', 'View intercompany transactions'),
   define('intercompany.post', 'ACCOUNTING', 'Create and post intercompany transactions'),
   define('workflow.manage', 'ADMINISTRATION', 'Configure approval workflows'),
@@ -284,7 +295,11 @@ export const PERMISSION_DEFINITIONS = [
   // Reporting & audit
   define('reports.view', 'REPORTING', 'View financial reports'),
   define('report-definition.manage', 'REPORTING', 'Create and edit report definitions'),
-  define('trace.view', 'REPORTING', 'Trace a financial figure to its source document and audit trail'),
+  define(
+    'trace.view',
+    'REPORTING',
+    'Trace a financial figure to its source document and audit trail',
+  ),
   define('reports.export', 'REPORTING', 'Export reports and lists as files'),
   define('numbering.view', 'ADMINISTRATION', 'View document numbering rules'),
   define('numbering.manage', 'ADMINISTRATION', 'Configure document numbering rules'),
@@ -297,8 +312,16 @@ export const PERMISSION_DEFINITIONS = [
     'Load opening balances into the ledger and subledgers',
   ),
   define('audit.view', 'AUDIT', 'View the audit trail'),
-  define('operations.view', 'ADMINISTRATION', 'View platform operations: jobs, queues, integrity runs and runtime status'),
-  define('operations.manage', 'ADMINISTRATION', 'Run jobs, retry or discard failed queue jobs and trigger integrity checks'),
+  define(
+    'operations.view',
+    'ADMINISTRATION',
+    'View platform operations: jobs, queues, integrity runs and runtime status',
+  ),
+  define(
+    'operations.manage',
+    'ADMINISTRATION',
+    'Run jobs, retry or discard failed queue jobs and trigger integrity checks',
+  ),
 
   // AI assistance (advisory only - nothing here posts)
   define('ai.view', 'AI', 'View AI intake, anomaly flags, forecasts and conversations'),

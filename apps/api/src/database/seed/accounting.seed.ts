@@ -17,6 +17,7 @@ import { seedOrders } from './orders.seed';
 import { seedReceivables } from './receivables.seed';
 import { seedPayables } from './payables.seed';
 import { seedTreasury } from './treasury.seed';
+import { seedConsolidation } from './consolidation.seed';
 import { seedSubledgers } from './subledger.seed';
 
 type Log = (m: string) => void;
@@ -107,6 +108,14 @@ const CHART: CoaRow[] = [
     subtype: 'OTHER_ASSET',
   },
   {
+    code: '1700',
+    name: 'Investment in Subsidiaries',
+    type: 'ASSET',
+    parent: '1500',
+    subtype: 'OTHER_ASSET',
+  },
+  { code: '1710', name: 'Goodwill', type: 'ASSET', parent: '1500', subtype: 'OTHER_ASSET' },
+  {
     code: '1520',
     name: 'Accumulated Depreciation',
     type: 'ASSET',
@@ -193,6 +202,20 @@ const CHART: CoaRow[] = [
     system: true,
   },
   {
+    code: '3400',
+    name: 'Non-controlling Interest',
+    type: 'EQUITY',
+    parent: '3000',
+    subtype: 'OTHER_EQUITY',
+  },
+  {
+    code: '3500',
+    name: 'Cumulative Translation Adjustment',
+    type: 'EQUITY',
+    parent: '3000',
+    subtype: 'OTHER_EQUITY',
+  },
+  {
     code: '3900',
     name: 'Opening Balance Equity',
     type: 'EQUITY',
@@ -231,6 +254,21 @@ const CHART: CoaRow[] = [
     type: 'REVENUE',
     parent: '4000',
     subtype: 'OTHER_INCOME',
+  },
+  {
+    code: '4950',
+    name: 'Share of Profit of Associates',
+    type: 'REVENUE',
+    parent: '4000',
+    subtype: 'OTHER_INCOME',
+  },
+  {
+    code: '4980',
+    name: 'Intercompany Management Fees',
+    type: 'REVENUE',
+    parent: '4000',
+    subtype: 'OTHER_INCOME',
+    intercompany: true,
   },
   { code: '5000', name: 'Cost of Sales', type: 'COST_OF_SALES', header: true },
   {
@@ -347,6 +385,21 @@ const CHART: CoaRow[] = [
     parent: '6000',
     subtype: 'OTHER_EXPENSE',
   },
+  {
+    code: '6970',
+    name: 'Intercompany Management Fees',
+    type: 'EXPENSE',
+    parent: '6000',
+    subtype: 'OTHER_EXPENSE',
+    intercompany: true,
+  },
+  {
+    code: '6980',
+    name: 'Intercompany Difference',
+    type: 'EXPENSE',
+    parent: '6000',
+    subtype: 'OTHER_EXPENSE',
+  },
   { code: '7000', name: 'Other Income', type: 'OTHER_INCOME', header: true },
   {
     code: '7100',
@@ -411,6 +464,12 @@ const MAPPINGS: Array<[AccountMappingKey, string]> = [
   ['WITHHOLDING_TAX_PAYABLE', '2140'],
   ['BANK_CHARGES', '6600'],
   ['CASH_IN_TRANSIT', '1190'],
+  ['INVESTMENT_IN_SUBSIDIARIES', '1700'],
+  ['GOODWILL', '1710'],
+  ['NON_CONTROLLING_INTEREST', '3400'],
+  ['CUMULATIVE_TRANSLATION_ADJUSTMENT', '3500'],
+  ['INTERCOMPANY_DIFFERENCE', '6980'],
+  ['SHARE_OF_ASSOCIATE_PROFIT', '4950'],
   ['OPENING_BALANCE_EQUITY', '3900'],
   ['SUSPENSE', '1900'],
   ['BAD_DEBT_EXPENSE', '6710'],
@@ -553,6 +612,7 @@ export async function seedAccounting(
     await seedAccountingCore(tx, company, codeToId, adminUserId, log);
   }
   await seedExchangeRates(tx, organizationId, adminUserId, log);
+  await seedConsolidation(tx, organizationId, adminUserId, log);
 }
 
 /** Organization-wide sample rates (Phase 8): USD and EUR against the PHP base. */

@@ -228,6 +228,9 @@ export const OUTBOUND_EVENT_TYPES = [
   'petty_cash.replenished',
   'cash.below_minimum',
   'cash.forecast_shortfall',
+  'consolidation.finalized',
+  'consolidation.reopened',
+  'intercompany.settled',
   'period.closed',
   'webhook.test',
 ] as const;
@@ -318,6 +321,11 @@ export const API_SCOPE_DEFINITIONS = [
     'purchase-orders:write',
     'Create draft purchase orders (never approves them)',
     ['purchase-order.view', 'vendor.view', 'purchase-order.create'],
+  ],
+  [
+    'consolidation:read',
+    'Read consolidation groups, runs and consolidated statements',
+    ['consolidation.view', 'intercompany.view'],
   ],
   [
     'treasury:read',
@@ -434,5 +442,8 @@ export const NOTIFICATION_EVENT_TYPES = [
   'PAYMENT_FILE_REJECTED',
   'PETTY_CASH_APPROVAL_REQUIRED',
   'PETTY_CASH_LOW',
+  'CONSOLIDATION_FINALIZED',
+  'CONSOLIDATION_REOPENED',
+  'INTERCOMPANY_MISMATCH',
 ] as const;
 export type NotificationEventType = (typeof NOTIFICATION_EVENT_TYPES)[number];
