@@ -155,6 +155,10 @@ export const ACCOUNT_MAPPING_KEYS = [
   'ALLOWANCE_FOR_DOUBTFUL_ACCOUNTS',
   'AR_WRITE_OFF',
   'BAD_DEBT_RECOVERY',
+  /** Early-payment discounts taken on vendor bills (Prompt #7). */
+  'PURCHASE_DISCOUNT',
+  /** Period-end accrual for services received but not billed (Prompt #7). */
+  'ACCRUED_EXPENSE',
 ] as const;
 export type AccountMappingKey = (typeof ACCOUNT_MAPPING_KEYS)[number];
 
@@ -193,6 +197,10 @@ export const DOCUMENT_TYPES = [
   'RFD',
   'PRV',
   'STMT',
+  /** Vendor payment run (Prompt #7). */
+  'PMR',
+  /** AP accrual run (Prompt #7). */
+  'ACR',
 ] as const;
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
 

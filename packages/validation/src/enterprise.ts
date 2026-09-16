@@ -148,7 +148,13 @@ export const createWorkflowSchema = z
     /** Restrict the workflow to documents of one branch; null = every branch. */
     branchId: z.string().uuid().nullable().optional(),
     /** Hours a request may stay pending before it is overdue and escalates. */
-    deadlineHours: z.coerce.number().int().min(1).max(24 * 90).nullable().optional(),
+    deadlineHours: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(24 * 90)
+      .nullable()
+      .optional(),
     /** Permission whose holders may decide an overdue request in place of the step approvers. */
     escalationPermission: z.string().trim().min(3).max(100).nullable().optional(),
     steps: z.array(workflowStepSchema).min(1, 'At least one step').max(10),
@@ -173,7 +179,13 @@ export const updateWorkflowSchema = z.object({
   priority: z.coerce.number().int().min(0).max(1000).optional(),
   allowSelfApproval: z.boolean().optional(),
   branchId: z.string().uuid().nullable().optional(),
-  deadlineHours: z.coerce.number().int().min(1).max(24 * 90).nullable().optional(),
+  deadlineHours: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(24 * 90)
+    .nullable()
+    .optional(),
   escalationPermission: z.string().trim().min(3).max(100).nullable().optional(),
   steps: z.array(workflowStepSchema).min(1).max(10).optional(),
   status: z.enum(ENTITY_STATUSES).optional(),
@@ -324,8 +336,6 @@ export const closeDecisionSchema = z.object({
   notes: optionalText(1000),
 });
 export type CloseDecisionInput = z.infer<typeof closeDecisionSchema>;
-
-
 
 // ------------------------------------------------ hardening: enterprise controls
 

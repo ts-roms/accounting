@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, inArray, lte, or, sql } from 'drizzle-orm';
 import { Money } from '@accounting/money';
-import { AGING_BUCKETS, type AgingBucketKey } from '@accounting/types';
+import { type AgingBucketDefinition, type AgingBucketKey } from '@accounting/types';
 import type { AgingQuery, ReconciliationQuery, StatementQuery } from '@accounting/validation';
 import { AccountsService } from '@/modules/accounting/accounts/accounts.service';
 import {
@@ -10,7 +10,9 @@ import {
 } from '@/modules/accounting/ledger/general-ledger.service';
 import { DRIZZLE, type Database } from '@/database/database.types';
 import { fxAdjustments, vendorBills, vendorPayments, vendors } from '@/database/schema';
-import { agingBucket, isDebitDocument } from '@/modules/subledger/subledger.logic';
+import { isDebitDocument } from '@/modules/subledger/subledger.logic';
+import { ApConfigService } from './ap-config.service';
+import { payableBucketFor } from './payables.logic';
 import { VendorsService } from './vendors.service';
 
 /** Explicit outer-table references for correlated subqueries. */
@@ -34,14 +36,14 @@ export interface AgingRow {
 export interface AgingReport {
   asOf: string;
   currency: string;
-  buckets: Array<{ key: AgingBucketKey; label: string }>;
+  buckets: Array<{ key: AgingBucketKey; label: string; from: number; to: number | null }>;
   rows: AgingRow[];
   totals: AgingRow['buckets'] & { outstanding: string; unappliedCredit: string; net: string };
 }
 
 export interface StatementLine {
   date: string;
-  kind: 'INVOICE' | 'CREDIT_NOTE' | 'DEBIT_NOTE' | 'PAYMENT' | 'REFUND';
+  kind: 'INVOICE' | 'CREDIT_NOTE' | 'DEBIT_NOTE' | 'PAYMENT' | 'REFUND' | 'DISCOUNT';
   documentId: string;
   documentNumber: string;
   reference: string | null;
@@ -80,6 +82,8 @@ export interface ReconciliationReport {
     refunds: string;
     /** Realized and unrealized FX posted against the control (signed). */
     fxAdjustments: string;
+    /** Early-payment discounts taken (already inside `payments` via the control amount; shown for transparency). */
+    discounts: string;
   };
 }
 
@@ -95,6 +99,7 @@ export class ApReportsService {
     private readonly accounts: AccountsService,
     private readonly ledger: GeneralLedgerService,
     private readonly vendorsService: VendorsService,
+    private readonly config: ApConfigService,
   ) {}
 
   /** A document counts in the ledger as of a date if it was posted, and not yet reversed by then. */
@@ -121,12 +126,15 @@ export class ApReportsService {
   async aging(companyId: string, query: AgingQuery): Promise<AgingReport> {
     const currency = await this.accounts.companyCurrency(companyId);
     const asOf = query.asOf;
+    // Buckets are AP policy (`ap_settings.agingBuckets`), never hard-coded.
+    const bucketDefs: AgingBucketDefinition[] = await this.config.agingBuckets(companyId);
     const docFilters = [
       eq(vendorBills.companyId, companyId),
       lte(vendorBills.documentDate, asOf),
       this.inLedgerAsOf(asOf)!,
     ];
     if (query.partyId) docFilters.push(eq(vendorBills.vendorId, query.partyId));
+    if (query.branchId) docFilters.push(eq(vendorBills.branchId, query.branchId));
 
     const docs = await this.db
       .select({
@@ -170,7 +178,7 @@ export class ApReportsService {
     const partyById = new Map(parties.map((p) => [p.id, p]));
 
     const emptyBuckets = (): Record<AgingBucketKey, Money> =>
-      Object.fromEntries(AGING_BUCKETS.map((b) => [b.key, Money.zero(currency)])) as Record<
+      Object.fromEntries(bucketDefs.map((b) => [b.key, Money.zero(currency)])) as Record<
         AgingBucketKey,
         Money
       >;
@@ -206,8 +214,8 @@ export class ApReportsService {
       if (remaining.isZero()) continue;
       const a = get(d.vendorId);
       if (isDebitDocument(d.documentType)) {
-        a.buckets[agingBucket(asOf, d.dueDate)] =
-          a.buckets[agingBucket(asOf, d.dueDate)].add(remaining);
+        const key = payableBucketFor(asOf, d.dueDate, bucketDefs) as AgingBucketKey;
+        a.buckets[key] = (a.buckets[key] ?? Money.zero(currency)).add(remaining);
         a.outstanding = a.outstanding.add(remaining);
         a.documents += 1;
         if (d.dueDate < asOf && (!a.oldest || d.dueDate < a.oldest)) a.oldest = d.dueDate;
@@ -246,8 +254,12 @@ export class ApReportsService {
         oldestDueDate: a.oldest,
         documents: a.documents,
       });
-      for (const b of AGING_BUCKETS)
-        totalsAcc.buckets[b.key] = totalsAcc.buckets[b.key].add(a.buckets[b.key]);
+      for (const b of bucketDefs) {
+        const key = b.key as AgingBucketKey;
+        totalsAcc.buckets[key] = (totalsAcc.buckets[key] ?? Money.zero(currency)).add(
+          a.buckets[key] ?? Money.zero(currency),
+        );
+      }
       totalsAcc.outstanding = totalsAcc.outstanding.add(a.outstanding);
       totalsAcc.credit = totalsAcc.credit.add(a.credit);
     }
@@ -257,7 +269,12 @@ export class ApReportsService {
     return {
       asOf,
       currency,
-      buckets: AGING_BUCKETS.map((b) => ({ key: b.key, label: b.label })),
+      buckets: bucketDefs.map((b) => ({
+        key: b.key as AgingBucketKey,
+        label: b.label,
+        from: b.from,
+        to: b.to,
+      })),
       rows,
       totals: {
         ...(Object.fromEntries(
@@ -307,6 +324,7 @@ export class ApReportsService {
         reference: vendorPayments.reference,
         memo: vendorPayments.memo,
         amount: vendorPayments.amount,
+        discountAmount: vendorPayments.discountAmount,
       })
       .from(vendorPayments)
       .where(
@@ -343,6 +361,20 @@ export class ApReportsService {
         debit: p.paymentType === 'REFUND' ? p.amount : '0.0000',
         credit: p.paymentType === 'PAYMENT' ? p.amount : '0.0000',
       })),
+      // Early-payment discounts settle part of the balance without cash (Prompt #7).
+      ...pays
+        .filter((p) => Money.of(p.discountAmount, currency).isPositive())
+        .map<Movement>((p) => ({
+          date: p.paymentDate,
+          kind: 'DISCOUNT',
+          documentId: p.id,
+          documentNumber: p.documentNumber,
+          reference: p.reference,
+          description: 'Early-payment discount taken',
+          dueDate: null,
+          debit: '0.0000',
+          credit: p.discountAmount,
+        })),
     ].sort(
       (a, b) => a.date.localeCompare(b.date) || a.documentNumber.localeCompare(b.documentNumber),
     );
@@ -462,6 +494,20 @@ export class ApReportsService {
         ),
       );
     const fxAdjustment = Money.of(fx?.total ?? '0', currency);
+    // Discounts relieve the control through the payment's control amount; reported separately (Prompt #7).
+    const [disc] = await this.db
+      .select({
+        total: sql<string>`coalesce(sum(${vendorPayments.discountAmount} * ${vendorPayments.exchangeRate}), 0)`,
+      })
+      .from(vendorPayments)
+      .where(
+        and(
+          eq(vendorPayments.companyId, companyId),
+          lte(vendorPayments.paymentDate, asOf),
+          this.paymentInLedgerAsOf(asOf)!,
+        ),
+      );
+    const discounts = Money.of(disc?.total ?? '0', currency);
     const subledger = inv.add(dn).subtract(cn).subtract(receipts).add(refunds).add(fxAdjustment);
 
     const activity = await this.ledger.activity({ companyId, to: asOf });
@@ -486,6 +532,7 @@ export class ApReportsService {
         payments: receipts.toString(),
         refunds: refunds.toString(),
         fxAdjustments: fxAdjustment.toString(),
+        discounts: discounts.toString(),
       },
     };
   }

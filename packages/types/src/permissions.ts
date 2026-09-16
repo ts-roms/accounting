@@ -69,12 +69,20 @@ export const PERMISSION_DEFINITIONS = [
   define('period.post-soft-closed', 'ACCOUNTING', 'Post into soft-closed fiscal periods'),
   define('journal.correct', 'ACCOUNTING', 'Reverse and re-draft a posted journal as a correction'),
   define('recurring-journal.view', 'ACCOUNTING', 'View recurring journal templates and their runs'),
-  define('recurring-journal.manage', 'ACCOUNTING', 'Create, update, pause and run recurring journal templates'),
+  define(
+    'recurring-journal.manage',
+    'ACCOUNTING',
+    'Create, update, pause and run recurring journal templates',
+  ),
   define('prepayment.view', 'ACCOUNTING', 'View prepayment schedules'),
   define('prepayment.manage', 'ACCOUNTING', 'Create, update and cancel prepayment schedules'),
   define('prepayment.post', 'ACCOUNTING', 'Activate prepayments and post scheduled recognitions'),
   define('posting-rule.view', 'ACCOUNTING', 'View posting rules'),
-  define('posting-rule.manage', 'ACCOUNTING', 'Create and update posting rules and dimension rules'),
+  define(
+    'posting-rule.manage',
+    'ACCOUNTING',
+    'Create and update posting rules and dimension rules',
+  ),
   define('integrity.check', 'ACCOUNTING', 'Run and view financial integrity checks'),
   define('reconciliation.view', 'ACCOUNTING', 'View subledger reconciliations'),
   define(
@@ -87,7 +95,11 @@ export const PERMISSION_DEFINITIONS = [
   define('close.view', 'ACCOUNTING', 'View financial close checklists'),
   define('close.manage', 'ACCOUNTING', 'Start closes, work checklist tasks'),
   define('close.approve', 'ACCOUNTING', 'Give management approval to a financial close'),
-  define('controls.view', 'ACCOUNTING', 'View the financial control dashboard and suspense monitor'),
+  define(
+    'controls.view',
+    'ACCOUNTING',
+    'View the financial control dashboard and suspense monitor',
+  ),
   define('history.view', 'ACCOUNTING', 'View field-level change history of financial records'),
 
   // Sales / AR
@@ -124,6 +136,24 @@ export const PERMISSION_DEFINITIONS = [
     'Configure payment terms, customer groups, credit rules, dunning and aging',
   ),
   define('quotation.view', 'SALES', 'View quotations'),
+  // Prompt #7 - accounts payable & procure-to-pay
+  define('vendor.approve', 'PURCHASING', 'Approve vendor onboarding and place / lift vendor holds'),
+  define('bill.hold', 'PURCHASING', 'Place and release payment holds on vendor bills'),
+  define('payment-run.view', 'PURCHASING', 'View payment runs and cash requirements'),
+  define('payment-run.create', 'PURCHASING', 'Propose and submit payment runs'),
+  define('payment-run.approve', 'PURCHASING', 'Approve payment runs'),
+  define(
+    'payment-run.execute',
+    'PURCHASING',
+    'Execute approved payment runs and export remittances',
+  ),
+  define('ap-accrual.view', 'PURCHASING', 'View AP accruals and received-not-billed analysis'),
+  define('ap-accrual.post', 'PURCHASING', 'Post and reverse period-end AP accruals'),
+  define(
+    'ap-settings.manage',
+    'PURCHASING',
+    'Configure vendor groups, payment terms, aging buckets and payment-run policy',
+  ),
   define('quotation.create', 'SALES', 'Create, send and convert quotations'),
   define('sales-order.view', 'SALES', 'View sales orders'),
   define('sales-order.create', 'SALES', 'Create sales orders and invoice them'),

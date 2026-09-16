@@ -37,7 +37,9 @@ export const PurchaseOrdersController = createOrderController({
     approve: P['purchase-order.approve'],
   },
   actions: {
+    submit: P['purchase-order.create'],
     approve: P['purchase-order.approve'],
+    reject: P['purchase-order.approve'],
     close: P['purchase-order.create'],
     cancel: P['purchase-order.create'],
   },

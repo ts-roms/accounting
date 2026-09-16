@@ -89,6 +89,8 @@ const DOCUMENT_PATH: Record<WorkflowDocumentType, string> = {
   CUSTOMER_PAYMENT: '/sales/payments',
   CUSTOMER_REFUND: '/receivables/refunds',
   WRITE_OFF: '/receivables/write-offs',
+  PAYMENT_RUN: '/payables/payment-runs',
+  VENDOR: '/purchasing/vendors',
 };
 const STATUS_VARIANT: Record<
   ApprovalRequestStatus,

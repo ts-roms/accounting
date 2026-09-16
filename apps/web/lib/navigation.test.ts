@@ -115,6 +115,17 @@ describe('navigation', () => {
         'reconciliation',
         'settings',
       ].map((p) => `/receivables/${p}`),
+      ...[
+        'dashboard',
+        'statements',
+        'holds',
+        'grni',
+        'payment-runs',
+        'cash-requirements',
+        'accruals',
+        'reconciliation',
+        'settings',
+      ].map((p) => `/payables/${p}`),
     ]);
     for (const section of NAVIGATION) {
       for (const item of section.items) {

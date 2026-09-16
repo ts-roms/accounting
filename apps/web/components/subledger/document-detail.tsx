@@ -64,6 +64,7 @@ import { MatchCard } from '@/components/orders/match-card';
 import { DocumentStatusBadge } from './badges';
 import { partyOf } from './documents';
 import { InvoiceArActions, InvoiceArBadges } from '@/components/receivables/ar-panels';
+import { BillApActions, BillApBadges } from '@/components/payables/ap-panels';
 
 export function DocumentDetailPage({ cfg, id }: { cfg: SubledgerConfig; id: string }) {
   const router = useRouter();
@@ -85,8 +86,7 @@ export function DocumentDetailPage({ cfg, id }: { cfg: SubledgerConfig; id: stri
   const canEdit = isDraft && hasPermission(cfg.permissions.docCreate);
   // Approval may be held natively or through an active delegation (the API enforces scope and limits).
   const canApprove =
-    (isDraft || (cfg.side === 'AR' && d.status === 'SUBMITTED')) &&
-    hasAuthority(cfg.permissions.docApprove);
+    (isDraft || d.status === 'SUBMITTED') && hasAuthority(cfg.permissions.docApprove);
   const canPost =
     d.status === 'APPROVED' &&
     d.accountingStatus === 'UNPOSTED' &&
@@ -124,7 +124,7 @@ export function DocumentDetailPage({ cfg, id }: { cfg: SubledgerConfig; id: stri
             <span className="font-mono">{d.documentNumber}</span>
             <DocumentStatusBadge status={d.status} accountingStatus={d.accountingStatus} />
             <Badge variant="outline">{typeLabel}</Badge>
-            {cfg.side === 'AR' ? <InvoiceArBadges document={d} /> : null}
+            {cfg.side === 'AR' ? <InvoiceArBadges document={d} /> : <BillApBadges document={d} />}
           </span>
         }
         description={d.description ?? `${typeLabel} for ${party.name}`}
@@ -157,7 +157,7 @@ export function DocumentDetailPage({ cfg, id }: { cfg: SubledgerConfig; id: stri
                 Apply to {cfg.document.plural.toLowerCase()}
               </Button>
             ) : null}
-            {cfg.side === 'AR' ? <InvoiceArActions document={d} /> : null}
+            {cfg.side === 'AR' ? <InvoiceArActions document={d} /> : <BillApActions document={d} />}
             {canApprove ? (
               <Button size="sm" onClick={() => setPending('approve')}>
                 <Check /> Approve
@@ -949,9 +949,7 @@ export function AllocationEditor({
                     <Input
                       inputMode="decimal"
                       aria-label={`Allocate to ${r.documentNumber}`}
-                      className={
-                        over ? 'tabular border-critical text-right' : 'tabular text-right'
-                      }
+                      className={over ? 'tabular border-critical text-right' : 'tabular text-right'}
                       value={value}
                       disabled={disabled}
                       onChange={(e) => set(r.id, e.target.value)}

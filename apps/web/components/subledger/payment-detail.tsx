@@ -47,6 +47,7 @@ import type { SubledgerConfig } from '@/lib/subledger/config';
 import { formatDateTime, titleCase } from '@/lib/format';
 import { ConfirmDialog, PageHeader } from '@/components/ui-ext/page';
 import { PaymentArActions } from '@/components/receivables/ar-panels';
+import { PaymentApActions } from '@/components/payables/ap-panels';
 import { AttachmentsPanel } from '@/components/enterprise/attachments-panel';
 import { Amount, today } from '@/components/accounting/primitives';
 import { PaymentStatusBadge } from './badges';
@@ -121,7 +122,11 @@ export function PaymentDetailPage({ cfg, id }: { cfg: SubledgerConfig; id: strin
                 Allocate on-account amount
               </Button>
             ) : null}
-            {cfg.side === 'AR' ? <PaymentArActions payment={p} /> : null}
+            {cfg.side === 'AR' ? (
+              <PaymentArActions payment={p} />
+            ) : (
+              <PaymentApActions payment={p} />
+            )}
             {canPost ? (
               <Button size="sm" onClick={() => setPosting(true)}>
                 <RotateCcw /> Post to ledger

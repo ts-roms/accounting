@@ -43,6 +43,8 @@ const DEFAULT_PREFIX: Record<DocumentType, string> = {
   RFD: 'RFD',
   PRV: 'PRV',
   STMT: 'STMT',
+  PMR: 'PMR',
+  ACR: 'ACR',
 };
 
 /** The rule that governs a document number, whether configured or the built-in default. */

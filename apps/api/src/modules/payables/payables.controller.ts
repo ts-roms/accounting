@@ -22,7 +22,7 @@ import {
   createBillSchema,
   createPaymentSchema,
   listDocumentsQuerySchema,
-  listPartiesQuerySchema,
+  listVendorsQuerySchema,
   listPaymentsQuerySchema,
   matchReviewSchema,
   reconciliationQuerySchema,
@@ -41,7 +41,7 @@ import { VendorPaymentsService } from './vendor-payments.service';
 import { VendorsService } from './vendors.service';
 import { BillsService } from './bills.service';
 
-class ListPartiesQueryDto extends createZodDto(listPartiesQuerySchema) {}
+class ListVendorsQueryDto extends createZodDto(listVendorsQuerySchema) {}
 class CreateVendorDto extends createZodDto(createVendorSchema) {}
 class UpdateVendorDto extends createZodDto(updateVendorSchema) {}
 class ListDocumentsQueryDto extends createZodDto(listDocumentsQuerySchema) {}
@@ -72,7 +72,7 @@ export class VendorsController {
 
   @Get()
   @RequirePermissions(P['vendor.view'])
-  list(@CurrentUser() user: AuthenticatedUser, @Query() query: ListPartiesQueryDto) {
+  list(@CurrentUser() user: AuthenticatedUser, @Query() query: ListVendorsQueryDto) {
     return this.vendors.list(user.companyId!, query);
   }
 
@@ -96,7 +96,7 @@ export class VendorsController {
   @Post()
   @RequirePermissions(P['vendor.manage'])
   create(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateVendorDto) {
-    return this.vendors.create(user.companyId!, body);
+    return this.vendors.create(user.companyId!, body, user);
   }
 
   @Patch(':id')
@@ -106,7 +106,7 @@ export class VendorsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: UpdateVendorDto,
   ) {
-    return this.vendors.update(user.companyId!, id, body);
+    return this.vendors.update(user.companyId!, id, body, user);
   }
 }
 
@@ -150,6 +150,13 @@ export class BillsController {
   @HttpCode(204)
   async remove(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
     await this.bills.remove(user.companyId!, id);
+  }
+
+  @Post(':id/submit')
+  @RequirePermissions(P['bill.create'])
+  @ApiOperation({ summary: 'Submit for approval: opens the workflow and notifies approvers' })
+  submit(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.bills.submit(user.companyId!, user, id);
   }
 
   @Post(':id/approve')
@@ -251,9 +258,26 @@ export class VendorPaymentsController {
     await this.payments.remove(user.companyId!, id);
   }
 
+  @Post(':id/submit')
+  @RequirePermissions(P['vendor-payment.create'])
+  @ApiOperation({ summary: 'Submit for approval: opens the workflow and notifies approvers' })
+  submit(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.payments.submit(user.companyId!, user, id);
+  }
+
+  @Post(':id/approve')
+  @RequirePermissions(P['vendor-payment.approve'])
+  @ApiOperation({ summary: 'Approve the payment (delegable; segregated from the creator)' })
+  approve(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.payments.approve(user.companyId!, user, id);
+  }
+
   @Post(':id/post')
   @RequirePermissions(P['vendor-payment.post'])
-  @ApiOperation({ summary: 'Post the receipt (Dr cash / Cr AR) and settle the allocated bills' })
+  @ApiOperation({
+    summary:
+      'Post the payment (Dr AP / Cr cash, Cr purchase discount) and settle the allocated bills',
+  })
   post(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
     return this.payments.post(user.companyId!, user, id);
   }
