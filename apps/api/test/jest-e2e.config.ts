@@ -13,6 +13,7 @@ const config: Config = {
     '^@accounting/config$': '<rootDir>/../../packages/config/src/index.ts',
     '^@accounting/money$': '<rootDir>/../../packages/money/src/index.ts',
   },
+  globalSetup: '<rootDir>/test/global-setup.ts',
   setupFiles: ['<rootDir>/test/setup-env.ts'],
   testTimeout: 60000,
 };

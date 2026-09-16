@@ -36,7 +36,7 @@ Enterprise accounting platform (modular monolith). Read `docs/architecture.md`,
 - Shared packages `types`, `validation`, `config`, `money` are compiled: after editing run `pnpm build:packages` (or keep `pnpm dev` running).
 - Schema change: edit `apps/api/src/database/schema/*.ts` -> `pnpm db:generate` -> review SQL -> `pnpm db:migrate`.
 - New permission: add to `packages/types/src/permissions.ts` (+ system roles) -> build -> `pnpm db:seed`.
-- e2e suites DROP the schema: they only run against a database whose name contains `test` (see `apps/api/test/setup-env.ts`); unit Jest is scoped to `src/`.
+- e2e suites DROP the schema: they only run against a database whose name contains `test` (see `apps/api/test/setup-env.ts`); unit Jest is scoped to `src/`. Each git worktree gets its own test database automatically (`accounting_test_<worktree>`, created by `test/global-setup.ts`); set `TEST_DATABASE_SUFFIX` to isolate another checkout or session - never run two e2e suites against one database.
 - Tests: `pnpm test` (unit), `pnpm --filter @accounting/api test:e2e` (needs Docker infra), `pnpm --filter @accounting/web test:e2e` (needs running stack).
 - Lint/typecheck before finishing: `pnpm lint && pnpm typecheck`.
 

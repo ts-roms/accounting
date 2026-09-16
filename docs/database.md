@@ -235,7 +235,12 @@ pnpm --filter @accounting/api db:generate -- --custom --name <name>   # hand-wri
 
 Integration tests use `TEST_DATABASE_URL` (`accounting_test`, created by
 `infrastructure/docker/postgres/init/01-test-database.sql`) and rebuild the
-schema on every run.
+schema on every run. Because every suite starts with `DROP SCHEMA public`,
+two checkouts must never share a test database: a git worktree automatically
+uses `accounting_test_<worktree slug>` and any checkout can set
+`TEST_DATABASE_SUFFIX` (`apps/api/test/test-database.ts`); the jest
+`globalSetup` (`test/global-setup.ts`) creates a missing database on the same
+server before the run.
 
 ## Planned entities (roadmap)
 
