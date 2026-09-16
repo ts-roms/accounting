@@ -367,9 +367,14 @@ A second programme strengthens the delivered system along the lines of
   job runs, queue depths); Administration → Operations console
 - Tests: API integration +9, API unit +2, Playwright +3
 
-### H9 (planned)
+### H9 - Consolidation readiness (COMPLETE, delivered as Prompt #9)
 
-Consolidation readiness.
+Group consolidation platform: consolidation groups (full / proportional /
+equity members), data-driven elimination rules, fiscal-year-to-date runs with
+a consolidation ledger, currency translation with CTA, non-controlling
+interest, consolidated statements, intercompany settlement and
+reconciliation, group-close readiness and integrity checks. See
+`docs/consolidation/`.
 
 ## Beyond the roadmap
 

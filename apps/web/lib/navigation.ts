@@ -27,6 +27,7 @@ import {
   MessageSquareWarning,
   PhoneCall,
   Landmark,
+  Network,
   Layers,
   LayoutDashboard,
   MessageSquareText,
@@ -121,7 +122,6 @@ export const NAVIGATION: NavSection[] = [
       ]),
       item('Exchange Rates', '/accounting/exchange-rates', Coins, [P['exchange-rate.view']]),
       item('FX Revaluation', '/accounting/fx-revaluation', Scale, [P['exchange-rate.view']]),
-      item('Intercompany', '/accounting/intercompany', GitBranch, [P['intercompany.view']]),
     ],
   },
   {
@@ -225,6 +225,35 @@ export const NAVIGATION: NavSection[] = [
       ),
       item('Petty Cash', '/treasury/petty-cash', Coins, [P['treasury.view']], 'Movements'),
       item('Treasury Settings', '/treasury/settings', Settings2, [P['treasury.view']], 'Control'),
+    ],
+  },
+  {
+    title: 'Group',
+    icon: Network,
+    items: [
+      item('Consolidation Groups', '/consolidation/groups', Building2, [P['consolidation.view']]),
+      item('Consolidation Runs', '/consolidation/runs', Layers, [P['consolidation.view']]),
+      item(
+        'Intercompany',
+        '/accounting/intercompany',
+        GitBranch,
+        [P['intercompany.view']],
+        'Intercompany',
+      ),
+      item(
+        'Intercompany Reconciliation',
+        '/consolidation/intercompany-reconciliation',
+        Scale,
+        [P['consolidation.view']],
+        'Intercompany',
+      ),
+      item(
+        'Quick Consolidated TB',
+        '/reports/consolidation',
+        ClipboardList,
+        [P['consolidation.view']],
+        'Reports',
+      ),
     ],
   },
   {
@@ -347,7 +376,6 @@ export const NAVIGATION: NavSection[] = [
       item('AR Aging', '/reports/ar-aging', ClipboardList, [P['reports.view']]),
       item('AP Aging', '/reports/ap-aging', ClipboardList, [P['reports.view']]),
       item('General Ledger Report', '/reports/general-ledger', BookOpenText, [P['reports.view']]),
-      item('Consolidation', '/reports/consolidation', Building2, [P['consolidation.view']]),
     ],
   },
   {

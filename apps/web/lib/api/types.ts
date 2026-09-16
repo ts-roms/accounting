@@ -1715,6 +1715,12 @@ export interface IntercompanyTransaction {
   toJournalEntryId: string | null;
   toJournalNumber: string | null;
   postedAt: string | null;
+  settlementDate: string | null;
+  settlementFromJournalEntryId: string | null;
+  settlementToJournalEntryId: string | null;
+  settlementFromJournalNumber: string | null;
+  settlementToJournalNumber: string | null;
+  settledAt: string | null;
   createdAt: string;
 }
 

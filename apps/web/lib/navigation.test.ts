@@ -138,6 +138,7 @@ describe('navigation', () => {
         'petty-cash',
         'settings',
       ].map((p) => `/treasury/${p}`),
+      ...['groups', 'runs', 'intercompany-reconciliation'].map((p) => `/consolidation/${p}`),
     ]);
     for (const section of NAVIGATION) {
       for (const item of section.items) {

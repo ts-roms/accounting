@@ -9,6 +9,7 @@ import { DRIZZLE, type Database } from '@/database/database.types';
 import { accounts, companies, organizations } from '@/database/schema';
 import { GeneralLedgerService } from '@/modules/accounting/ledger/general-ledger.service';
 import { ExchangeRatesService } from '@/modules/fx/exchange-rates.service';
+import { isDebitNatural } from './consolidation.logic';
 
 export interface ConsolidatedCompany {
   id: string;
@@ -157,9 +158,9 @@ export class ConsolidationService {
       if (row.isIntercompany) {
         row.eliminations = combined.negate().toString();
         row.consolidated = '0.0000';
-        // Receivables and payables between members should net to zero across the group.
+        // Mirrored intercompany pairs (receivable vs payable, revenue vs expense) net to zero across the group.
         eliminationCheck = eliminationCheck.add(
-          row.type === 'ASSET' ? combined : combined.negate(),
+          isDebitNatural(row.type) ? combined : combined.negate(),
         );
       } else {
         row.eliminations = '0.0000';

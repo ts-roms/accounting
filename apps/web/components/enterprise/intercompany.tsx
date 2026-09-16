@@ -65,11 +65,13 @@ import { Amount, DateRange, startOfYear, today } from '@/components/accounting/p
 import { Stat } from '@/components/fixed-assets/shared';
 import { useQuery } from '@tanstack/react-query';
 import { toneOf } from '@/components/status';
+import { SettleIntercompanyDialog } from '@/components/consolidation/settle-dialog';
 
 type IctFormInput = z.input<typeof createIntercompanySchema>;
 const STATUS_VARIANT: Record<IntercompanyStatus, 'secondary' | 'success' | 'outline'> = {
   DRAFT: 'secondary',
   POSTED: 'success',
+  SETTLED: 'success',
   REVERSED: 'outline',
 };
 
@@ -449,6 +451,7 @@ function IntercompanyDetailDialog({
   const remove = useDeleteIntercompany();
   const [reason, setReason] = React.useState('');
   const [reversing, setReversing] = React.useState(false);
+  const [settling, setSettling] = React.useState(false);
   const [current, setCurrent] = React.useState<IntercompanyTransaction | null>(t);
   React.useEffect(() => {
     setCurrent(t);
@@ -500,7 +503,26 @@ function IntercompanyDetailDialog({
           </dd>
           <dt className="text-muted-foreground">Reference</dt>
           <dd>{c.reference ?? '-'}</dd>
+          {c.status === 'SETTLED' ? (
+            <>
+              <dt className="text-muted-foreground">Settled</dt>
+              <dd>
+                {c.settlementDate}
+                <span className="ml-2 font-mono text-xs text-muted-foreground">
+                  {c.settlementFromJournalNumber} / {c.settlementToJournalNumber}
+                </span>
+              </dd>
+            </>
+          ) : null}
         </dl>
+        {canPost && c.status === 'POSTED' ? (
+          <SettleIntercompanyDialog
+            transaction={c}
+            open={settling}
+            onOpenChange={setSettling}
+            onSettled={(r) => setCurrent(r)}
+          />
+        ) : null}
         {reversing ? (
           <div className="space-y-1">
             <Label>Reason</Label>
@@ -575,9 +597,12 @@ function IntercompanyDetailDialog({
                 </Button>
               </>
             ) : (
-              <Button variant="outline" onClick={() => setReversing(true)}>
-                Reverse
-              </Button>
+              <>
+                <Button variant="outline" onClick={() => setReversing(true)}>
+                  Reverse
+                </Button>
+                <Button onClick={() => setSettling(true)}>Settle in cash</Button>
+              </>
             )
           ) : null}
         </DialogFooter>
@@ -696,10 +721,7 @@ export function ConsolidationPage() {
                   {r.rows.map((row) => (
                     <TableRow
                       key={row.code}
-                      className={cn(
-                        'hover:bg-transparent',
-                        row.isIntercompany && 'bg-warning/8',
-                      )}
+                      className={cn('hover:bg-transparent', row.isIntercompany && 'bg-warning/8')}
                       data-testid="consolidation-row"
                     >
                       <TableCell>

@@ -194,11 +194,24 @@ export const intercompanyTransactions = pgTable(
     idempotencyKey: text('idempotency_key'),
     postedBy: uuid('posted_by').references(() => users.id, { onDelete: 'set null' }),
     postedAt: timestamp('posted_at', { withTimezone: true }),
+    /** Settlement (Prompt #9): cash from the originating company's bank to the receiving company's bank. */
+    settlementDate: date('settlement_date'),
+    settlementFromJournalEntryId: uuid('settlement_from_journal_entry_id').references(
+      () => journalEntries.id,
+      { onDelete: 'restrict' },
+    ),
+    settlementToJournalEntryId: uuid('settlement_to_journal_entry_id').references(
+      () => journalEntries.id,
+      { onDelete: 'restrict' },
+    ),
+    settledBy: uuid('settled_by').references(() => users.id, { onDelete: 'set null' }),
+    settledAt: timestamp('settled_at', { withTimezone: true }),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
     ...timestamps,
   },
   (t) => [
-    uniqueIndex('intercompany_org_number_uq').on(t.organizationId, t.documentNumber),
+    // Numbers come from the originating company's ICT sequence (Prompt #9: per-company, like every other document).
+    uniqueIndex('intercompany_company_number_uq').on(t.fromCompanyId, t.documentNumber),
     uniqueIndex('intercompany_idempotency_uq').on(t.organizationId, t.idempotencyKey),
     index('intercompany_from_idx').on(t.fromCompanyId, t.transactionDate),
     index('intercompany_to_idx').on(t.toCompanyId, t.transactionDate),
