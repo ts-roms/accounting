@@ -31,6 +31,7 @@ export interface SystemRoleDefinition {
 /** Every read permission except the audit trail, which is reserved for auditors and administrators. */
 const RESTRICTED_VIEWS: readonly PermissionKey[] = [
   'audit.view',
+  'trace.view',
   'integration.view',
   'api-key.view',
   'webhook.view',
@@ -115,6 +116,8 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
       P['ai.use'],
       P['ai.review'],
       P['reports.export'],
+      P['report-definition.manage'],
+      P['trace.view'],
     ],
   },
   {
@@ -156,6 +159,8 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
       P['ai.use'],
       P['ai.review'],
       P['reports.export'],
+      P['report-definition.manage'],
+      P['trace.view'],
     ],
   },
   {
@@ -237,6 +242,8 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
       P['depreciation.run'],
       P['bank-reconciliation.perform'],
       P['reports.export'],
+      P['report-definition.manage'],
+      P['trace.view'],
     ],
   },
   {
@@ -247,6 +254,7 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
       ...VIEW_ALL,
       ...INTEGRATION_VIEWS,
       P['audit.view'],
+      P['trace.view'],
       P['reports.export'],
       P['integrity.check'],
     ],
@@ -350,6 +358,8 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
       P['bill.hold'],
       P['payment-run.approve'],
       P['reports.export'],
+      P['report-definition.manage'],
+      P['trace.view'],
       P['ai.use'],
       P['delegation.create'],
     ],

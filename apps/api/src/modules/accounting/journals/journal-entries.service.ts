@@ -8,6 +8,7 @@ import {
   getTableColumns,
   gte,
   ilike,
+  isNull,
   lte,
   or,
   sql,
@@ -115,6 +116,24 @@ const EDITABLE = new Set(['DRAFT', 'REJECTED']);
  *   POSTED/LOCKED -> REVERSED (a REVERSAL entry is created and posted)
  * Posting itself is delegated to AccountingPostingService.
  */
+export interface JournalControlSummary {
+  total: {
+    count: number;
+    totalDebit: string;
+    /** Entries that reverse another journal. */
+    reversals: number;
+    /** Entries that have been reversed. */
+    reversed: number;
+    /** Entries without a source document (manual journals). */
+    manual: number;
+    awaitingApproval: number;
+    /** Posted entries whose poster is also their creator - a four-eyes exception to review. */
+    selfPosted: number;
+  };
+  byStatus: Array<{ status: string; count: number; totalDebit: string }>;
+  bySource: Array<{ sourceType: string; count: number; posted: number; totalDebit: string }>;
+}
+
 @Injectable()
 export class JournalEntriesService {
   constructor(
@@ -131,16 +150,26 @@ export class JournalEntriesService {
 
   // ----------------------------------------------------------------- queries
 
-  async list(
-    companyId: string,
-    query: ListJournalEntriesQuery,
-  ): Promise<PaginatedResult<JournalEntryView>> {
+  /** WHERE clauses shared by the list and the journal control summary. */
+  private listFilters(companyId: string, query: Partial<ListJournalEntriesQuery>): SQL[] {
     const filters: SQL[] = [eq(journalEntries.companyId, companyId)];
     if (query.status) filters.push(eq(journalEntries.status, query.status));
     if (query.journalType) filters.push(eq(journalEntries.journalType, query.journalType));
     if (query.from) filters.push(gte(journalEntries.entryDate, query.from));
     if (query.to) filters.push(lte(journalEntries.entryDate, query.to));
     if (query.fiscalPeriodId) filters.push(eq(journalEntries.fiscalPeriodId, query.fiscalPeriodId));
+    if (query.branchId) filters.push(eq(journalEntries.branchId, query.branchId));
+    if (query.sourceType)
+      filters.push(
+        query.sourceType === 'MANUAL'
+          ? isNull(journalEntries.sourceType)
+          : eq(journalEntries.sourceType, query.sourceType),
+      );
+    if (query.createdBy) filters.push(eq(journalEntries.createdBy, query.createdBy));
+    if (query.approvedBy) filters.push(eq(journalEntries.approvedBy, query.approvedBy));
+    if (query.postedBy) filters.push(eq(journalEntries.postedBy, query.postedBy));
+    if (query.minAmount) filters.push(gte(journalEntries.totalDebit, query.minAmount));
+    if (query.maxAmount) filters.push(lte(journalEntries.totalDebit, query.maxAmount));
     if (query.accountId) {
       filters.push(
         exists(
@@ -166,6 +195,14 @@ export class JournalEntriesService {
         )!,
       );
     }
+    return filters;
+  }
+
+  async list(
+    companyId: string,
+    query: ListJournalEntriesQuery,
+  ): Promise<PaginatedResult<JournalEntryView>> {
+    const filters = this.listFilters(companyId, query);
     const where = and(...filters);
     const sortColumn =
       query.sortBy === 'documentNumber'
@@ -184,6 +221,66 @@ export class JournalEntriesService {
       countWhere(this.db, journalEntries, where),
     ]);
     return toPaginatedResult(rows, total, query);
+  }
+
+  /**
+   * Journal control center: counts and totals per status and per source
+   * module for the filtered population. Read-only aggregation over
+   * journal_entries - the ledger itself stays the only source of figures.
+   */
+  async summary(
+    companyId: string,
+    query: Omit<ListJournalEntriesQuery, 'page' | 'pageSize' | 'sortBy' | 'sortDir'>,
+  ): Promise<JournalControlSummary> {
+    const where = and(...this.listFilters(companyId, query));
+    const sourceExpr = sql<string>`COALESCE(${journalEntries.sourceType}, 'MANUAL')`;
+    const [byStatus, bySource, [totals]] = await Promise.all([
+      this.db
+        .select({
+          status: journalEntries.status,
+          count: sql<number>`COUNT(*)::int`,
+          totalDebit: sql<string>`COALESCE(SUM(${journalEntries.totalDebit}), 0)::text`,
+        })
+        .from(journalEntries)
+        .where(where)
+        .groupBy(journalEntries.status),
+      this.db
+        .select({
+          sourceType: sourceExpr,
+          count: sql<number>`COUNT(*)::int`,
+          posted: sql<number>`COUNT(*) FILTER (WHERE ${journalEntries.status} = 'POSTED')::int`,
+          totalDebit: sql<string>`COALESCE(SUM(${journalEntries.totalDebit}), 0)::text`,
+        })
+        .from(journalEntries)
+        .where(where)
+        .groupBy(sourceExpr)
+        .orderBy(sourceExpr),
+      this.db
+        .select({
+          count: sql<number>`COUNT(*)::int`,
+          totalDebit: sql<string>`COALESCE(SUM(${journalEntries.totalDebit}), 0)::text`,
+          reversals: sql<number>`COUNT(*) FILTER (WHERE ${journalEntries.reversalOfId} IS NOT NULL)::int`,
+          reversed: sql<number>`COUNT(*) FILTER (WHERE ${journalEntries.status} = 'REVERSED')::int`,
+          manual: sql<number>`COUNT(*) FILTER (WHERE ${journalEntries.sourceType} IS NULL)::int`,
+          awaitingApproval: sql<number>`COUNT(*) FILTER (WHERE ${journalEntries.status} = 'SUBMITTED')::int`,
+          selfPosted: sql<number>`COUNT(*) FILTER (WHERE ${journalEntries.status} = 'POSTED' AND ${journalEntries.postedBy} IS NOT NULL AND ${journalEntries.postedBy} = ${journalEntries.createdBy})::int`,
+        })
+        .from(journalEntries)
+        .where(where),
+    ]);
+    return {
+      total: totals ?? {
+        count: 0,
+        totalDebit: '0',
+        reversals: 0,
+        reversed: 0,
+        manual: 0,
+        awaitingApproval: 0,
+        selfPosted: 0,
+      },
+      byStatus,
+      bySource,
+    };
   }
 
   async get(companyId: string, id: string): Promise<JournalEntryDetail> {

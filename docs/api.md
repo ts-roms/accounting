@@ -401,6 +401,16 @@ New audit actions: `SOD_WARNING`, `ESCALATE`.
 
 New error codes: `IMPORT_FILE_INVALID`, `IMPORT_INVALID_ROWS`, `OPENING_BALANCE_INVALID` (all 422). New audit actions: `IMPORT`, `EXPORT`.
 
+### Reporting engine, journal control and traceability (see `docs/reporting-engine.md`)
+
+| Method       | Path                                                                                                                                                                                                                       | Permission                 |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| GET          | `/report-definitions` (paginated; `category`, `status`; seeds the system definitions), `/report-definitions/:id`                                                                                                           | `reports.view`             |
+| POST         | `/report-definitions/:id/run { from, to, branchId?, departmentId?, costCenterId?, projectId?, budgetId?, includeZero }`, `/reports/run { basis, layout, params }` (ad hoc)                                                 | `reports.view`             |
+| POST / PATCH | `/report-definitions { code, name, description?, category, basis, layout }`, `/report-definitions/:id` (system layouts read-only), `/report-definitions/:id/copy { code, name }`                                           | `report-definition.manage` |
+| GET          | `/journal-entries` new filters `branchId`, `sourceType` (`MANUAL`), `createdBy`, `approvedBy`, `postedBy`, `minAmount`, `maxAmount`; `/journal-entries/summary` (counts / totals per status and source, review indicators) | `journal.view`             |
+| GET          | `/trace/journal/:id` (journal → source document → party → related journals → approvals → audit trail), `/trace/document/:sourceId`                                                                                         | `trace.view`               |
+
 ### Audit & health
 
 | Method | Path                                                                                                                 | Notes                         |

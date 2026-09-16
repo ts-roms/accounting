@@ -331,9 +331,28 @@ A second programme strengthens the delivered system along the lines of
   database pool errors no longer crash the API
 - Tests: API integration 174 (+5), API unit 146 (+8), Playwright +4
 
-### H7-H9 (planned)
+### H7 - Reporting engine (COMPLETE)
 
-Reporting engine, reliability, consolidation readiness.
+- Configurable report definitions (`report_definitions`): rows (accounts by
+  selector, formulas, dimension groups, headers) × columns (current, prior
+  period, year to date, prior year, budget, custom range, variance, variance
+  %), PERIOD or AS_OF basis; four seeded system reports (comparative P&L,
+  budget vs actual, as-of balance sheet, expenses by department); copy and
+  edit custom layouts with preview; figures from posted journals and approved
+  budgets only; Reporting → Custom Reports
+- Journal control center: journal filters by branch, source module, preparer /
+  approver / poster and amount; summary per status and source with manual,
+  self-posted, awaiting-approval and reversal indicators; Accounting → Journal
+  Control
+- Traceability: journal → source document → party → related journals →
+  approvals → audit trail (`/trace/journal/:id`), document → journals;
+  panels on journal and invoice / bill detail pages; `trace.view` restricted
+  to accounting roles and auditors
+- Tests: API integration 199 (+10), API unit +6, Playwright +3
+
+### H8-H9 (planned)
+
+Reliability, consolidation readiness.
 
 ## Beyond the roadmap
 
