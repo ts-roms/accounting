@@ -39,6 +39,11 @@ import { Can, ConfirmDialog, PageHeader } from '@/components/ui-ext/page';
 import { Amount, DateRange, startOfYear, today } from '@/components/accounting/primitives';
 import { PartyDialog } from './parties';
 import { DocumentStatusBadge, PaymentStatusBadge } from './badges';
+import {
+  CustomerCollectionsTab,
+  CustomerCreditCard,
+  CustomerMasterTab,
+} from '@/components/receivables/ar-panels';
 
 export function PartyDetailPage({ cfg, id }: { cfg: SubledgerConfig; id: string }) {
   const { hasPermission } = useSession();
@@ -120,11 +125,8 @@ export function PartyDetailPage({ cfg, id }: { cfg: SubledgerConfig; id: string 
           emphasis
         />
       </div>
-      {cfg.side === 'AR' && p.creditLimit ? (
-        <p className="text-xs text-muted-foreground">
-          Credit limit <Amount value={p.creditLimit} className="inline" /> - terms{' '}
-          {p.paymentTermsDays} days
-        </p>
+      {cfg.side === 'AR' ? (
+        <CustomerCreditCard customer={p} />
       ) : (
         <p className="text-xs text-muted-foreground">
           Terms {p.paymentTermsDays} days{p.email ? ` - ${p.email}` : ''}
@@ -137,7 +139,19 @@ export function PartyDetailPage({ cfg, id }: { cfg: SubledgerConfig; id: string 
           <TabsTrigger value="documents">{cfg.document.plural}</TabsTrigger>
           <TabsTrigger value="payments">{cfg.payment.plural}</TabsTrigger>
           <TabsTrigger value="statement">Statement</TabsTrigger>
+          {cfg.side === 'AR' ? <TabsTrigger value="master">Profile & contacts</TabsTrigger> : null}
+          {cfg.side === 'AR' ? <TabsTrigger value="collections">Collections</TabsTrigger> : null}
         </TabsList>
+        {cfg.side === 'AR' ? (
+          <TabsContent value="master">
+            <CustomerMasterTab customer={p} />
+          </TabsContent>
+        ) : null}
+        {cfg.side === 'AR' ? (
+          <TabsContent value="collections">
+            <CustomerCollectionsTab customerId={p.id} />
+          </TabsContent>
+        ) : null}
         <TabsContent value="documents">
           <Card>
             <CardContent className="p-0">

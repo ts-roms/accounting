@@ -73,7 +73,7 @@ describe('Receivables & payables (e2e)', () => {
 
   it('seed: AR and AP subledgers reconcile to their control accounts', async () => {
     const ar = await expectReconciled('ar');
-    expect(ar.subledgerBalance).toBe('116640.0000');
+    expect(ar.subledgerBalance).toBe('1950240.0000');
     const ap = await expectReconciled('ap');
     expect(ap.subledgerBalance).toBe('9200.0000');
     const aging = await as(admin, http().get(`/api/v1/reports/ar-aging?asOf=${TODAY}`)).expect(200);

@@ -134,6 +134,13 @@
       "when": 1789525327063,
       "tag": "0018_integration_procurement_category",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1789526623958,
+      "tag": "0019_receivables_platform",
+      "breakpoints": true
     }
   ]
 }

@@ -84,6 +84,11 @@ const DOCUMENT_PATH: Record<WorkflowDocumentType, string> = {
   PURCHASE_ORDER: '/purchasing/orders',
   EXPENSE_CLAIM: '/budgeting/expense-claims',
   VENDOR_BILL: '/purchasing/bills',
+  SALES_ORDER: '/sales/orders',
+  INVOICE: '/sales/invoices',
+  CUSTOMER_PAYMENT: '/sales/payments',
+  CUSTOMER_REFUND: '/receivables/refunds',
+  WRITE_OFF: '/receivables/write-offs',
 };
 const STATUS_VARIANT: Record<
   ApprovalRequestStatus,

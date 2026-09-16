@@ -211,7 +211,12 @@ export type CreateApiKeyInput = z.infer<typeof createApiKeySchema>;
 
 export const rotateApiKeySchema = z.object({
   /** Grace period during which the previous secret keeps working (0 = immediate). */
-  graceMinutes: z.coerce.number().int().min(0).max(24 * 60).default(0),
+  graceMinutes: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(24 * 60)
+    .default(0),
 });
 export type RotateApiKeyInput = z.infer<typeof rotateApiKeySchema>;
 
@@ -289,6 +294,11 @@ export type ListNotificationsQuery = z.infer<typeof listNotificationsQuerySchema
 export const notificationPolicySchema = z.object({
   enabled: z.boolean().default(true),
   /** Suppress repeats of the same event key for this many minutes. */
-  throttleMinutes: z.coerce.number().int().min(0).max(24 * 60).default(60),
+  throttleMinutes: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(24 * 60)
+    .default(60),
 });
 export type NotificationPolicyInput = z.infer<typeof notificationPolicySchema>;

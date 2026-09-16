@@ -12,7 +12,13 @@ import {
   TAX_SOURCE_TYPES,
 } from '@accounting/types';
 import { amountSchema, isoDateSchema, signedAmountSchema } from './accounting';
-import { codeSchema, nameSchema, optionalText, paginationQuerySchema, uuidSchema } from './primitives';
+import {
+  codeSchema,
+  nameSchema,
+  optionalText,
+  paginationQuerySchema,
+  uuidSchema,
+} from './primitives';
 import { dimensionRefsSchema, lineTaxSchema } from './dimensions';
 import { percentSchema } from './subledger';
 

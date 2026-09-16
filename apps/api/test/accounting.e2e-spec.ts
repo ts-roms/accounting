@@ -319,11 +319,12 @@ describe('Accounting core (e2e)', () => {
       admin,
       http().get('/api/v1/reports/income-statement?from=2026-01-01&to=2026-04-30'),
     ).expect(200);
-    expect(is.body.revenue.total).toBe('312000.0000');
+    // Seed revenue 312,000 + 1,020,000 from the AR demo invoices dated Jan-Apr (Prompt #6 seed).
+    expect(is.body.revenue.total).toBe('1332000.0000');
     expect(is.body.costOfSales.total).toBe('60000.0000');
-    expect(is.body.grossProfit).toBe('252000.0000');
+    expect(is.body.grossProfit).toBe('1272000.0000');
     expect(is.body.expenses.total).toBe('125950.5000'); // seed 124,700 + 1,250.50 posted above
-    expect(is.body.netIncome).toBe('126049.5000');
+    expect(is.body.netIncome).toBe('1146049.5000');
     expect(bs.body.currentEarnings).toBe(is.body.netIncome);
   });
 

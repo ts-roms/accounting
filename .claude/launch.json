@@ -32,6 +32,15 @@
         "API_INTERNAL_URL": "http://localhost:3011",
         "NEXT_DIST_DIR": ".next-verify"
       }
+    },
+    {
+      "name": "web-ar",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@accounting/web", "exec", "next", "dev", "-p", "3021"],
+      "port": 3021,
+      "env": {
+        "API_INTERNAL_URL": "http://localhost:3012"
+      }
     }
   ]
 }

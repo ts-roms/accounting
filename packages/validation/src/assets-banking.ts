@@ -10,7 +10,13 @@ import {
   MATCH_CONFIDENCES,
 } from '@accounting/types';
 import { amountSchema, isoDateSchema, signedAmountSchema } from './accounting';
-import { codeSchema, nameSchema, optionalText, paginationQuerySchema, uuidSchema } from './primitives';
+import {
+  codeSchema,
+  nameSchema,
+  optionalText,
+  paginationQuerySchema,
+  uuidSchema,
+} from './primitives';
 import { percentSchema } from './subledger';
 
 // -------------------------------------------------------------- fixed assets

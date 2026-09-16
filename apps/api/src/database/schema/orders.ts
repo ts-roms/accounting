@@ -68,6 +68,18 @@ export const orders = pgTable(
     receiptStatus: fulfillmentStatusEnum('receipt_status').notNull().default('NONE'),
     /** Invoicing (sales orders) / billing (purchase orders) progress. */
     billingStatus: fulfillmentStatusEnum('billing_status').notNull().default('NONE'),
+    /** Delivery progress (sales orders, Prompt #6). */
+    deliveryStatus: fulfillmentStatusEnum('delivery_status').notNull().default('NONE'),
+    /** Named payment term, salesperson and shipping warehouse carried to the invoice (Prompt #6). */
+    paymentTermId: uuid('payment_term_id'),
+    salespersonId: uuid('salesperson_id').references(() => users.id, { onDelete: 'set null' }),
+    warehouseId: uuid('warehouse_id').references((): AnyPgColumn => warehouses.id, {
+      onDelete: 'restrict',
+    }),
+    /** Credit check outcome recorded when the order was submitted / approved (Prompt #6). */
+    creditCheck: jsonb('credit_check').$type<Record<string, unknown>>(),
+    confirmedBy: uuid('confirmed_by').references(() => users.id, { onDelete: 'set null' }),
+    confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
     /** Quotation -> sales order, purchase request -> purchase order. */
     sourceOrderId: uuid('source_order_id').references((): AnyPgColumn => orders.id, {
       onDelete: 'restrict',
@@ -128,6 +140,10 @@ export const orderLines = pgTable(
     receivedQuantity: money('received_quantity').notNull().default('0'),
     billedQuantity: money('billed_quantity').notNull().default('0'),
     returnedQuantity: money('returned_quantity').notNull().default('0'),
+    /** Quantity shipped through deliveries (sales orders, Prompt #6). */
+    deliveredQuantity: money('delivered_quantity').notNull().default('0'),
+    /** Unit of measure label carried from the product (informational). */
+    unit: text('unit'),
     /** Line of the source quotation / request this line was converted from. */
     sourceLineId: uuid('source_line_id').references((): AnyPgColumn => orderLines.id, {
       onDelete: 'set null',
@@ -148,7 +164,7 @@ export const orderLines = pgTable(
     ),
     check(
       'order_lines_fulfilment_chk',
-      sql`${t.receivedQuantity} >= 0 AND ${t.billedQuantity} >= 0 AND ${t.returnedQuantity} >= 0`,
+      sql`${t.receivedQuantity} >= 0 AND ${t.billedQuantity} >= 0 AND ${t.returnedQuantity} >= 0 AND ${t.deliveredQuantity} >= 0`,
     ),
   ],
 );

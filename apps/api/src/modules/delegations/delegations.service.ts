@@ -512,17 +512,15 @@ export class DelegationsService {
           .from(companies)
           .where(eq(companies.id, row.companyId));
         await tx.delete(delegationScopes).where(eq(delegationScopes.delegationId, id));
-        await tx
-          .insert(delegationScopes)
-          .values(
-            input.scopes.map((s) => ({
-              delegationId: id,
-              permission: s.permission,
-              branchId: s.branchId ?? null,
-              maxAmount: s.maxAmount ?? null,
-              currency: s.maxAmount ? (s.currency ?? company!.baseCurrency) : null,
-            })),
-          );
+        await tx.insert(delegationScopes).values(
+          input.scopes.map((s) => ({
+            delegationId: id,
+            permission: s.permission,
+            branchId: s.branchId ?? null,
+            maxAmount: s.maxAmount ?? null,
+            currency: s.maxAmount ? (s.currency ?? company!.baseCurrency) : null,
+          })),
+        );
       }
       await tx
         .update(delegations)
@@ -585,14 +583,12 @@ export class DelegationsService {
           ErrorCodes.DELEGATION_NOT_ELIGIBLE,
           'You already decided this delegation.',
         );
-      await tx
-        .insert(delegationApprovals)
-        .values({
-          delegationId: id,
-          approverUserId: actor.id,
-          decision: input.decision,
-          comment: input.comment ?? null,
-        });
+      await tx.insert(delegationApprovals).values({
+        delegationId: id,
+        approverUserId: actor.id,
+        decision: input.decision,
+        comment: input.comment ?? null,
+      });
       const now = new Date();
       if (input.decision === 'REJECT') {
         await tx

@@ -29,18 +29,18 @@ Posting, configuration and administration permissions cannot be delegated.
 
 ## Rules and where they are enforced
 
-| #  | Rule                                                        | Enforcement                                                      |
-| -- | ----------------------------------------------------------- | ---------------------------------------------------------------- |
-| 1  | Cannot delegate a permission you do not hold                | `create`: delegator's resolved permissions (no chaining)         |
-| 2  | Delegate never exceeds the delegator                        | Same check; re-validated at use when `revalidateAtUse`           |
-| 3  | Explicit start and end                                      | Schema + `validateWindow` (future, <= policy max days)           |
-| 4  | Expired delegations stop automatically                      | Window check in `grantsFor` / `checkGrant`; job marks EXPIRED    |
-| 5  | Revoked delegations stop immediately                        | Status re-read `FOR UPDATE` inside the approving transaction     |
-| 6  | Company and branch scope                                    | Grants resolved per active company; branch compared per document |
-| 7  | Monetary limits                                             | Exact-decimal `Money` compare, currency must match               |
-| 8  | Segregation of duties                                       | `SodService.assertAllowed` on the delegate's combined permissions at creation |
-| 9  | No self-approval                                            | Document creator == acting user is refused; delegator cannot use own delegation |
-| 10 | Never bypasses accounting controls                          | Only "may this person approve" is answered; posting is untouched |
+| #   | Rule                                         | Enforcement                                                                     |
+| --- | -------------------------------------------- | ------------------------------------------------------------------------------- |
+| 1   | Cannot delegate a permission you do not hold | `create`: delegator's resolved permissions (no chaining)                        |
+| 2   | Delegate never exceeds the delegator         | Same check; re-validated at use when `revalidateAtUse`                          |
+| 3   | Explicit start and end                       | Schema + `validateWindow` (future, <= policy max days)                          |
+| 4   | Expired delegations stop automatically       | Window check in `grantsFor` / `checkGrant`; job marks EXPIRED                   |
+| 5   | Revoked delegations stop immediately         | Status re-read `FOR UPDATE` inside the approving transaction                    |
+| 6   | Company and branch scope                     | Grants resolved per active company; branch compared per document                |
+| 7   | Monetary limits                              | Exact-decimal `Money` compare, currency must match                              |
+| 8   | Segregation of duties                        | `SodService.assertAllowed` on the delegate's combined permissions at creation   |
+| 9   | No self-approval                             | Document creator == acting user is refused; delegator cannot use own delegation |
+| 10  | Never bypasses accounting controls           | Only "may this person approve" is answered; posting is untouched                |
 
 ## Approval policy
 
@@ -76,7 +76,12 @@ The audit entry written on use names both sides explicitly:
   "delegation": "DLG-000001",
   "permission": "bill.approve",
   "action": "Approved vendor bill",
-  "document": { "type": "VENDOR_BILL", "number": "BILL-2026-000031", "amount": "120000.0000", "currency": "PHP" },
+  "document": {
+    "type": "VENDOR_BILL",
+    "number": "BILL-2026-000031",
+    "amount": "120000.0000",
+    "currency": "PHP"
+  },
   "reason": "Leave coverage: AP bill approval while the Finance Manager is away",
   "validUntil": "2026-09-28T..."
 }

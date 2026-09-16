@@ -17,6 +17,7 @@ const ORDER_VARIANT: Record<OrderStatus, Variant> = {
   SENT: 'warning',
   ACCEPTED: 'default',
   APPROVED: 'default',
+  CONFIRMED: 'default',
   CONVERTED: 'success',
   REJECTED: 'destructive',
   CLOSED: 'success',

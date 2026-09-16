@@ -20,6 +20,7 @@ import {
   createCustomerSchema,
   createInvoiceSchema,
   createPaymentSchema,
+  createRefundRequestSchema,
   listDocumentsQuerySchema,
   listPartiesQuerySchema,
   listPaymentsQuerySchema,
@@ -38,6 +39,7 @@ import { ArReportsService } from './ar-reports.service';
 import { CustomerPaymentsService } from './customer-payments.service';
 import { CustomersService } from './customers.service';
 import { InvoicesService } from './invoices.service';
+import { RefundsService } from './refunds.service';
 
 class ListPartiesQueryDto extends createZodDto(listPartiesQuerySchema) {}
 class CreateCustomerDto extends createZodDto(createCustomerSchema) {}
@@ -54,6 +56,11 @@ class UpdatePaymentDto extends createZodDto(updatePaymentSchema) {}
 class AgingQueryDto extends createZodDto(agingQuerySchema) {}
 class StatementQueryDto extends createZodDto(statementQuerySchema) {}
 class ReconciliationQueryDto extends createZodDto(reconciliationQuerySchema) {}
+class RefundFromPaymentDto extends createZodDto(
+  createRefundRequestSchema
+    .omit({ customerId: true, paymentId: true, creditNoteId: true, branchId: true })
+    .partial({ amount: true, cashAccountId: true, method: true }),
+) {}
 
 @ApiTags('Customers')
 @Controller('customers')
@@ -90,7 +97,7 @@ export class CustomersController {
   @Post()
   @RequirePermissions(P['customer.manage'])
   create(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateCustomerDto) {
-    return this.customers.create(user.companyId!, body);
+    return this.customers.create(user.companyId!, body, user);
   }
 
   @Patch(':id')
@@ -100,7 +107,7 @@ export class CustomersController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: UpdateCustomerDto,
   ) {
-    return this.customers.update(user.companyId!, id, body);
+    return this.customers.update(user.companyId!, id, body, user);
   }
 }
 
@@ -144,6 +151,15 @@ export class InvoicesController {
   @HttpCode(204)
   async remove(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
     await this.invoices.remove(user.companyId!, id);
+  }
+
+  @Post(':id/submit')
+  @RequirePermissions(P['invoice.create'])
+  @ApiOperation({
+    summary: 'Submit for approval: runs the credit policy and opens the approval workflow',
+  })
+  submit(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.invoices.submit(user.companyId!, user, id);
   }
 
   @Post(':id/approve')
@@ -196,7 +212,10 @@ export class InvoicesController {
 @Controller('customer-payments')
 @CompanyScoped()
 export class CustomerPaymentsController {
-  constructor(private readonly payments: CustomerPaymentsService) {}
+  constructor(
+    private readonly payments: CustomerPaymentsService,
+    private readonly refunds: RefundsService,
+  ) {}
 
   @Get()
   @RequirePermissions(P['invoice.view'])
@@ -234,11 +253,49 @@ export class CustomerPaymentsController {
     await this.payments.remove(user.companyId!, id);
   }
 
+  @Post(':id/submit')
+  @RequirePermissions(P['customer-payment.create'])
+  submit(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.payments.submit(user.companyId!, user, id);
+  }
+
+  @Post(':id/approve')
+  @RequirePermissions(P['customer-payment.approve'])
+  @ApiOperation({ summary: 'Approve a receipt (workflow, delegated authority and SoD enforced)' })
+  approve(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.payments.approve(user.companyId!, user, id);
+  }
+
   @Post(':id/post')
   @RequirePermissions(P['customer-payment.post'])
   @ApiOperation({ summary: 'Post the receipt (Dr cash / Cr AR) and settle the allocated invoices' })
   post(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
     return this.payments.post(user.companyId!, user, id);
+  }
+
+  @Post(':id/refund')
+  @RequirePermissions(P['customer-refund.create'])
+  @ApiOperation({
+    summary:
+      'Request a refund of the unapplied part of this receipt (goes through refund approval)',
+  })
+  async refund(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: RefundFromPaymentDto,
+  ) {
+    const payment = await this.payments.get(user.companyId!, id);
+    return this.refunds.create(user.companyId!, user, {
+      customerId: payment.customerId,
+      paymentId: payment.id,
+      amount: body.amount ?? payment.unallocatedAmount,
+      reason: body.reason,
+      method: body.method ?? payment.method,
+      cashAccountId: body.cashAccountId ?? payment.cashAccountId,
+      reference: body.reference,
+      branchId: payment.branchId,
+      idempotencyKey: body.idempotencyKey,
+    });
   }
 
   @Post(':id/allocate')
