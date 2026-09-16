@@ -3,9 +3,10 @@ import { and, asc, eq, isNull, or, sql } from 'drizzle-orm';
 import type { SodEnforcement } from '@accounting/types';
 import type { UpsertSodPolicyInput } from '@accounting/validation';
 import { AuditService } from '@/modules/audit/audit.service';
-import { BusinessRuleError, NotFoundError } from '@/common/errors/app-error';
+import { BusinessRuleError, DuplicateError, NotFoundError } from '@/common/errors/app-error';
 import { ErrorCodes } from '@/common/errors/error-codes';
 import { shallowDiff } from '@/common/utils/diff';
+import { isUniqueViolation } from '@/common/utils/pg-errors';
 import { DRIZZLE, type Database, type DbExecutor } from '@/database/database.types';
 import { companies, sodPolicies, userRoles, users, type SodPolicy } from '@/database/schema';
 import { PermissionResolverService } from './permission-resolver.service';
@@ -222,10 +223,22 @@ export class SodService {
 
   async create(organizationId: string, input: UpsertSodPolicyInput): Promise<SodPolicy> {
     return this.db.transaction(async (tx) => {
-      const [created] = await tx
-        .insert(sodPolicies)
-        .values({ organizationId, ...input, description: input.description ?? null })
-        .returning();
+      let created: SodPolicy | undefined;
+      try {
+        [created] = await tx
+          .insert(sodPolicies)
+          .values({ organizationId, ...input, description: input.description ?? null })
+          .returning();
+      } catch (err) {
+        // One policy per permission pair and organization (the defaults are seeded).
+        if (isUniqueViolation(err, 'sod_policies_org_pair_uq'))
+          throw new DuplicateError(
+            'SodPolicy',
+            'permission pair',
+            `${input.permissionA} / ${input.permissionB}`,
+          );
+        throw err;
+      }
       if (!created) throw new Error('Insert returned no row');
       await this.audit.record(
         {

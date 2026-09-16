@@ -466,8 +466,14 @@ describe('Delegated authority (e2e)', () => {
   });
 
   it('Rule 8: a delegation that would create a segregation-of-duties conflict is refused', async () => {
-    // Give the accountant an explicit BLOCK policy between creating and approving bills, then try to lend bill.approve again.
-    await as(server().post('/api/v1/sod-policies'))
+    // Tighten the seeded bill create / approve policy (WARN by default) to BLOCK, then try to lend bill.approve again.
+    const policies = await as(server().get('/api/v1/sod-policies')).expect(200);
+    const billPolicy = policies.body.find(
+      (p: { permissionA: string; permissionB: string }) =>
+        p.permissionA === 'bill.create' && p.permissionB === 'bill.approve',
+    );
+    expect(billPolicy).toBeDefined();
+    await as(server().put(`/api/v1/sod-policies/${billPolicy.id}`))
       .send({
         name: 'Bill create vs approve',
         permissionA: 'bill.create',
@@ -475,7 +481,17 @@ describe('Delegated authority (e2e)', () => {
         enforcement: 'BLOCK',
         isActive: true,
       })
-      .expect(201);
+      .expect(200);
+    // A second policy for the same pair is a 409, never a raw database error.
+    await as(server().post('/api/v1/sod-policies'))
+      .send({
+        name: 'Duplicate pair',
+        permissionA: 'bill.create',
+        permissionB: 'bill.approve',
+        enforcement: 'BLOCK',
+        isActive: true,
+      })
+      .expect(409);
     const conflict = await as(server().post('/api/v1/delegations'), finance)
       .send({
         delegateUserId: users[ACCOUNTANT.email],
