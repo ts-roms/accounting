@@ -32,6 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
   Skeleton,
+  StatusBadge,
 } from '@accounting/ui';
 import { describeError } from '@/lib/api/client';
 import {
@@ -47,6 +48,7 @@ import { useSession } from '@/lib/auth/session';
 import { DataTable, useTableState } from '@/components/ui-ext/data-table';
 import { Can, EmptyState, PageHeader } from '@/components/ui-ext/page';
 import { Amount, today } from '@/components/accounting/primitives';
+import { toneOf } from '@/components/status';
 
 export const AREA_LABEL: Record<ReconciliationArea, string> = {
   AR: 'Accounts receivable',
@@ -70,9 +72,9 @@ const STATUS_VARIANT: Record<
 
 export function ReconciliationStatusBadge({ status }: { status: SubledgerReconciliationStatus }) {
   return (
-    <Badge variant={STATUS_VARIANT[status]} data-testid="recon-status">
+    <StatusBadge tone={toneOf(STATUS_VARIANT[status])} data-testid="recon-status">
       {status.replace('_', ' ')}
-    </Badge>
+    </StatusBadge>
   );
 }
 
@@ -350,7 +352,7 @@ function AreaTile({
           {live.withinMateriality ? (
             <CheckCircle2 className="h-5 w-5 text-success" aria-label="reconciled" />
           ) : (
-            <AlertTriangle className="h-5 w-5 text-destructive" aria-label="variance" />
+            <AlertTriangle className="h-5 w-5 text-critical" aria-label="variance" />
           )}
         </div>
         <div className="grid grid-cols-3 gap-2 text-xs">
@@ -365,7 +367,7 @@ function AreaTile({
           <div>
             <div className="text-muted-foreground">Variance</div>
             <div
-              className={`tabular ${live.withinMateriality ? '' : 'font-semibold text-destructive'}`}
+              className={`tabular ${live.withinMateriality ? '' : 'font-semibold text-critical'}`}
               data-testid="recon-live-variance"
             >
               {formatMoney(live.variance)}

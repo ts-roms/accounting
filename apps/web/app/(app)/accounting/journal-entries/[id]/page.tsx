@@ -36,6 +36,7 @@ import {
   Input,
   Label,
   Skeleton,
+  StepTimeline,
   Table,
   TableBody,
   TableCell,
@@ -57,9 +58,16 @@ import {
 } from '@/lib/api/accounting-hooks';
 import type { JournalEntryDetail, RelatedJournalEntry, SodConflict } from '@/lib/api/types';
 import { useSession } from '@/lib/auth/session';
-import { formatDateTime, titleCase } from '@/lib/format';
+import { titleCase } from '@/lib/format';
 import { ConfirmDialog, PageHeader } from '@/components/ui-ext/page';
 import { Amount, JournalStatusBadge, today } from '@/components/accounting/primitives';
+import {
+  APPROVAL_STEPS,
+  OperationDialog,
+  POSTING_STEPS,
+} from '@/components/accounting/operation-dialog';
+import { DelegatedAuthorityNotice } from '@/components/delegations/delegated-authority-notice';
+import { journalTimeline } from '@/components/accounting/timelines';
 
 const ACTION_LABEL: Record<
   JournalAction,
@@ -114,9 +122,14 @@ export default function JournalEntryDetailPage() {
       const result = await action.mutateAsync({ id: e.id, action: act });
       setWarnings(result.sodWarnings ?? []);
       toast.success(`${e.documentNumber} ${ACTION_LABEL[act].verb}.`);
-      setPending(null);
+      if (act === 'submit') setPending(null);
     } catch (err) {
-      toast.error(describeError(err));
+      if (act === 'submit') {
+        toast.error(describeError(err));
+        return;
+      }
+      // Post / approve dialogs render the failure against the failing check.
+      throw err;
     }
   };
 
@@ -374,12 +387,9 @@ export default function JournalEntryDetailPage() {
                 </ul>
               </div>
             ) : null}
-            <div className="mt-4 space-y-1.5 border-t pt-3 text-xs text-muted-foreground">
-              <Timeline label="Created" who={e.createdByEmail} when={e.createdAt} />
-              <Timeline label="Submitted" who={null} when={e.submittedAt} />
-              <Timeline label="Approved" who={e.approvedByEmail} when={e.approvedAt} />
-              <Timeline label="Rejected" who={null} when={e.rejectedAt} />
-              <Timeline label="Posted" who={e.postedByEmail} when={e.postedAt} />
+            <div className="mt-4 border-t pt-3">
+              <div className="type-label mb-2">Workflow</div>
+              <StepTimeline steps={journalTimeline(e)} />
             </div>
             <Button variant="link" size="sm" className="mt-2 px-0" asChild>
               <Link href={`/admin/audit-logs?entityId=${e.id}`}>View audit trail</Link>
@@ -390,20 +400,41 @@ export default function JournalEntryDetailPage() {
       </div>
 
       <ConfirmDialog
-        open={Boolean(pending)}
+        open={pending === 'submit'}
         onOpenChange={(open) => !open && setPending(null)}
-        title={pending ? `${ACTION_LABEL[pending].label}?` : ''}
-        description={
-          pending === 'post'
-            ? `${e.documentNumber} will be written to the general ledger for ${e.periodName}. Posted entries cannot be edited - only reversed.`
-            : pending === 'approve'
-              ? 'Approving confirms the entry is correct and ready to post.'
-              : 'The entry will be routed for approval.'
-        }
-        confirmLabel={pending ? ACTION_LABEL[pending].label : 'Confirm'}
+        title={`${ACTION_LABEL.submit.label}?`}
+        description="The entry will be routed for approval."
+        confirmLabel={ACTION_LABEL.submit.label}
+        loadingLabel="Submitting..."
         loading={action.isPending}
-        onConfirm={() => (pending ? run(pending) : undefined)}
+        onConfirm={() => run('submit')}
       />
+      <OperationDialog
+        open={pending === 'post'}
+        onOpenChange={(open) => !open && setPending(null)}
+        title="Post journal"
+        description={`${e.documentNumber} will be written to the general ledger for ${e.periodName}. Posted entries cannot be edited - only reversed.`}
+        confirmLabel="Post to ledger"
+        loadingLabel="Posting..."
+        resultLabel="Posted"
+        steps={POSTING_STEPS}
+        run={() => run('post')}
+      >
+        <DelegatedAuthorityNotice permission={P['journal.post']} />
+      </OperationDialog>
+      <OperationDialog
+        open={pending === 'approve'}
+        onOpenChange={(open) => !open && setPending(null)}
+        title="Approve journal"
+        description="Approving confirms the entry is correct and ready to post."
+        confirmLabel="Approve"
+        loadingLabel="Approving..."
+        resultLabel="Approved"
+        steps={APPROVAL_STEPS}
+        run={() => run('approve')}
+      >
+        <DelegatedAuthorityNotice permission={P['journal.approve']} />
+      </OperationDialog>
       <ConfirmDialog
         open={deleting}
         onOpenChange={setDeleting}
@@ -485,27 +516,6 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
       <dt className="text-muted-foreground">{label}</dt>
       <dd>{value}</dd>
     </>
-  );
-}
-
-function Timeline({
-  label,
-  who,
-  when,
-}: {
-  label: string;
-  who: string | null;
-  when: string | null;
-}) {
-  if (!when) return null;
-  return (
-    <div className="flex justify-between gap-2">
-      <span>
-        {label}
-        {who ? <span className="text-foreground"> by {who}</span> : null}
-      </span>
-      <span className="whitespace-nowrap">{formatDateTime(when)}</span>
-    </div>
   );
 }
 

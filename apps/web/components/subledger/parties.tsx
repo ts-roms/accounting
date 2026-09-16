@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -48,10 +48,14 @@ import { AccountCombobox, Amount } from '@/components/accounting/primitives';
 
 export function PartiesPage({ cfg }: { cfg: SubledgerConfig }) {
   const router = useRouter();
+  const params = useSearchParams();
   const { hasPermission } = useSession();
   const table = useTableState({ sortBy: 'name', sortDir: 'asc' });
   const [status, setStatus] = React.useState('ACTIVE');
-  const [dialog, setDialog] = React.useState<{ open: boolean; party?: Party }>({ open: false });
+  // `?action=create` (command palette) opens the create dialog directly.
+  const [dialog, setDialog] = React.useState<{ open: boolean; party?: Party }>({
+    open: params.get('action') === 'create',
+  });
   const parties = useParties(cfg, {
     ...table.query,
     status: status === 'ALL' ? undefined : (status as 'ACTIVE' | 'INACTIVE'),
@@ -103,7 +107,7 @@ export function PartiesPage({ cfg }: { cfg: SubledgerConfig }) {
           <Amount
             value={row.original.balance.overdue}
             zeroAsDash
-            className={row.original.balance.overdue !== '0.0000' ? 'text-destructive' : ''}
+            className={row.original.balance.overdue !== '0.0000' ? 'text-critical' : ''}
           />
         ),
       },
@@ -148,6 +152,8 @@ export function PartiesPage({ cfg }: { cfg: SubledgerConfig }) {
         columns={columns}
         data={parties.data}
         isLoading={parties.isLoading}
+        error={parties.error}
+        onRetry={() => void parties.refetch()}
         isFetching={parties.isFetching}
         pagination={table.pagination}
         sorting={table.sorting}

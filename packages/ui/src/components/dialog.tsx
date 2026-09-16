@@ -16,7 +16,7 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      'fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+      'fixed inset-0 z-50 bg-black/60 backdrop-blur-[1px] data-[state=open]:animate-enter data-[state=open]:fade-in data-[state=closed]:animate-exit data-[state=closed]:fade-out',
       className,
     )}
     {...props}
@@ -24,6 +24,14 @@ const DialogOverlay = React.forwardRef<
 ));
 DialogOverlay.displayName = 'DialogOverlay';
 
+const closeButtonClasses =
+  'absolute right-3 top-3 inline-flex size-7 items-center justify-center rounded-sm text-muted-foreground transition-colors duration-fast hover:bg-accent hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none';
+
+/**
+ * Centred dialog. Enters with a 98% -> 100% scale + fade over --motion-normal;
+ * the centring uses the `translate` property so it composes with the animated
+ * `transform`.
+ */
 const DialogContent = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
@@ -35,15 +43,16 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed left-1/2 top-1/2 z-50 grid w-full -translate-x-1/2 -translate-y-1/2 gap-4 border bg-background p-5 shadow-lg duration-200 sm:rounded-lg',
+        'fixed left-1/2 top-1/2 z-50 grid w-full -translate-x-1/2 -translate-y-1/2 gap-4 border bg-popover p-5 text-popover-foreground shadow-overlay sm:rounded-xl',
+        'data-[state=open]:animate-enter data-[state=open]:fade-in data-[state=open]:scale-in-98 data-[state=closed]:animate-exit data-[state=closed]:fade-out data-[state=closed]:scale-out-98',
         { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl' }[size],
         className,
       )}
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring disabled:pointer-events-none">
-        <X className="h-4 w-4" />
+      <DialogPrimitive.Close className={closeButtonClasses}>
+        <X className="size-4" />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>
@@ -54,21 +63,25 @@ DialogContent.displayName = 'DialogContent';
 /** Side panel variant built on the same primitive (for record detail views). */
 const SheetContent = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { side?: 'left' | 'right' }
+>(({ className, children, side = 'right', ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed inset-y-0 right-0 z-50 flex h-full w-full max-w-xl flex-col gap-4 overflow-y-auto border-l bg-background p-5 shadow-lg',
+        'fixed inset-y-0 z-50 flex h-full w-full max-w-xl flex-col gap-4 overflow-y-auto bg-popover p-5 text-popover-foreground shadow-overlay',
+        'data-[state=open]:animate-enter-medium data-[state=closed]:animate-exit',
+        side === 'right'
+          ? 'right-0 border-l data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right'
+          : 'left-0 border-r data-[state=open]:slide-in-from-left data-[state=closed]:slide-out-to-left',
         className,
       )}
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring">
-        <X className="h-4 w-4" />
+      <DialogPrimitive.Close className={closeButtonClasses}>
+        <X className="size-4" />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>
@@ -77,11 +90,11 @@ const SheetContent = React.forwardRef<
 SheetContent.displayName = 'SheetContent';
 
 const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('flex flex-col space-y-1.5 text-left', className)} {...props} />
+  <div className={cn('flex flex-col space-y-1.5 pr-6 text-left', className)} {...props} />
 );
 const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
-    className={cn('flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2', className)}
+    className={cn('flex flex-col-reverse gap-2 sm:flex-row sm:justify-end', className)}
     {...props}
   />
 );
@@ -92,7 +105,7 @@ const DialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
-    className={cn('text-base font-semibold leading-none tracking-tight', className)}
+    className={cn('type-h2 leading-none tracking-tight', className)}
     {...props}
   />
 ));

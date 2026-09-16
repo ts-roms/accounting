@@ -263,7 +263,7 @@ export function VariancePage() {
                           currency={currency}
                           className={cn(
                             'font-semibold',
-                            Number(r.totals.net.variance) < 0 && 'text-destructive',
+                            Number(r.totals.net.variance) < 0 && 'text-critical',
                           )}
                         />
                       </TableCell>
@@ -309,7 +309,7 @@ function TotalsStat({
       hint={
         <span>
           budget {t.budget} · variance{' '}
-          <span className={bad ? 'text-destructive' : 'text-emerald-600'}>{t.variance}</span>
+          <span className={bad ? 'text-critical' : 'text-positive'}>{t.variance}</span>
         </span>
       }
     />
@@ -349,7 +349,7 @@ function VarianceLine({
         <Amount
           value={row.variance}
           currency={currency}
-          className={bad ? 'text-destructive' : undefined}
+          className={bad ? 'text-critical' : undefined}
           zeroAsDash
         />
       </TableCell>

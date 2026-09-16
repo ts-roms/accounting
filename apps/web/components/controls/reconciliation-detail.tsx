@@ -191,7 +191,7 @@ export function ReconciliationDetailPage({ id }: { id: string }) {
                       <Amount
                         value={l.difference}
                         zeroAsDash
-                        className={Number(l.difference) ? 'font-semibold text-destructive' : ''}
+                        className={Number(l.difference) ? 'font-semibold text-critical' : ''}
                       />
                     </TableCell>
                   </TableRow>

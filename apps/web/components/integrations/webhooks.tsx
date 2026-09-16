@@ -125,7 +125,7 @@ export function WebhooksPage() {
                     </TableCell>
                     <TableCell className="font-mono">{w.pendingDeliveries}</TableCell>
                     <TableCell
-                      className={`font-mono ${w.exhaustedDeliveries ? 'text-destructive' : ''}`}
+                      className={`font-mono ${w.exhaustedDeliveries ? 'text-critical' : ''}`}
                     >
                       {w.exhaustedDeliveries}
                     </TableCell>
@@ -261,7 +261,7 @@ export function WebhooksPage() {
                   <TableCell className="text-xs">
                     {d.nextAttemptAt ? formatDateTime(d.nextAttemptAt) : ''}
                   </TableCell>
-                  <TableCell className="max-w-80 truncate text-xs text-destructive">
+                  <TableCell className="max-w-80 truncate text-xs text-critical">
                     {d.lastError}
                   </TableCell>
                 </TableRow>

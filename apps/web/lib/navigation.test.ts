@@ -1,11 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { NAVIGATION, findNavItem } from './navigation';
+import { GO_TO, NAVIGATION, SHORTCUTS, findNavItem, groupItems } from './navigation';
 
 describe('navigation', () => {
   it('resolves a pathname to its section and item', () => {
     const match = findNavItem('/admin/users');
     expect(match?.section.title).toBe('Administration');
     expect(match?.item.title).toBe('Users');
+  });
+
+  it('groups items by their optional sub-heading, preserving order', () => {
+    const ops = NAVIGATION.find((s) => s.title === 'Operations')!;
+    const groups = groupItems(ops.items).map((g) => g.group);
+    expect(groups).toEqual(['Sales', 'Purchasing', 'Inventory']);
+    expect(groupItems([{ title: 'A', href: '/a' }])).toEqual([
+      { group: undefined, items: [{ title: 'A', href: '/a' }] },
+    ]);
+  });
+
+  it('every go-to shortcut targets a navigable page', () => {
+    const hrefs = new Set(NAVIGATION.flatMap((s) => s.items.map((i) => i.href)));
+    for (const href of Object.values(GO_TO)) expect(hrefs.has(href), href).toBe(true);
+    expect(SHORTCUTS.some((s) => s.keys.join('+') === 'Ctrl+K')).toBe(true);
   });
 
   it('matches nested paths and ignores unknown ones', () => {

@@ -31,6 +31,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  StepTimeline,
   Textarea,
 } from '@accounting/ui';
 import { describeError } from '@/lib/api/client';
@@ -50,6 +51,12 @@ import type { SubledgerConfig } from '@/lib/subledger/config';
 import { formatDateTime, titleCase } from '@/lib/format';
 import { ConfirmDialog, PageHeader } from '@/components/ui-ext/page';
 import { DelegatedAuthorityNotice } from '@/components/delegations/delegated-authority-notice';
+import {
+  APPROVAL_STEPS,
+  OperationDialog,
+  POSTING_STEPS,
+} from '@/components/accounting/operation-dialog';
+import { documentTimeline } from '@/components/accounting/timelines';
 import { AttachmentsPanel } from '@/components/enterprise/attachments-panel';
 import { Amount, today } from '@/components/accounting/primitives';
 import { MatchCard } from '@/components/orders/match-card';
@@ -96,17 +103,13 @@ export function DocumentDetailPage({ cfg, id }: { cfg: SubledgerConfig; id: stri
         ? cfg.document.creditNoteLabel
         : cfg.document.debitNoteLabel;
 
+  // Throws on failure: the operation dialog maps the error to the failing check.
   const run = async (act: DocumentAction) => {
-    try {
-      const result = await action.mutateAsync({ id: d.id, action: act });
-      setWarnings(result.warnings ?? []);
-      toast.success(
-        `${d.documentNumber} ${act === 'approve' ? 'approved' : 'posted to the ledger'}.`,
-      );
-      setPending(null);
-    } catch (err) {
-      toast.error(describeError(err));
-    }
+    const result = await action.mutateAsync({ id: d.id, action: act });
+    setWarnings(result.warnings ?? []);
+    toast.success(
+      `${d.documentNumber} ${act === 'approve' ? 'approved' : 'posted to the ledger'}.`,
+    );
   };
 
   return (
@@ -413,7 +416,7 @@ export function DocumentDetailPage({ cfg, id }: { cfg: SubledgerConfig; id: stri
                     <span>
                       {d.dueDate}
                       {d.daysOverdue > 0 ? (
-                        <span className="ml-1 text-xs text-destructive">
+                        <span className="ml-1 text-xs text-critical">
                           {d.daysOverdue} days overdue
                         </span>
                       ) : null}
@@ -482,11 +485,9 @@ export function DocumentDetailPage({ cfg, id }: { cfg: SubledgerConfig; id: stri
                   />
                 ) : null}
               </dl>
-              <div className="mt-4 space-y-1.5 border-t pt-3 text-xs text-muted-foreground">
-                <Timeline label="Created" when={d.createdAt} />
-                <Timeline label="Approved" when={d.approvedAt} />
-                <Timeline label="Posted" when={d.postedAt} />
-                <Timeline label="Voided" when={d.voidedAt} />
+              <div className="mt-4 border-t pt-3">
+                <div className="type-label mb-2">Lifecycle</div>
+                <StepTimeline steps={documentTimeline(d)} />
               </div>
               <Button variant="link" size="sm" className="mt-2 px-0" asChild>
                 <Link href={`/admin/audit-logs?entityId=${d.id}`}>View audit trail</Link>
@@ -501,27 +502,31 @@ export function DocumentDetailPage({ cfg, id }: { cfg: SubledgerConfig; id: stri
         </div>
       </div>
 
-      <ConfirmDialog
+      <OperationDialog
         open={pending === 'approve'}
         onOpenChange={(o) => !o && setPending(null)}
-        title={`Approve ${d.documentNumber}?`}
+        title={`Approve ${d.documentNumber}`}
         description="Approval locks the lines. The document has no ledger effect until it is posted."
         confirmLabel="Approve"
-        loading={action.isPending}
-        onConfirm={() => run('approve')}
+        loadingLabel="Approving..."
+        resultLabel="Approved"
+        steps={APPROVAL_STEPS}
+        run={() => run('approve')}
       />
-      <ConfirmDialog
+      <OperationDialog
         open={pending === 'post'}
         onOpenChange={(o) => !o && setPending(null)}
-        title={`Post ${d.documentNumber} to the ledger?`}
+        title={`Post ${d.documentNumber} to the ledger`}
         description={
           cfg.side === 'AR'
             ? `Debits the receivables control account and credits each line account for ${d.currency} ${d.total}. Posted entries can only be reversed.`
             : `Debits each line account and credits the payables control account for ${d.currency} ${d.total}. Posted entries can only be reversed.`
         }
         confirmLabel="Post"
-        loading={action.isPending}
-        onConfirm={() => run('post')}
+        loadingLabel="Posting..."
+        resultLabel="Posted"
+        steps={POSTING_STEPS}
+        run={() => run('post')}
       />
       <ConfirmDialog
         open={deleting}
@@ -578,16 +583,6 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
       <dt className="text-muted-foreground">{label}</dt>
       <dd>{value}</dd>
     </>
-  );
-}
-
-function Timeline({ label, when }: { label: string; when: string | null }) {
-  if (!when) return null;
-  return (
-    <div className="flex justify-between">
-      <span>{label}</span>
-      <span>{formatDateTime(when)}</span>
-    </div>
   );
 }
 
@@ -831,7 +826,7 @@ function ApplyCreditNoteDialog({
             <Amount
               value={remaining.toString()}
               currency={currency}
-              className={remaining.isNegative() ? 'inline text-destructive' : 'inline'}
+              className={remaining.isNegative() ? 'inline text-critical' : 'inline'}
             />
           </div>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -936,7 +931,7 @@ export function AllocationEditor({
                 <TableCell className="whitespace-nowrap">
                   {r.dueDate}
                   {r.daysOverdue > 0 ? (
-                    <span className="ml-1 text-xs text-destructive">+{r.daysOverdue}d</span>
+                    <span className="ml-1 text-xs text-critical">+{r.daysOverdue}d</span>
                   ) : null}
                 </TableCell>
                 <TableCell>
@@ -948,7 +943,7 @@ export function AllocationEditor({
                       inputMode="decimal"
                       aria-label={`Allocate to ${r.documentNumber}`}
                       className={
-                        over ? 'tabular border-destructive text-right' : 'tabular text-right'
+                        over ? 'tabular border-critical text-right' : 'tabular text-right'
                       }
                       value={value}
                       disabled={disabled}

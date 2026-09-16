@@ -1,20 +1,34 @@
 import * as React from 'react';
 import { cn } from '../lib/utils';
 
-const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
-  ({ className, ...props }, ref) => (
-    <div className="relative w-full overflow-auto">
-      <table ref={ref} className={cn('w-full caption-bottom text-sm', className)} {...props} />
-    </div>
-  ),
-);
+/**
+ * Dense financial table. Alignment rules (docs/design-system/components.md):
+ * text/codes left, numbers/currency right (`align="right"` + tabular), status
+ * left, actions right. Hover is a 100ms background shift; rows never move.
+ */
+const Table = React.forwardRef<
+  HTMLTableElement,
+  React.HTMLAttributes<HTMLTableElement> & { containerClassName?: string }
+>(({ className, containerClassName, ...props }, ref) => (
+  <div className={cn('relative w-full overflow-auto', containerClassName)}>
+    <table ref={ref} className={cn('w-full caption-bottom text-sm', className)} {...props} />
+  </div>
+));
 Table.displayName = 'Table';
 
 const TableHeader = React.forwardRef<
   HTMLTableSectionElement,
-  React.HTMLAttributes<HTMLTableSectionElement>
->(({ className, ...props }, ref) => (
-  <thead ref={ref} className={cn('[&_tr]:border-b', className)} {...props} />
+  React.HTMLAttributes<HTMLTableSectionElement> & { sticky?: boolean }
+>(({ className, sticky, ...props }, ref) => (
+  <thead
+    ref={ref}
+    className={cn(
+      '[&_tr]:border-b',
+      sticky && 'sticky top-0 z-10 bg-card shadow-[inset_0_-1px_0_0_var(--border)]',
+      className,
+    )}
+    {...props}
+  />
 ));
 TableHeader.displayName = 'TableHeader';
 
@@ -32,7 +46,7 @@ const TableFooter = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <tfoot
     ref={ref}
-    className={cn('border-t bg-muted/50 font-medium [&>tr]:last:border-b-0', className)}
+    className={cn('border-t bg-muted/50 font-medium tabular [&>tr]:last:border-b-0', className)}
     {...props}
   />
 ));
@@ -43,7 +57,7 @@ const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTML
     <tr
       ref={ref}
       className={cn(
-        'border-b transition-colors hover:bg-muted/40 data-[state=selected]:bg-muted',
+        'border-b transition-colors duration-fast hover:bg-accent/50 data-[state=selected]:bg-primary/8 focus-visible:outline-none focus-visible:bg-accent/60',
         className,
       )}
       {...props}
@@ -52,14 +66,22 @@ const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTML
 );
 TableRow.displayName = 'TableRow';
 
+type Align = 'left' | 'center' | 'right';
+const ALIGN: Record<Align, string> = {
+  left: 'text-left',
+  center: 'text-center',
+  right: 'text-right',
+};
+
 const TableHead = React.forwardRef<
   HTMLTableCellElement,
-  React.ThHTMLAttributes<HTMLTableCellElement>
->(({ className, ...props }, ref) => (
+  React.ThHTMLAttributes<HTMLTableCellElement> & { align?: Align }
+>(({ className, align = 'left', ...props }, ref) => (
   <th
     ref={ref}
     className={cn(
-      'h-9 px-3 text-left align-middle text-xs font-medium uppercase tracking-wide text-muted-foreground [&:has([role=checkbox])]:pr-0',
+      'h-9 px-3 align-middle type-label whitespace-nowrap [&:has([role=checkbox])]:pr-0',
+      ALIGN[align],
       className,
     )}
     {...props}
@@ -69,11 +91,16 @@ TableHead.displayName = 'TableHead';
 
 const TableCell = React.forwardRef<
   HTMLTableCellElement,
-  React.TdHTMLAttributes<HTMLTableCellElement>
->(({ className, ...props }, ref) => (
+  React.TdHTMLAttributes<HTMLTableCellElement> & { align?: Align; numeric?: boolean }
+>(({ className, align, numeric, ...props }, ref) => (
   <td
     ref={ref}
-    className={cn('px-3 py-2 align-middle [&:has([role=checkbox])]:pr-0', className)}
+    className={cn(
+      'px-3 py-2 align-middle [&:has([role=checkbox])]:pr-0',
+      numeric && 'tabular text-right',
+      align && ALIGN[align],
+      className,
+    )}
     {...props}
   />
 ));

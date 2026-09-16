@@ -169,7 +169,7 @@ export function IntegrationsPage() {
         enableSorting: false,
         cell: ({ row }) =>
           row.original.lastError ? (
-            <span className="line-clamp-1 max-w-72 text-xs text-destructive">
+            <span className="line-clamp-1 max-w-72 text-xs text-critical">
               {row.original.lastError}
             </span>
           ) : null,

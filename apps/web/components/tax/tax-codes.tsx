@@ -511,7 +511,7 @@ function TaxCodeDialog({
                 </TableBody>
               </Table>
               {form.formState.errors.rates?.root || form.formState.errors.rates?.message ? (
-                <p className="text-sm text-destructive">
+                <p className="text-sm text-critical">
                   {form.formState.errors.rates.root?.message ?? form.formState.errors.rates.message}
                 </p>
               ) : null}

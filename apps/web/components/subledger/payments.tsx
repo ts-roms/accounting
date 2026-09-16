@@ -138,6 +138,8 @@ export function PaymentsPage({ cfg }: { cfg: SubledgerConfig }) {
         columns={columns}
         data={payments.data}
         isLoading={payments.isLoading}
+        error={payments.error}
+        onRetry={() => void payments.refetch()}
         isFetching={payments.isFetching}
         pagination={table.pagination}
         sorting={table.sorting}

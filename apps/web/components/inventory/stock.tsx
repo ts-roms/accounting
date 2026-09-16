@@ -155,7 +155,7 @@ export function StockOnHandPage() {
                       </TableCell>
                       <TableCell>
                         {r.belowReorder ? (
-                          <span className="flex items-center gap-1 text-xs text-destructive">
+                          <span className="flex items-center gap-1 text-xs text-critical">
                             <AlertTriangle className="h-3.5 w-3.5" /> below {qty(r.reorderLevel!)}
                           </span>
                         ) : r.reorderLevel ? (
@@ -237,7 +237,7 @@ export function InventoryValuationPage() {
                 r.reconciled ? (
                   <CheckCircle2 className="h-4 w-4 text-success" />
                 ) : (
-                  <XCircle className="h-4 w-4 text-destructive" />
+                  <XCircle className="h-4 w-4 text-critical" />
                 )
               ) : null}
               Subledger vs. general ledger
@@ -257,7 +257,7 @@ export function InventoryValuationPage() {
                   <Amount value={r.totalLedger} currency={r.currency} />
                 </dd>
                 <dt
-                  className={cn('font-medium', r.reconciled ? 'text-success' : 'text-destructive')}
+                  className={cn('font-medium', r.reconciled ? 'text-success' : 'text-critical')}
                 >
                   {r.reconciled ? 'Reconciled' : 'Difference'}
                 </dt>
@@ -265,7 +265,7 @@ export function InventoryValuationPage() {
                   <Amount
                     value={r.accounts.reduce((s, a) => s + Number(a.difference), 0).toFixed(4)}
                     currency={r.currency}
-                    className={cn('font-semibold', !r.reconciled && 'text-destructive')}
+                    className={cn('font-semibold', !r.reconciled && 'text-critical')}
                     zeroAsDash
                   />
                 </dd>
@@ -319,7 +319,7 @@ export function InventoryValuationPage() {
                           value={a.difference}
                           currency={r.currency}
                           zeroAsDash
-                          className={a.reconciled ? '' : 'text-destructive'}
+                          className={a.reconciled ? '' : 'text-critical'}
                         />
                       </TableCell>
                     </TableRow>

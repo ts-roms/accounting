@@ -1,4 +1,6 @@
 export { cn } from './lib/utils';
+export * from './lib/overlay';
+export * from './theme';
 export * from './components/button';
 export * from './components/input';
 export * from './components/primitives';
@@ -9,3 +11,8 @@ export * from './components/select';
 export * from './components/misc';
 export * from './components/command';
 export * from './components/form';
+export * from './components/status';
+export * from './components/motion';
+export * from './components/feedback';
+export * from './components/workflow';
+export * from './components/theme';

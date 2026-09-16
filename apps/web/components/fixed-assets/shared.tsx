@@ -1,8 +1,9 @@
 'use client';
 import * as React from 'react';
-import { Badge, Card, CardContent } from '@accounting/ui';
+import { Card, CardContent, StatusBadge } from '@accounting/ui';
 import type { AssetStatus, DepreciationRunStatus } from '@accounting/types';
 import { titleCase } from '@/lib/format';
+import { toneOf } from '@/components/status';
 
 export const ASSETS_PATH = '/fixed-assets/assets';
 export const DEPRECIATION_PATH = '/fixed-assets/depreciation';
@@ -19,7 +20,7 @@ const ASSET_VARIANT: Record<
 };
 
 export function AssetStatusBadge({ status }: { status: AssetStatus }) {
-  return <Badge variant={ASSET_VARIANT[status]}>{titleCase(status)}</Badge>;
+  return <StatusBadge tone={toneOf(ASSET_VARIANT[status])}>{titleCase(status)}</StatusBadge>;
 }
 
 const RUN_VARIANT: Record<DepreciationRunStatus, 'secondary' | 'success' | 'outline'> = {
@@ -29,7 +30,7 @@ const RUN_VARIANT: Record<DepreciationRunStatus, 'secondary' | 'success' | 'outl
 };
 
 export function RunStatusBadge({ status }: { status: DepreciationRunStatus }) {
-  return <Badge variant={RUN_VARIANT[status]}>{titleCase(status)}</Badge>;
+  return <StatusBadge tone={toneOf(RUN_VARIANT[status])}>{titleCase(status)}</StatusBadge>;
 }
 
 export function Field({ label, value }: { label: string; value: React.ReactNode }) {
@@ -55,8 +56,8 @@ export function Stat({
   return (
     <Card>
       <CardContent className="p-4">
-        <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
-        <div className={`mt-1 text-lg font-semibold ${danger ? 'text-destructive' : ''}`}>
+        <div className="type-label">{label}</div>
+        <div className={`mt-1 text-lg font-semibold tabular ${danger ? 'text-critical' : ''}`}>
           {value}
         </div>
         {hint ? <div className="mt-1 text-xs text-muted-foreground">{hint}</div> : null}

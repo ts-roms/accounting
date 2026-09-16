@@ -425,7 +425,7 @@ export function OrderForm({
           </Table>
         </div>
         {form.formState.errors.lines?.root || form.formState.errors.lines?.message ? (
-          <p className="text-xs text-destructive">
+          <p className="text-xs text-critical">
             {String(
               form.formState.errors.lines.root?.message ?? form.formState.errors.lines.message,
             )}

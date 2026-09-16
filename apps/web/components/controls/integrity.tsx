@@ -15,6 +15,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  StatusBadge,
 } from '@accounting/ui';
 import { describeError } from '@/lib/api/client';
 import { useIntegrityReport } from '@/lib/api/accounting-hooks';
@@ -23,6 +24,7 @@ import { formatDateTime } from '@/lib/format';
 import { PageHeader } from '@/components/ui-ext/page';
 import { today } from '@/components/accounting/primitives';
 import { Stat } from '@/components/fixed-assets/shared';
+import { toneOf } from '@/components/status';
 
 const SEVERITY_VARIANT = {
   CRITICAL: 'destructive',
@@ -68,7 +70,7 @@ export function IntegrityPage() {
       />
       {report.isError ? (
         <Card>
-          <CardContent className="p-4 text-sm text-destructive" data-testid="integrity-error">
+          <CardContent className="p-4 text-sm text-critical" data-testid="integrity-error">
             {describeError(report.error)}
           </CardContent>
         </Card>
@@ -87,7 +89,7 @@ export function IntegrityPage() {
                         ? 'h-5 w-5 text-success'
                         : r.status === 'WARNING'
                           ? 'h-5 w-5 text-warning'
-                          : 'h-5 w-5 text-destructive'
+                          : 'h-5 w-5 text-critical'
                     }
                   />
                   {r.status}
@@ -124,14 +126,18 @@ export function IntegrityPage() {
                           <div className="font-mono text-xs text-muted-foreground">{f.check}</div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={SEVERITY_VARIANT[f.severity]}>{f.severity}</Badge>
+                          <StatusBadge tone={toneOf(SEVERITY_VARIANT[f.severity])}>
+                            {f.severity}
+                          </StatusBadge>
                         </TableCell>
                         <TableCell className="text-right tabular">{f.count}</TableCell>
                         <TableCell>
                           {f.count === 0 ? (
                             <Badge variant="success">PASS</Badge>
                           ) : (
-                            <Badge variant={SEVERITY_VARIANT[f.severity]}>FAIL</Badge>
+                            <StatusBadge tone={toneOf(SEVERITY_VARIANT[f.severity])}>
+                              FAIL
+                            </StatusBadge>
                           )}
                           {f.detail ? (
                             <div className="mt-0.5 text-xs text-muted-foreground">{f.detail}</div>

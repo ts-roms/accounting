@@ -170,7 +170,7 @@ export function PartyDetailPage({ cfg, id }: { cfg: SubledgerConfig; id: string 
                         <TableCell className="whitespace-nowrap">
                           {d.dueDate}
                           {d.daysOverdue > 0 ? (
-                            <span className="ml-1 text-xs text-destructive">+{d.daysOverdue}d</span>
+                            <span className="ml-1 text-xs text-critical">+{d.daysOverdue}d</span>
                           ) : null}
                         </TableCell>
                         <TableCell>
@@ -397,7 +397,7 @@ function Stat({
         <div className="text-xs text-muted-foreground">{label}</div>
         <Amount
           value={value}
-          className={`${emphasis ? 'text-lg font-semibold' : 'text-lg'} ${danger ? 'text-destructive' : ''}`}
+          className={`${emphasis ? 'text-lg font-semibold' : 'text-lg'} ${danger ? 'text-critical' : ''}`}
         />
       </CardContent>
     </Card>

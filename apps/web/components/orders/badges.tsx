@@ -6,7 +6,8 @@ import type {
   OrderStatus,
   ReturnStatus,
 } from '@accounting/types';
-import { Badge } from '@accounting/ui';
+import { StatusBadge } from '@accounting/ui';
+import { toneOf } from '@/components/status';
 
 type Variant = 'secondary' | 'default' | 'warning' | 'success' | 'destructive' | 'outline';
 
@@ -23,7 +24,7 @@ const ORDER_VARIANT: Record<OrderStatus, Variant> = {
 };
 
 export function OrderStatusBadge({ status }: { status: OrderStatus }) {
-  return <Badge variant={ORDER_VARIANT[status]}>{status}</Badge>;
+  return <StatusBadge tone={toneOf(ORDER_VARIANT[status])}>{status}</StatusBadge>;
 }
 
 const FULFILMENT_VARIANT: Record<FulfillmentStatus, Variant> = {
@@ -35,9 +36,9 @@ const FULFILMENT_VARIANT: Record<FulfillmentStatus, Variant> = {
 /** Receiving / invoicing / billing progress. */
 export function FulfillmentBadge({ status, label }: { status: FulfillmentStatus; label: string }) {
   return (
-    <Badge variant={FULFILMENT_VARIANT[status]} className="text-[10px]">
+    <StatusBadge tone={toneOf(FULFILMENT_VARIANT[status])} className="text-[10px]">
       {label}: {status === 'NONE' ? 'none' : status.toLowerCase()}
-    </Badge>
+    </StatusBadge>
   );
 }
 
@@ -50,7 +51,7 @@ const MATCH_VARIANT: Record<MatchStatus, Variant> = {
 
 export function MatchStatusBadge({ status }: { status: MatchStatus }) {
   return (
-    <Badge variant={MATCH_VARIANT[status]} data-testid="match-status">
+    <StatusBadge tone={toneOf(MATCH_VARIANT[status])} data-testid="match-status">
       {status === 'NOT_REQUIRED'
         ? 'No PO match'
         : status === 'EXCEPTION'
@@ -58,7 +59,7 @@ export function MatchStatusBadge({ status }: { status: MatchStatus }) {
           : status === 'REVIEWED'
             ? 'Exception reviewed'
             : 'Matched'}
-    </Badge>
+    </StatusBadge>
   );
 }
 
@@ -69,7 +70,7 @@ const RECEIPT_VARIANT: Record<GoodsReceiptStatus, Variant> = {
 };
 
 export function ReceiptStatusBadge({ status }: { status: GoodsReceiptStatus }) {
-  return <Badge variant={RECEIPT_VARIANT[status]}>{status}</Badge>;
+  return <StatusBadge tone={toneOf(RECEIPT_VARIANT[status])}>{status}</StatusBadge>;
 }
 
 const RETURN_VARIANT: Record<ReturnStatus, Variant> = {
@@ -80,5 +81,5 @@ const RETURN_VARIANT: Record<ReturnStatus, Variant> = {
 };
 
 export function ReturnStatusBadge({ status }: { status: ReturnStatus }) {
-  return <Badge variant={RETURN_VARIANT[status]}>{status}</Badge>;
+  return <StatusBadge tone={toneOf(RETURN_VARIANT[status])}>{status}</StatusBadge>;
 }

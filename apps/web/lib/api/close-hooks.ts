@@ -19,11 +19,12 @@ const invalidate = (qc: ReturnType<typeof useQueryClient>) => {
   void qc.invalidateQueries({ queryKey: ['accounting'] });
 };
 
-export const useCloses = (query: Partial<ListClosesQuery>) =>
+export const useCloses = (query: Partial<ListClosesQuery>, enabled = true) =>
   useQuery({
     queryKey: key('list', query),
     queryFn: () => api.get<PaginatedResult<CloseView>>('/financial-closes', { query }),
     placeholderData: (p) => p,
+    enabled,
   });
 
 export const useClose = (id: string | null) =>

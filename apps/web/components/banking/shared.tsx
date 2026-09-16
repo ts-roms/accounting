@@ -1,12 +1,12 @@
 'use client';
 import * as React from 'react';
 import {
-  Badge,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
+  StatusBadge,
 } from '@accounting/ui';
 import type {
   BankTransactionStatus,
@@ -16,6 +16,7 @@ import type {
 } from '@accounting/types';
 import { useBankAccounts } from '@/lib/api/assets-banking-hooks';
 import { titleCase } from '@/lib/format';
+import { toneOf } from '@/components/status';
 
 export const ACCOUNTS_PATH = '/banking/accounts';
 export const TRANSACTIONS_PATH = '/banking/transactions';
@@ -27,7 +28,7 @@ const TX_VARIANT: Record<BankTransactionStatus, 'secondary' | 'success' | 'destr
   VOID: 'destructive',
 };
 export function TxStatusBadge({ status }: { status: BankTransactionStatus }) {
-  return <Badge variant={TX_VARIANT[status]}>{titleCase(status)}</Badge>;
+  return <StatusBadge tone={toneOf(TX_VARIANT[status])}>{titleCase(status)}</StatusBadge>;
 }
 
 const LINE_VARIANT: Record<
@@ -42,12 +43,14 @@ const LINE_VARIANT: Record<
   RECONCILED: 'success',
 };
 export function LineStatusBadge({ status }: { status: StatementLineStatus }) {
-  return <Badge variant={LINE_VARIANT[status]}>{titleCase(status)}</Badge>;
+  return <StatusBadge tone={toneOf(LINE_VARIANT[status])}>{titleCase(status)}</StatusBadge>;
 }
 
 export function StatementStatusBadge({ status }: { status: StatementStatus }) {
   return (
-    <Badge variant={status === 'RECONCILED' ? 'success' : 'warning'}>{titleCase(status)}</Badge>
+    <StatusBadge tone={toneOf(status === 'RECONCILED' ? 'success' : 'warning')}>
+      {titleCase(status)}
+    </StatusBadge>
   );
 }
 

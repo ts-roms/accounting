@@ -5,7 +5,6 @@ import { MoreHorizontal, Plus, Search, ShieldCheck, UserCheck, UserX } from 'luc
 import { toast } from 'sonner';
 import { P } from '@accounting/types';
 import {
-  Badge,
   Button,
   DropdownMenu,
   DropdownMenuContent,
@@ -17,6 +16,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  StatusBadge,
 } from '@accounting/ui';
 import { describeError } from '@/lib/api/client';
 import { useSetUserStatus, useUsers } from '@/lib/api/hooks';
@@ -27,6 +27,7 @@ import { DataTable, useTableState } from '@/components/ui-ext/data-table';
 import { Can, ConfirmDialog, EmptyState, PageHeader } from '@/components/ui-ext/page';
 import { CreateUserDialog } from './create-user-dialog';
 import { UserRolesDialog } from './user-roles-dialog';
+import { toneOf } from '@/components/status';
 
 const STATUS_VARIANT = { ACTIVE: 'success', INACTIVE: 'secondary', LOCKED: 'warning' } as const;
 
@@ -70,7 +71,9 @@ export default function UsersPage() {
         header: 'Status',
         enableSorting: false,
         cell: ({ row }) => (
-          <Badge variant={STATUS_VARIANT[row.original.status]}>{row.original.status}</Badge>
+          <StatusBadge tone={toneOf(STATUS_VARIANT[row.original.status])}>
+            {row.original.status}
+          </StatusBadge>
         ),
       },
       {
@@ -105,7 +108,7 @@ export default function UsersPage() {
                   {canDeactivate && user.status === 'ACTIVE' ? (
                     <DropdownMenuItem
                       onSelect={() => setStatusChange({ user, to: 'INACTIVE' })}
-                      className="text-destructive"
+                      className="text-critical"
                     >
                       <UserX /> Deactivate
                     </DropdownMenuItem>

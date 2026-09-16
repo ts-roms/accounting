@@ -469,7 +469,7 @@ export function JournalEntryForm({
               <TableRow className="hover:bg-transparent">
                 <TableCell
                   colSpan={3}
-                  className={cn('text-xs', balanced ? 'text-success' : 'text-destructive')}
+                  className={cn('text-xs', balanced ? 'text-success' : 'text-critical')}
                 >
                   {balanced
                     ? 'Balanced'
@@ -491,7 +491,7 @@ export function JournalEntryForm({
           </Table>
         </div>
         {form.formState.errors.lines?.root || form.formState.errors.lines?.message ? (
-          <p className="text-xs text-destructive">
+          <p className="text-xs text-critical">
             {String(
               form.formState.errors.lines.root?.message ?? form.formState.errors.lines.message,
             )}
