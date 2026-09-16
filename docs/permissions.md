@@ -16,7 +16,7 @@ Format `<resource>.<action>`. Grouped by module:
 | SALES          | `customer.view/manage/credit-manage`, `quotation.view/create`, `sales-order.view/create/approve`, `delivery.view/manage`, `invoice.view/create/approve/post/void`, `sales-return.view/create/approve`, `customer-payment.create/approve/post`, `customer-refund.create/approve/pay`, `collection.view/manage`, `dispute.manage`, `write-off.view/create/approve/post`, `ar-settings.manage`       |
 | PURCHASING     | `vendor.view/manage`, `purchase-request.view/create/approve`, `purchase-order.view/create/approve`, `goods-receipt.view/create`, `bill.view/create/approve/post/void/match-review`, `purchase-return.view/create`, `vendor-payment.create/approve/post`, `vendor.approve`, `bill.hold`, `payment-run.view/create/approve/execute`, `ap-accrual.view/post`, `ap-settings.manage`                   |
 | INVENTORY      | `product.view/manage`, `warehouse.manage`, `inventory.view/adjust`, `inventory-settings.manage`                                                                                                                                                                                                                                                                                                   |
-| BANKING        | `bank-account.view/manage`, `bank-transaction.create/post`, `bank-statement.import`, `bank-reconciliation.perform`                                                                                                                                                                                                                                                                                |
+| BANKING        | `bank-account.view/manage`, `bank-transaction.create/post`, `bank-statement.import`, `bank-reconciliation.perform`, `treasury.view/forecast-manage`, `treasury-settings.manage`, `bank-transfer.create/approve/post`, `payment-file.manage`, `petty-cash.manage/approve/post`                                                                                                                     |
 | FIXED_ASSETS   | `fixed-asset.view/manage/post`, `depreciation.run`                                                                                                                                                                                                                                                                                                                                                |
 | BUDGETING      | `budget.view/manage/approve`, `dimension.view/manage`, `expense-claim.view/create/approve/post`                                                                                                                                                                                                                                                                                                   |
 | TAX            | `tax.view/manage`                                                                                                                                                                                                                                                                                                                                                                                 |
@@ -56,14 +56,16 @@ organization; custom roles can be created freely.
 
 Default policies (all `WARN`; an administrator may switch any to `BLOCK`):
 
-| Policy                                  | Conflict                                         |
-| --------------------------------------- | ------------------------------------------------ |
-| Journal creator vs approver             | `journal.create` + `journal.approve`             |
-| Journal approver vs poster              | `journal.approve` + `journal.post`               |
-| Vendor bill creator vs payment approver | `bill.create` + `vendor-payment.approve`         |
-| Vendor master vs vendor payment         | `vendor.manage` + `vendor-payment.post`          |
-| Period close vs period reopen           | `period.close` + `period.reopen`                 |
-| Expense claim submitter vs approver     | `expense-claim.create` + `expense-claim.approve` |
+| Policy                                  | Conflict                                                          |
+| --------------------------------------- | ----------------------------------------------------------------- |
+| Journal creator vs approver             | `journal.create` + `journal.approve`                              |
+| Journal approver vs poster              | `journal.approve` + `journal.post`                                |
+| Vendor bill creator vs payment approver | `bill.create` + `vendor-payment.approve`                          |
+| Vendor master vs vendor payment         | `vendor.manage` + `vendor-payment.post`                           |
+| Period close vs period reopen           | `period.close` + `period.reopen`                                  |
+| Expense claim submitter vs approver     | `expense-claim.create` + `expense-claim.approve`                  |
+| Bank transfer creator vs approver       | `bank-transfer.create` + `bank-transfer.approve`                  |
+| Petty cash preparer vs approver         | `petty-cash.manage` + `petty-cash.approve` (above the fund limit) |
 
 `SodService.evaluate()` is pure and unit-tested; `assertAllowed()` is invoked
 before every assignment with the permission set the user _would_ hold in the

@@ -23,3 +23,4 @@ export * from './data-infrastructure';
 export * from './payables';
 export * from './reporting-engine';
 export * from './operations';
+export * from './treasury';

@@ -94,4 +94,19 @@ export const DEFAULT_SOD_POLICIES: readonly SodPolicyDefinition[] = [
     permissionB: P['expense-claim.approve'],
     enforcement: 'WARN',
   },
+  {
+    name: 'Bank transfer creator vs approver',
+    description: 'A user who drafts inter-account bank transfers must not approve them.',
+    permissionA: P['bank-transfer.create'],
+    permissionB: P['bank-transfer.approve'],
+    enforcement: 'WARN',
+  },
+  {
+    name: 'Petty cash preparer vs approver',
+    description:
+      'A user who prepares petty cash vouchers should not approve them above the fund limit.',
+    permissionA: P['petty-cash.manage'],
+    permissionB: P['petty-cash.approve'],
+    enforcement: 'WARN',
+  },
 ];

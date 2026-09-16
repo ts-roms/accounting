@@ -16,6 +16,7 @@ import { seedInventory } from './inventory.seed';
 import { seedOrders } from './orders.seed';
 import { seedReceivables } from './receivables.seed';
 import { seedPayables } from './payables.seed';
+import { seedTreasury } from './treasury.seed';
 import { seedSubledgers } from './subledger.seed';
 
 type Log = (m: string) => void;
@@ -42,6 +43,14 @@ const CHART: CoaRow[] = [
   { code: '1110', name: 'Cash on Hand', type: 'ASSET', parent: '1100', subtype: 'CASH' },
   { code: '1120', name: 'Petty Cash', type: 'ASSET', parent: '1100', subtype: 'CASH' },
   { code: '1130', name: 'Cash in Bank - BDO', type: 'ASSET', parent: '1100', subtype: 'BANK' },
+  {
+    code: '1180',
+    name: 'Cash in Bank - BPI Savings',
+    type: 'ASSET',
+    parent: '1100',
+    subtype: 'BANK',
+  },
+  { code: '1190', name: 'Cash in Transit', type: 'ASSET', parent: '1100', subtype: 'CASH' },
   {
     code: '1200',
     name: 'Accounts Receivable',
@@ -401,6 +410,7 @@ const MAPPINGS: Array<[AccountMappingKey, string]> = [
   ['INPUT_VAT', '1450'],
   ['WITHHOLDING_TAX_PAYABLE', '2140'],
   ['BANK_CHARGES', '6600'],
+  ['CASH_IN_TRANSIT', '1190'],
   ['OPENING_BALANCE_EQUITY', '3900'],
   ['SUSPENSE', '1900'],
   ['BAD_DEBT_EXPENSE', '6710'],
@@ -538,6 +548,7 @@ export async function seedAccounting(
     await seedPayables(tx, company, codeToId, adminUserId, log);
     await seedInventory(tx, company, adminUserId, log);
     await seedAssetsBanking(tx, company, codeToId, adminUserId, log);
+    await seedTreasury(tx, company, codeToId, adminUserId, log);
     await seedBudgetingTax(tx, company, codeToId, adminUserId, log);
     await seedAccountingCore(tx, company, codeToId, adminUserId, log);
   }

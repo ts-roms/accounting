@@ -41,6 +41,13 @@ const BANK_ACCOUNTS = [
     accountNumber: '****4471',
     glCode: '1130',
   },
+  {
+    code: 'BPI-SAVE',
+    name: 'BPI Savings Account',
+    bankName: 'Bank of the Philippine Islands',
+    accountNumber: '****2208',
+    glCode: '1180',
+  },
   { code: 'CASH', name: 'Cash on Hand', bankName: null, accountNumber: null, glCode: '1110' },
 ];
 

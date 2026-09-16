@@ -219,6 +219,33 @@ export const PERMISSION_DEFINITIONS = [
     'BANKING',
     'Match statement lines and complete reconciliations',
   ),
+  // Prompt #8 - cash management & treasury
+  define(
+    'treasury.view',
+    'BANKING',
+    'View cash position, forecast, transfers, payment files and petty cash',
+  ),
+  define(
+    'treasury.forecast-manage',
+    'BANKING',
+    'Maintain planned cash flow items and forecast settings',
+  ),
+  define('bank-transfer.create', 'BANKING', 'Draft inter-account bank transfers'),
+  define('bank-transfer.approve', 'BANKING', 'Approve bank transfers'),
+  define(
+    'bank-transfer.post',
+    'BANKING',
+    'Send and settle approved transfers (posts through cash in transit)',
+  ),
+  define('payment-file.manage', 'BANKING', 'Generate, transmit and acknowledge bank payment files'),
+  define('petty-cash.manage', 'BANKING', 'Manage petty cash funds and draft vouchers'),
+  define('petty-cash.approve', 'BANKING', 'Approve petty cash vouchers'),
+  define('petty-cash.post', 'BANKING', 'Post petty cash vouchers and replenishments'),
+  define(
+    'treasury-settings.manage',
+    'BANKING',
+    'Configure treasury policy, scenarios and account limits',
+  ),
 
   // Fixed assets
   define('fixed-asset.view', 'FIXED_ASSETS', 'View fixed assets and depreciation'),
@@ -264,7 +291,11 @@ export const PERMISSION_DEFINITIONS = [
   define('import.view', 'ADMINISTRATION', 'View data imports'),
   define('import.run', 'ADMINISTRATION', 'Upload, validate and commit data imports'),
   define('opening-balance.view', 'ACCOUNTING', 'View opening balances and their reconciliation'),
-  define('opening-balance.manage', 'ACCOUNTING', 'Load opening balances into the ledger and subledgers'),
+  define(
+    'opening-balance.manage',
+    'ACCOUNTING',
+    'Load opening balances into the ledger and subledgers',
+  ),
   define('audit.view', 'AUDIT', 'View the audit trail'),
   define('operations.view', 'ADMINISTRATION', 'View platform operations: jobs, queues, integrity runs and runtime status'),
   define('operations.manage', 'ADMINISTRATION', 'Run jobs, retry or discard failed queue jobs and trigger integrity checks'),

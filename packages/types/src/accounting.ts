@@ -159,6 +159,8 @@ export const ACCOUNT_MAPPING_KEYS = [
   'PURCHASE_DISCOUNT',
   /** Period-end accrual for services received but not billed (Prompt #7). */
   'ACCRUED_EXPENSE',
+  /** Clearing account for money between two bank accounts (Prompt #8). */
+  'CASH_IN_TRANSIT',
 ] as const;
 export type AccountMappingKey = (typeof ACCOUNT_MAPPING_KEYS)[number];
 
@@ -201,6 +203,12 @@ export const DOCUMENT_TYPES = [
   'PMR',
   /** AP accrual run (Prompt #7). */
   'ACR',
+  /** Bank transfer (Prompt #8). */
+  'BTR',
+  /** Petty cash voucher (Prompt #8). */
+  'PCV',
+  /** Bank payment file (Prompt #8). */
+  'PMF',
 ] as const;
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
 

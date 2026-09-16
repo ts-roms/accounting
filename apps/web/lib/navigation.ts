@@ -1,6 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
 import {
   Activity,
+  ArrowLeftRight,
   BadgePercent,
   FileUp,
   Hash,
@@ -15,6 +16,7 @@ import {
   ClipboardList,
   Coins,
   FileQuestion,
+  FileCode2,
   FileText,
   GitBranch,
   Inbox,
@@ -46,6 +48,7 @@ import {
   Undo2,
   UserCheck,
   Users,
+  Vault,
   Wallet,
   Webhook,
   Workflow,
@@ -197,6 +200,31 @@ export const NAVIGATION: NavSection[] = [
       item('AP Accruals', '/payables/accruals', Layers, [P['ap-accrual.view']], 'Control'),
       item('AP Reconciliation', '/payables/reconciliation', Scale, [P['reports.view']], 'Control'),
       item('Payables Settings', '/payables/settings', Settings2, [P['vendor.view']], 'Control'),
+    ],
+  },
+  {
+    title: 'Treasury',
+    icon: Vault,
+    items: [
+      item('Cash Dashboard', '/treasury/dashboard', LayoutDashboard, [P['treasury.view']]),
+      item('Cash Position', '/treasury/position', Landmark, [P['treasury.view']], 'Cash'),
+      item('Cash Forecast', '/treasury/forecast', BarChart3, [P['treasury.view']], 'Cash'),
+      item(
+        'Bank Transfers',
+        '/treasury/transfers',
+        ArrowLeftRight,
+        [P['treasury.view']],
+        'Movements',
+      ),
+      item(
+        'Payment Files',
+        '/treasury/payment-files',
+        FileCode2,
+        [P['treasury.view']],
+        'Movements',
+      ),
+      item('Petty Cash', '/treasury/petty-cash', Coins, [P['treasury.view']], 'Movements'),
+      item('Treasury Settings', '/treasury/settings', Settings2, [P['treasury.view']], 'Control'),
     ],
   },
   {

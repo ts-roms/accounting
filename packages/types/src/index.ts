@@ -15,3 +15,4 @@ export * from './integrations';
 export * from './delegations';
 export * from './receivables';
 export * from './payables';
+export * from './treasury';
