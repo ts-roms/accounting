@@ -12,7 +12,6 @@ import { Money } from '@accounting/money';
 import { BUDGET_STATUSES, P, type BudgetStatus, type BudgetVersionStatus } from '@accounting/types';
 import { createBudgetSchema, type CreateBudgetInput } from '@accounting/validation';
 import {
-  Badge,
   Button,
   Card,
   CardContent,
@@ -47,6 +46,7 @@ import {
   TableHeader,
   TableRow,
   Textarea,
+  StatusBadge,
 } from '@accounting/ui';
 import { useFiscalYears } from '@/lib/api/accounting-hooks';
 import { describeError } from '@/lib/api/client';
@@ -74,6 +74,7 @@ import { DataTable, useTableState } from '@/components/ui-ext/data-table';
 import { Can, ConfirmDialog, PageHeader } from '@/components/ui-ext/page';
 import { AccountCombobox, Amount } from '@/components/accounting/primitives';
 import { DimensionsPopover } from '@/components/dimensions/pickers';
+import { toneOf } from '@/components/status';
 
 export const BUDGETS_PATH = '/budgeting/budgets';
 type BudgetFormInput = z.input<typeof createBudgetSchema>;
@@ -146,9 +147,9 @@ export function BudgetsPage() {
         header: 'Status',
         enableSorting: false,
         cell: ({ row }) => (
-          <Badge variant={STATUS_VARIANT[row.original.status]}>
+          <StatusBadge tone={toneOf(STATUS_VARIANT[row.original.status])}>
             {titleCase(row.original.status)}
-          </Badge>
+          </StatusBadge>
         ),
       },
     ],
@@ -383,7 +384,7 @@ export function BudgetDetailPage({ id }: { id: string }) {
           <span className="flex items-center gap-2">
             <span className="font-mono">{b.code}</span>
             <span>{b.name}</span>
-            <Badge variant={STATUS_VARIANT[b.status]}>{titleCase(b.status)}</Badge>
+            <StatusBadge tone={toneOf(STATUS_VARIANT[b.status])}>{titleCase(b.status)}</StatusBadge>
           </span>
         }
         description={`${b.fiscalYearName} · ${b.versionCount} version(s)${b.description ? ` · ${b.description}` : ''}`}
@@ -430,7 +431,9 @@ export function BudgetDetailPage({ id }: { id: string }) {
                         <span className="font-medium">
                           v{v.versionNumber} {v.name}
                         </span>
-                        <Badge variant={VERSION_VARIANT[v.status]}>{titleCase(v.status)}</Badge>
+                        <StatusBadge tone={toneOf(VERSION_VARIANT[v.status])}>
+                          {titleCase(v.status)}
+                        </StatusBadge>
                       </div>
                       <div className="mt-1 flex justify-between text-xs text-muted-foreground">
                         <span>{v.lineCount} lines</span>
@@ -653,7 +656,9 @@ function VersionEditor({ budget, versionId }: { budget: BudgetDetail; versionId:
         <div>
           <CardTitle className="flex items-center gap-2">
             v{v.versionNumber} {v.name}{' '}
-            <Badge variant={VERSION_VARIANT[v.status]}>{titleCase(v.status)}</Badge>
+            <StatusBadge tone={toneOf(VERSION_VARIANT[v.status])}>
+              {titleCase(v.status)}
+            </StatusBadge>
           </CardTitle>
           <CardDescription>
             {v.status === 'APPROVED'

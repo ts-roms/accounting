@@ -4,6 +4,7 @@ export * from './users';
 export * from './rbac';
 export * from './audit';
 export * from './accounting';
+export * from './accounting-core';
 export * from './subledger';
 export * from './orders';
 export * from './inventory';

@@ -29,7 +29,20 @@ import {
   cn,
 } from '@accounting/ui';
 import type { PaginatedResult } from '@accounting/types';
-import { TableSkeleton } from './page';
+import { EmptyState, ErrorState, TableSkeleton } from './page';
+import { ApiError } from '@/lib/api/client';
+
+/** Per-column presentation hints (`meta` on a ColumnDef). */
+export interface ColumnMeta {
+  align?: 'left' | 'center' | 'right';
+  /** Right-aligned tabular figures. */
+  numeric?: boolean;
+  /** Monospace (codes, document numbers). */
+  mono?: boolean;
+  className?: string;
+}
+
+const metaOf = (col: { columnDef: { meta?: unknown } }) => (col.columnDef.meta ?? {}) as ColumnMeta;
 
 export interface ServerPagination {
   page: number;
@@ -52,6 +65,9 @@ interface DataTableProps<TData, TValue> {
   pagination: ServerPagination;
   sorting?: ServerSorting;
   emptyState?: React.ReactNode;
+  /** Query error: renders the standard error state with a retry action. */
+  error?: unknown;
+  onRetry?: () => void;
   onRowClick?: (row: TData) => void;
   getRowId?: (row: TData) => string;
   toolbar?: React.ReactNode;
@@ -69,6 +85,8 @@ export function DataTable<TData, TValue>({
   pagination,
   sorting,
   emptyState,
+  error,
+  onRetry,
   onRowClick,
   getRowId,
   toolbar,
@@ -95,6 +113,24 @@ export function DataTable<TData, TValue>({
     },
     getCoreRowModel: getCoreRowModel(),
   });
+
+  const bodyRef = React.useRef<HTMLTableSectionElement>(null);
+  // Arrow keys move between clickable rows; Enter opens the focused one.
+  const onRowKeyDown = (e: React.KeyboardEvent<HTMLTableRowElement>, row: TData) => {
+    if (e.key === 'Enter' && onRowClick) {
+      e.preventDefault();
+      onRowClick(row);
+      return;
+    }
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    const rows = Array.from(bodyRef.current?.querySelectorAll<HTMLElement>('tr[tabindex]') ?? []);
+    const idx = rows.indexOf(e.currentTarget);
+    const next = rows[idx + (e.key === 'ArrowDown' ? 1 : -1)];
+    if (next) {
+      e.preventDefault();
+      next.focus();
+    }
+  };
 
   const total = data?.total ?? 0;
   const from = total === 0 ? 0 : (pagination.page - 1) * pagination.pageSize + 1;
@@ -133,15 +169,35 @@ export function DataTable<TData, TValue>({
 
       <div
         className={cn(
-          'rounded-md border bg-card transition-opacity',
-          isFetching && !isLoading && 'opacity-70',
+          'relative rounded-lg border bg-card transition-opacity duration-normal',
+          isFetching && !isLoading && 'opacity-80',
         )}
+        aria-busy={isFetching || isLoading || undefined}
       >
-        {isLoading ? (
+        {isFetching && !isLoading ? (
+          <div
+            className="absolute inset-x-0 top-0 z-20 h-0.5 overflow-hidden rounded-t-lg"
+            aria-hidden
+          >
+            <div className="h-full w-1/3 animate-pulse bg-primary/60" />
+          </div>
+        ) : null}
+        {error ? (
+          <ErrorState
+            compact
+            className="border-0"
+            title="Unable to load records"
+            description={error instanceof Error ? error.message : undefined}
+            correlationId={error instanceof ApiError ? error.body.correlationId : undefined}
+            reference={error instanceof ApiError ? error.code : undefined}
+            onRetry={onRetry}
+            retrying={isFetching}
+          />
+        ) : isLoading ? (
           <TableSkeleton columns={columns.length} />
         ) : (
-          <Table>
-            <TableHeader>
+          <Table containerClassName="max-h-[calc(100vh-16rem)]">
+            <TableHeader sticky>
               {table.getHeaderGroups().map((hg) => (
                 <TableRow key={hg.id} className="hover:bg-transparent">
                   {hg.headers.map((header) => {
@@ -150,12 +206,27 @@ export function DataTable<TData, TValue>({
                     return (
                       <TableHead
                         key={header.id}
+                        align={
+                          metaOf(header.column).align ??
+                          (metaOf(header.column).numeric ? 'right' : 'left')
+                        }
+                        className={metaOf(header.column).className}
+                        aria-sort={
+                          sorted === 'asc'
+                            ? 'ascending'
+                            : sorted === 'desc'
+                              ? 'descending'
+                              : undefined
+                        }
                         style={{ width: header.getSize() !== 150 ? header.getSize() : undefined }}
                       >
                         {header.isPlaceholder ? null : canSort ? (
                           <button
                             type="button"
-                            className="inline-flex items-center gap-1 hover:text-foreground"
+                            className={cn(
+                              'inline-flex items-center gap-1 rounded-xs transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                              sorted && 'text-foreground',
+                            )}
                             onClick={header.column.getToggleSortingHandler()}
                           >
                             {flexRender(header.column.columnDef.header, header.getContext())}
@@ -176,14 +247,17 @@ export function DataTable<TData, TValue>({
                 </TableRow>
               ))}
             </TableHeader>
-            <TableBody>
+            <TableBody ref={bodyRef}>
               {table.getRowModel().rows.length === 0 ? (
                 <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={columns.length} className="p-0">
+                  <TableCell colSpan={columns.length} className="p-3">
                     {emptyState ?? (
-                      <div className="py-10 text-center text-sm text-muted-foreground">
-                        No records found.
-                      </div>
+                      <EmptyState
+                        compact
+                        title="No records found"
+                        description="Nothing matches the current filters."
+                        className="border-0"
+                      />
                     )}
                   </TableCell>
                 </TableRow>
@@ -192,13 +266,23 @@ export function DataTable<TData, TValue>({
                   <TableRow
                     key={row.id}
                     onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+                    onKeyDown={onRowClick ? (e) => onRowKeyDown(e, row.original) : undefined}
+                    tabIndex={onRowClick ? 0 : undefined}
                     className={cn(onRowClick && 'cursor-pointer')}
                   >
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </TableCell>
-                    ))}
+                    {row.getVisibleCells().map((cell) => {
+                      const meta = metaOf(cell.column);
+                      return (
+                        <TableCell
+                          key={cell.id}
+                          align={meta.align}
+                          numeric={meta.numeric}
+                          className={cn(meta.mono && 'font-mono text-xs', meta.className)}
+                        >
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </TableCell>
+                      );
+                    })}
                   </TableRow>
                 ))
               )}

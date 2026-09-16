@@ -68,6 +68,7 @@ docs                Architecture, accounting engine, database, API, security, pe
 
 - [Architecture](docs/architecture.md)
 - [Accounting engine rules](docs/accounting-engine.md)
+- [Accounting core reference](docs/accounting/architecture.md) - chart, journals, posting engine, ledger, statements, dimensions, posting rules, multi-currency, period close, reversals, integrity
 - [Accounting controls](docs/accounting-controls.md)
 - [Subledger reconciliation](docs/reconciliation.md)
 - [Database](docs/database.md)

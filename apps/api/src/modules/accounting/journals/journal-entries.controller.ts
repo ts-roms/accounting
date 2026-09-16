@@ -16,6 +16,7 @@ import { P } from '@accounting/types';
 import {
   createJournalEntrySchema,
   listJournalEntriesQuerySchema,
+  openingBalancesSchema,
   rejectJournalEntrySchema,
   correctJournalEntrySchema,
   reverseJournalEntrySchema,
@@ -33,6 +34,7 @@ class UpdateJournalEntryDto extends createZodDto(updateJournalEntrySchema) {}
 class RejectJournalEntryDto extends createZodDto(rejectJournalEntrySchema) {}
 class ReverseJournalEntryDto extends createZodDto(reverseJournalEntrySchema) {}
 class CorrectJournalEntryDto extends createZodDto(correctJournalEntrySchema) {}
+class OpeningBalancesDto extends createZodDto(openingBalancesSchema) {}
 
 @ApiTags('Journal Entries')
 @Controller('journal-entries')
@@ -57,6 +59,16 @@ export class JournalEntriesController {
   @ApiOperation({ summary: 'Create a balanced draft journal entry (idempotent on idempotencyKey)' })
   create(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateJournalEntryDto) {
     return this.service.create(user.companyId!, user, body);
+  }
+
+  @Post('opening-balances')
+  @RequirePermissions(P['journal.create'])
+  @ApiOperation({
+    summary:
+      'Create an OPENING journal from per-account balances; any difference is offset to the OPENING_BALANCE_EQUITY mapping',
+  })
+  openingBalances(@CurrentUser() user: AuthenticatedUser, @Body() body: OpeningBalancesDto) {
+    return this.service.openingBalances(user.companyId!, user, body);
   }
 
   @Patch(':id')

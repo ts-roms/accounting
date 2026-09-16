@@ -7,6 +7,8 @@ export const ACCOUNT_TYPES = [
   'REVENUE',
   'COST_OF_SALES',
   'EXPENSE',
+  'OTHER_INCOME',
+  'OTHER_EXPENSE',
 ] as const;
 export type AccountType = (typeof ACCOUNT_TYPES)[number];
 
@@ -21,6 +23,8 @@ export const NORMAL_BALANCE_BY_TYPE: Record<AccountType, NormalBalance> = {
   REVENUE: 'CREDIT',
   COST_OF_SALES: 'DEBIT',
   EXPENSE: 'DEBIT',
+  OTHER_INCOME: 'CREDIT',
+  OTHER_EXPENSE: 'DEBIT',
 };
 
 export const BALANCE_SHEET_TYPES: readonly AccountType[] = ['ASSET', 'LIABILITY', 'EQUITY'];
@@ -28,6 +32,8 @@ export const INCOME_STATEMENT_TYPES: readonly AccountType[] = [
   'REVENUE',
   'COST_OF_SALES',
   'EXPENSE',
+  'OTHER_INCOME',
+  'OTHER_EXPENSE',
 ];
 
 /**
@@ -58,6 +64,8 @@ export const ACCOUNT_SUBTYPES = [
   'DEPRECIATION_EXPENSE',
   'TAX_EXPENSE',
   'OTHER_EXPENSE',
+  /** Clearing / unallocated balances that must be investigated and cleared (suspense monitor). */
+  'SUSPENSE',
 ] as const;
 export type AccountSubtype = (typeof ACCOUNT_SUBTYPES)[number];
 
@@ -75,7 +83,22 @@ export type JournalStatus = (typeof JOURNAL_STATUSES)[number];
 /** Statuses whose lines are part of the general ledger. */
 export const LEDGER_STATUSES: readonly JournalStatus[] = ['POSTED', 'LOCKED', 'REVERSED'];
 
-export const JOURNAL_TYPES = ['GENERAL', 'ADJUSTING', 'REVERSAL', 'CLOSING', 'OPENING'] as const;
+/**
+ * GENERAL: day-to-day. ADJUSTING: period-end adjustments (also prepayment
+ * recognition). ACCRUAL: accrued income / expense, usually auto-reversed on
+ * the first day of the next period. RECLASSIFICATION: moves a balance between
+ * accounts (e.g. clearing suspense). REVERSAL / CLOSING / OPENING are
+ * engine-generated.
+ */
+export const JOURNAL_TYPES = [
+  'GENERAL',
+  'ADJUSTING',
+  'ACCRUAL',
+  'RECLASSIFICATION',
+  'REVERSAL',
+  'CLOSING',
+  'OPENING',
+] as const;
 export type JournalType = (typeof JOURNAL_TYPES)[number];
 
 /**
@@ -124,6 +147,10 @@ export const ACCOUNT_MAPPING_KEYS = [
   'UNREALIZED_FX_LOSS',
   'INTERCOMPANY_RECEIVABLE',
   'INTERCOMPANY_PAYABLE',
+  /** Offset for opening-balance journals that do not balance on their own. */
+  'OPENING_BALANCE_EQUITY',
+  /** Default suspense / clearing account monitored by the suspense dashboard. */
+  'SUSPENSE',
 ] as const;
 export type AccountMappingKey = (typeof ACCOUNT_MAPPING_KEYS)[number];
 
@@ -157,3 +184,50 @@ export const DOCUMENT_TYPES = [
   'FXR',
 ] as const;
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
+
+// ------------------------------------------------------- accounting core extensions
+
+/** Cash-flow statement classification of a balance-sheet account (NULL = derived from subtype). */
+export const CASH_FLOW_ACTIVITIES = ['OPERATING', 'INVESTING', 'FINANCING'] as const;
+export type CashFlowActivity = (typeof CASH_FLOW_ACTIVITIES)[number];
+
+export const RECURRING_FREQUENCIES = [
+  'DAILY',
+  'WEEKLY',
+  'MONTHLY',
+  'QUARTERLY',
+  'ANNUALLY',
+] as const;
+export type RecurringFrequency = (typeof RECURRING_FREQUENCIES)[number];
+
+/**
+ * DRAFT: each occurrence is created as a DRAFT journal for the normal
+ * submit / approve / post workflow. AUTO_POST: occurrences post immediately;
+ * choosing it requires `journal.post` and is audited on the template.
+ */
+export const RECURRING_JOURNAL_MODES = ['DRAFT', 'AUTO_POST'] as const;
+export type RecurringJournalMode = (typeof RECURRING_JOURNAL_MODES)[number];
+
+export const RECURRING_JOURNAL_STATUSES = ['ACTIVE', 'PAUSED', 'COMPLETED'] as const;
+export type RecurringJournalStatus = (typeof RECURRING_JOURNAL_STATUSES)[number];
+
+export const PREPAYMENT_STATUSES = ['DRAFT', 'ACTIVE', 'COMPLETED', 'CANCELLED'] as const;
+export type PrepaymentStatus = (typeof PREPAYMENT_STATUSES)[number];
+
+export const PREPAYMENT_SCHEDULE_STATUSES = ['PENDING', 'RECOGNIZED', 'CANCELLED'] as const;
+export type PrepaymentScheduleStatus = (typeof PREPAYMENT_SCHEDULE_STATUSES)[number];
+
+export const POSTING_SIDES = ['DEBIT', 'CREDIT'] as const;
+export type PostingSide = (typeof POSTING_SIDES)[number];
+
+/**
+ * How a posting-rule line finds its account: a company account mapping key,
+ * a fixed account, or a key the calling module supplies at resolve time
+ * (e.g. the revenue account of the product category on the line).
+ */
+export const POSTING_RULE_ACCOUNT_SOURCES = ['MAPPING', 'ACCOUNT', 'CONTEXT'] as const;
+export type PostingRuleAccountSource = (typeof POSTING_RULE_ACCOUNT_SOURCES)[number];
+
+/** What a dimension rule applies to. */
+export const DIMENSION_RULE_SCOPES = ['ACCOUNT', 'ACCOUNT_TYPE', 'CODE_PREFIX'] as const;
+export type DimensionRuleScope = (typeof DIMENSION_RULE_SCOPES)[number];

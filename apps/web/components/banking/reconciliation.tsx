@@ -53,6 +53,7 @@ import { useSession } from '@/lib/auth/session';
 import { PageHeader } from '@/components/ui-ext/page';
 import { Amount } from '@/components/accounting/primitives';
 import { Stat } from '@/components/fixed-assets/shared';
+import { ReconciliationCounters } from './reconciliation-counters';
 import { LineStatusBadge, RECONCILIATION_PATH, StatementStatusBadge } from './shared';
 import { TransactionDialog } from './transactions';
 
@@ -182,6 +183,12 @@ export function ReconciliationPage({ id }: { id: string }) {
           danger={f.difference !== '0.0000'}
         />
       </div>
+      <ReconciliationCounters
+        matched={s.matchedCount}
+        review={s.exceptionCount}
+        unmatched={s.unmatchedCount}
+        total={s.lineCount}
+      />
       <div className="grid gap-4 xl:grid-cols-[1fr_380px]">
         <Card>
           <CardHeader className="flex-row items-center justify-between space-y-0">

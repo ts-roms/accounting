@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq, gte, inArray, lt, lte, sql, type SQL } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, lt, lte, notInArray, sql, type SQL } from 'drizzle-orm';
 import { Money } from '@accounting/money';
-import { LEDGER_STATUSES, type AccountType } from '@accounting/types';
+import { LEDGER_STATUSES, type AccountType, type JournalType } from '@accounting/types';
 import type { GeneralLedgerQuery } from '@accounting/validation';
 import { NotFoundError } from '@/common/errors/app-error';
 import { DRIZZLE, type Database, type DbExecutor } from '@/database/database.types';
@@ -55,6 +55,8 @@ export interface BalanceFilter {
   costCenterId?: string | null;
   projectId?: string | null;
   accountTypes?: readonly AccountType[];
+  /** Leave out engine journals (e.g. year-end CLOSING for the cash-flow statement). */
+  excludeJournalTypes?: readonly JournalType[];
 }
 
 /** Sign a (debit - credit) net amount according to the account's normal side. */
@@ -97,6 +99,8 @@ export class GeneralLedgerService {
     if (filter.branchId) conditions.push(eq(journalLines.branchId, filter.branchId));
     conditions.push(...dimensionConditions(filter));
     if (filter.accountTypes) conditions.push(inArray(accounts.type, [...filter.accountTypes]));
+    if (filter.excludeJournalTypes?.length)
+      conditions.push(notInArray(journalEntries.journalType, [...filter.excludeJournalTypes]));
 
     const rows = await executor
       .select({

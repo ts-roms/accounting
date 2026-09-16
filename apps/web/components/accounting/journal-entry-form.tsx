@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus, Trash2 } from 'lucide-react';
 import type { z } from 'zod';
 import { Money } from '@accounting/money';
-import { JOURNAL_TYPES } from '@accounting/types';
+import { JOURNAL_TYPES, type JournalType } from '@accounting/types';
 import { createJournalEntrySchema, type CreateJournalEntryInput } from '@accounting/validation';
 import {
   Button,
@@ -49,27 +49,45 @@ const emptyLine = (): JournalFormInput['lines'][number] => ({
   projectId: null,
 });
 
-function toFormValues(entry?: JournalEntryDetail): JournalFormInput {
+export interface JournalPrefill {
+  journalType?: JournalType;
+  description?: string;
+  /** Account of the first line (e.g. the suspense account being cleared). */
+  accountId?: string;
+}
+
+function toFormValues(entry?: JournalEntryDetail, prefill?: JournalPrefill): JournalFormInput {
   if (!entry) {
+    const first = emptyLine();
+    if (prefill?.accountId) first.accountId = prefill.accountId;
     return {
       entryDate: today(),
-      description: '',
+      documentDate: null,
+      description: prefill?.description ?? '',
       reference: '',
-      journalType: 'GENERAL',
-      lines: [emptyLine(), emptyLine()],
+      journalType: prefill?.journalType ?? 'GENERAL',
+      transactionCurrency: undefined,
+      exchangeRate: undefined,
+      autoReverseDate: null,
+      lines: [first, emptyLine()],
     };
   }
   return {
     entryDate: entry.entryDate,
+    documentDate: entry.documentDate,
     description: entry.description,
     reference: entry.reference ?? '',
     journalType: entry.journalType,
     branchId: entry.branchId,
+    transactionCurrency: entry.transactionCurrency ?? undefined,
+    exchangeRate: entry.exchangeRate ? trim(entry.exchangeRate) : undefined,
+    autoReverseDate: entry.autoReverseDate,
+    // Foreign entries are edited in the currency they were entered in.
     lines: entry.lines.map((l) => ({
       accountId: l.accountId,
       description: l.description ?? '',
-      debit: trim(l.debit),
-      credit: trim(l.credit),
+      debit: trim(l.foreignDebit ?? l.debit),
+      credit: trim(l.foreignCredit ?? l.credit),
       branchId: l.branchId,
       departmentId: l.departmentId,
       costCenterId: l.costCenterId,
@@ -95,12 +113,14 @@ function safeMoney(value: string, currency: string): Money {
 
 export function JournalEntryForm({
   entry,
-  currency,
+  prefill,
+  currency: currencyProp,
   submitting,
   onSubmit,
   onCancel,
 }: {
   entry?: JournalEntryDetail;
+  prefill?: JournalPrefill;
   currency: string;
   submitting: boolean;
   onSubmit: (values: CreateJournalEntryInput) => Promise<void>;
@@ -108,10 +128,17 @@ export function JournalEntryForm({
 }) {
   const form = useForm<JournalFormInput, unknown, CreateJournalEntryInput>({
     resolver: zodResolver(createJournalEntrySchema),
-    defaultValues: toFormValues(entry),
+    defaultValues: toFormValues(entry, prefill),
     mode: 'onBlur',
   });
   const lines = useFieldArray({ control: form.control, name: 'lines' });
+  const baseCurrency = currencyProp;
+  const txCurrency = (useWatch({ control: form.control, name: 'transactionCurrency' }) ||
+    '') as string;
+  const foreign = txCurrency.length === 3 && txCurrency !== baseCurrency;
+  // Totals are shown in the currency the lines are entered in.
+  const currency = foreign ? txCurrency : baseCurrency;
+  const journalType = useWatch({ control: form.control, name: 'journalType' });
   // useWatch re-renders on every keystroke in any line; the sums are cheap.
   const watched = useWatch({ control: form.control, name: 'lines' });
   const debit = Money.sum(
@@ -210,6 +237,93 @@ export function JournalEntryForm({
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="documentDate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Document date</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="date"
+                      {...field}
+                      value={field.value ?? ''}
+                      onChange={(e) => field.onChange(e.target.value || null)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="transactionCurrency"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Currency</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder={baseCurrency}
+                      maxLength={3}
+                      data-testid="je-currency"
+                      {...field}
+                      value={field.value ?? ''}
+                      onChange={(e) => field.onChange(e.target.value.toUpperCase() || undefined)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="exchangeRate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Rate to {baseCurrency}</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder={foreign ? 'From the rate table' : 'n/a'}
+                      disabled={!foreign}
+                      inputMode="decimal"
+                      data-testid="je-rate"
+                      {...field}
+                      value={field.value ?? ''}
+                      onChange={(e) => field.onChange(e.target.value || undefined)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="autoReverseDate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Auto-reverse on{journalType === 'ACCRUAL' ? '' : ' (optional)'}
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      type="date"
+                      data-testid="je-auto-reverse"
+                      {...field}
+                      value={field.value ?? ''}
+                      onChange={(e) => field.onChange(e.target.value || null)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {foreign ? (
+              <p className="text-xs text-muted-foreground md:col-span-4">
+                Lines are entered in {txCurrency}; the ledger stores the {baseCurrency} equivalent
+                at the rate above (or the organization rate on the entry date) and keeps the{' '}
+                {txCurrency} amounts beside it.
+              </p>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -355,7 +469,7 @@ export function JournalEntryForm({
               <TableRow className="hover:bg-transparent">
                 <TableCell
                   colSpan={3}
-                  className={cn('text-xs', balanced ? 'text-success' : 'text-destructive')}
+                  className={cn('text-xs', balanced ? 'text-success' : 'text-critical')}
                 >
                   {balanced
                     ? 'Balanced'
@@ -377,7 +491,7 @@ export function JournalEntryForm({
           </Table>
         </div>
         {form.formState.errors.lines?.root || form.formState.errors.lines?.message ? (
-          <p className="text-xs text-destructive">
+          <p className="text-xs text-critical">
             {String(
               form.formState.errors.lines.root?.message ?? form.formState.errors.lines.message,
             )}

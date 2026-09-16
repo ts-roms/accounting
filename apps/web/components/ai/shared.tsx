@@ -2,9 +2,10 @@
 import * as React from 'react';
 import { Sparkles } from 'lucide-react';
 import type { AiDocumentStatus, AiSeverity, AiSuggestionStatus } from '@accounting/types';
-import { Badge } from '@accounting/ui';
+import { StatusBadge } from '@accounting/ui';
 import { useAiStatus } from '@/lib/api/ai-hooks';
 import { titleCase } from '@/lib/format';
+import { toneOf } from '@/components/status';
 
 const DOC_VARIANT: Record<AiDocumentStatus, 'success' | 'warning' | 'secondary' | 'outline'> = {
   EXTRACTED: 'success',
@@ -14,7 +15,7 @@ const DOC_VARIANT: Record<AiDocumentStatus, 'success' | 'warning' | 'secondary' 
 };
 
 export function DocStatusBadge({ status }: { status: AiDocumentStatus }) {
-  return <Badge variant={DOC_VARIANT[status]}>{titleCase(status)}</Badge>;
+  return <StatusBadge tone={toneOf(DOC_VARIANT[status])}>{titleCase(status)}</StatusBadge>;
 }
 
 const SEVERITY_VARIANT: Record<AiSeverity, 'destructive' | 'warning' | 'secondary'> = {
@@ -24,14 +25,16 @@ const SEVERITY_VARIANT: Record<AiSeverity, 'destructive' | 'warning' | 'secondar
 };
 
 export function SeverityBadge({ severity }: { severity: AiSeverity }) {
-  return <Badge variant={SEVERITY_VARIANT[severity]}>{titleCase(severity)}</Badge>;
+  return <StatusBadge tone={toneOf(SEVERITY_VARIANT[severity])}>{titleCase(severity)}</StatusBadge>;
 }
 
 export function FlagStatusBadge({ status }: { status: AiSuggestionStatus }) {
   return (
-    <Badge variant={status === 'OPEN' ? 'warning' : status === 'ACCEPTED' ? 'success' : 'outline'}>
+    <StatusBadge
+      tone={toneOf(status === 'OPEN' ? 'warning' : status === 'ACCEPTED' ? 'success' : 'outline')}
+    >
       {titleCase(status)}
-    </Badge>
+    </StatusBadge>
   );
 }
 

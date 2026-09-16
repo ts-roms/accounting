@@ -46,6 +46,7 @@ import {
   TableHeader,
   TableRow,
   Textarea,
+  StatusBadge,
 } from '@accounting/ui';
 import { useFiscalYears } from '@/lib/api/accounting-hooks';
 import { describeError } from '@/lib/api/client';
@@ -66,6 +67,7 @@ import { useSession } from '@/lib/auth/session';
 import { DataTable, useTableState } from '@/components/ui-ext/data-table';
 import { Can, ConfirmDialog, EmptyState, PageHeader } from '@/components/ui-ext/page';
 import { Stat } from '@/components/fixed-assets/shared';
+import { toneOf } from '@/components/status';
 
 const STATUS_VARIANT: Record<
   CloseStatus,
@@ -90,9 +92,9 @@ const TASK_VARIANT: Record<
 
 export function CloseStatusBadge({ status }: { status: CloseStatus }) {
   return (
-    <Badge variant={STATUS_VARIANT[status]} data-testid="close-status">
+    <StatusBadge tone={toneOf(STATUS_VARIANT[status])} data-testid="close-status">
       {status.replace('_', ' ')}
-    </Badge>
+    </StatusBadge>
   );
 }
 
@@ -394,12 +396,12 @@ export function FinancialCloseDetailPage({ id }: { id: string }) {
         />
       </div>
       {c.blockers.length ? (
-        <Card className={blocking.length ? 'border-destructive' : 'border-warning'}>
+        <Card className={blocking.length ? 'border-critical' : 'border-warning'}>
           <CardContent className="space-y-1 p-3 text-sm">
             {c.blockers.map((b) => (
               <div key={b.key} className="flex items-start gap-2" data-testid="close-blocker">
                 {b.blocking ? (
-                  <AlertTriangle className="mt-0.5 h-4 w-4 text-destructive" />
+                  <AlertTriangle className="mt-0.5 h-4 w-4 text-critical" />
                 ) : (
                   <AlertTriangle className="mt-0.5 h-4 w-4 text-warning" />
                 )}
@@ -455,7 +457,9 @@ export function FinancialCloseDetailPage({ id }: { id: string }) {
                     ) : null}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={TASK_VARIANT[t.status]}>{t.status.replace('_', ' ')}</Badge>
+                    <StatusBadge tone={toneOf(TASK_VARIANT[t.status])}>
+                      {t.status.replace('_', ' ')}
+                    </StatusBadge>
                   </TableCell>
                   <TableCell className="text-xs">
                     {t.ownerName ?? '-'} / {t.reviewerName ?? '-'}

@@ -1,58 +1,125 @@
 'use client';
+import * as React from 'react';
 import Link from 'next/link';
-import { ArrowRight, Building2, ClipboardList, ShieldCheck, Users } from 'lucide-react';
-import { Money } from '@accounting/money';
-import { P } from '@accounting/types';
+import { useQueries } from '@tanstack/react-query';
 import {
-  Badge,
+  ArrowRight,
+  Building2,
+  ClipboardList,
+  Inbox,
+  ShieldCheck,
+  Users,
+  Wallet,
+} from 'lucide-react';
+import { Money } from '@accounting/money';
+import { AGING_BUCKETS, P } from '@accounting/types';
+import {
   Button,
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
+  EmptyState,
+  Skeleton,
+  StatusBadge,
 } from '@accounting/ui';
 import { useSession } from '@/lib/auth/session';
+import { api } from '@/lib/api/client';
 import { useAuditLogs, useCompanies, useRoles, useUsers } from '@/lib/api/hooks';
-import { useBalanceSheet, useIncomeStatement, useJournalEntries } from '@/lib/api/accounting-hooks';
+import {
+  accountingKeys,
+  useBalanceSheet,
+  useIncomeStatement,
+  useJournalEntries,
+} from '@/lib/api/accounting-hooks';
+import type { IncomeStatementReport } from '@/lib/api/types';
 import { useAging } from '@/lib/api/subledger-hooks';
 import { AP_CONFIG, AR_CONFIG } from '@/lib/subledger/config';
-import {
-  Amount,
-  endOfMonth,
-  startOfMonth,
-  startOfYear,
-  today,
-} from '@/components/accounting/primitives';
+import { endOfMonth, startOfMonth, today } from '@/components/accounting/primitives';
 import { PageHeader } from '@/components/ui-ext/page';
-import { formatDateTime } from '@/lib/format';
+import { formatDate, formatDateTime } from '@/lib/format';
+import { FinancialMetricCard } from '@/components/financial/metric-card';
+import { FinancialHealth } from '@/components/financial/financial-health';
+import { CurrencyDisplay } from '@/components/financial/display';
+import { BarChart, DonutChart, chartColor } from '@/components/charts/charts';
+
+const MONTHS = 6;
+
+function monthRange(offset: number): { from: string; to: string; label: string } {
+  const now = new Date();
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - offset, 1));
+  const iso = d.toISOString().slice(0, 10);
+  return {
+    from: startOfMonth(iso),
+    to: endOfMonth(iso),
+    label: d.toLocaleString('en-PH', { month: 'short', timeZone: 'UTC' }),
+  };
+}
+
+/** Percentage change between two decimal strings (null when the base is zero). */
+function pctChange(current: string | undefined, previous: string | undefined): number | null {
+  if (current === undefined || previous === undefined) return null;
+  const c = Number(current);
+  const p = Number(previous);
+  if (!Number.isFinite(c) || !Number.isFinite(p) || p === 0) return null;
+  return ((c - p) / Math.abs(p)) * 100;
+}
 
 /**
- * Cash, net income and pending approvals come straight from the general ledger
- * (Phase 2); receivables and payables from the AR/AP aging reports (Phase 3).
- * KPIs that depend on later phases stay explicit placeholders - never
- * invented numbers.
+ * Financial overview. Every figure is read from the general ledger and the
+ * AR/AP aging reports; nothing is estimated on the client. Trend and aging
+ * charts draw once when their data arrives.
  */
-const PLANNED_KPIS = [
-  { label: 'Inventory value', phase: 5 },
-  { label: 'Budget variance', phase: 7 },
-];
-
 export default function DashboardPage() {
   const { me, activeCompany, hasPermission } = useSession();
   const canAdmin = hasPermission(P['user.view']);
-  const users = useUsers({ page: 1, pageSize: 1 });
-  const roles = useRoles();
-  const companies = useCompanies();
-  const audit = useAuditLogs({ page: 1, pageSize: 6 });
   const canReport = hasPermission(P['reports.view']) && Boolean(activeCompany);
+  const canJournals = hasPermission(P['journal.view']) && Boolean(activeCompany);
+  const currency = activeCompany?.baseCurrency ?? 'PHP';
   const now = today();
-  const mtd = useIncomeStatement({ from: startOfMonth(now), to: endOfMonth(now) }, canReport);
-  const ytd = useIncomeStatement({ from: startOfYear(now), to: now }, canReport);
+
+  const thisMonth = monthRange(0);
+  const lastMonth = monthRange(1);
+  const mtd = useIncomeStatement({ from: thisMonth.from, to: thisMonth.to }, canReport);
+  const prev = useIncomeStatement({ from: lastMonth.from, to: lastMonth.to }, canReport);
   const bs = useBalanceSheet({ asOf: now }, canReport);
+  const prevBs = useBalanceSheet({ asOf: lastMonth.to }, canReport);
   const pending = useJournalEntries({ page: 1, pageSize: 1, status: 'SUBMITTED' });
   const arAging = useAging(AR_CONFIG, { asOf: now }, canReport);
   const apAging = useAging(AP_CONFIG, { asOf: now }, canReport);
+
+  const months = React.useMemo(
+    () => Array.from({ length: MONTHS }, (_, i) => monthRange(MONTHS - 1 - i)),
+    [],
+  );
+  const trend = useQueries({
+    queries: months.map((m) => ({
+      queryKey: accountingKeys.incomeStatement({ from: m.from, to: m.to }),
+      queryFn: () =>
+        api.get<IncomeStatementReport>('/reports/income-statement', {
+          query: { from: m.from, to: m.to },
+        }),
+      enabled: canReport,
+      staleTime: 60_000,
+    })),
+  });
+  const trendLoading = canReport && trend.some((q) => q.isLoading);
+  const trendReady = canReport && trend.every((q) => q.data);
+
+  const cashOf = (report: typeof bs.data) =>
+    report
+      ? report.assets.rows
+          .filter((r) => !r.isHeader && /cash|bank/i.test(r.name))
+          .reduce((acc, r) => acc.add(Money.of(r.amount, currency)), Money.zero(currency))
+          .toString()
+      : undefined;
+  const cash = cashOf(bs.data);
+  const prevCash = cashOf(prevBs.data);
+  const expensesOf = (r: IncomeStatementReport | undefined) =>
+    r
+      ? Money.of(r.costOfSales.total, currency).add(Money.of(r.expenses.total, currency)).toString()
+      : undefined;
   const overdue = (report: typeof arAging.data) =>
     report
       ? Money.sum(
@@ -62,146 +129,227 @@ export default function DashboardPage() {
           report.currency,
         ).toString()
       : undefined;
-  const currency = activeCompany?.baseCurrency ?? 'PHP';
-  const cash = bs.data
-    ? bs.data.assets.rows
-        .filter((r) => !r.isHeader && /cash|bank/i.test(r.name))
-        .reduce((acc, r) => acc.add(Money.of(r.amount, currency)), Money.zero(currency))
-    : null;
+
+  const users = useUsers({ page: 1, pageSize: 1 });
+  const roles = useRoles();
+  const companies = useCompanies();
+  const audit = useAuditLogs({ page: 1, pageSize: 6 });
 
   return (
     <>
       <PageHeader
+        eyebrow="Financial overview"
         title={`Good day, ${me.user.firstName}`}
         description={
-          activeCompany
-            ? `${activeCompany.name} (${activeCompany.baseCurrency})`
-            : me.organization.name
+          <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span>{activeCompany ? activeCompany.name : me.organization.name}</span>
+            {activeCompany ? (
+              <>
+                <Sep />
+                <span className="font-mono text-xs">{activeCompany.baseCurrency}</span>
+                <Sep />
+                <span>Period {thisMonth.from.slice(0, 7)}</span>
+              </>
+            ) : null}
+            <Sep />
+            <span>{formatDate(now)}</span>
+          </span>
         }
       />
 
-      {canAdmin ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            icon={Building2}
-            label="Companies"
-            value={companies.data?.length}
-            hint={`${companies.data?.filter((c) => c.status === 'ACTIVE').length ?? 0} active`}
-            href="/admin/organization"
+      {canReport ? (
+        <section aria-label="Key figures" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <FinancialMetricCard
+            label="Revenue (MTD)"
+            value={mtd.data?.revenue.total}
+            currency={currency}
+            delta={pctChange(mtd.data?.revenue.total, prev.data?.revenue.total)}
+            deltaLabel="vs last month"
+            href="/reports/financial-statements"
+            testId="kpi-revenue"
           />
-          <StatCard
-            icon={Users}
-            label="Users"
-            value={users.data?.total}
-            hint="in this organization"
-            href="/admin/users"
+          <FinancialMetricCard
+            label="Expenses (MTD)"
+            value={expensesOf(mtd.data)}
+            currency={currency}
+            delta={pctChange(expensesOf(mtd.data), expensesOf(prev.data))}
+            deltaLabel="vs last month"
+            deltaDirection="down-is-good"
+            href="/reports/financial-statements"
+            testId="kpi-expenses"
           />
-          <StatCard
-            icon={ShieldCheck}
-            label="Roles"
-            value={roles.data?.length}
-            hint={`${roles.data?.filter((r) => !r.isSystem).length ?? 0} custom`}
-            href="/admin/roles"
+          <FinancialMetricCard
+            label="Net income (MTD)"
+            value={mtd.data?.netIncome}
+            currency={currency}
+            delta={pctChange(mtd.data?.netIncome, prev.data?.netIncome)}
+            deltaLabel="vs last month"
+            href="/reports/financial-statements"
+            testId="kpi-net-income"
           />
-          <StatCard
-            icon={ClipboardList}
-            label="Audit events"
-            value={audit.data?.total}
-            hint="recorded"
-            href="/admin/audit-logs"
+          <FinancialMetricCard
+            label="Cash and bank"
+            value={cash}
+            currency={currency}
+            delta={pctChange(cash, prevCash)}
+            deltaLabel="vs month end"
+            icon={Wallet}
+            href="/reports/financial-statements"
+            testId="kpi-cash"
+          />
+        </section>
+      ) : null}
+
+      {canReport ? (
+        <Card>
+          <CardHeader className="flex-row items-start justify-between space-y-0">
+            <div className="space-y-1">
+              <CardTitle>Revenue and expense trend</CardTitle>
+              <CardDescription>
+                Monthly totals from the income statement, last {MONTHS} months.
+              </CardDescription>
+            </div>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/reports/financial-statements">
+                Statements <ArrowRight />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {trendLoading || !trendReady ? (
+              <BarChart labels={[]} series={[]} loading />
+            ) : (
+              <BarChart
+                labels={months.map((m) => m.label)}
+                ariaLabel="Revenue and expenses by month"
+                series={[
+                  {
+                    key: 'revenue',
+                    label: 'Revenue',
+                    color: chartColor(0),
+                    values: trend.map((q) => Number(q.data!.revenue.total)),
+                  },
+                  {
+                    key: 'expenses',
+                    label: 'Expenses',
+                    color: chartColor(4),
+                    values: trend.map((q) => Number(expensesOf(q.data))),
+                  },
+                ]}
+              />
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {canReport ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <AgingCard
+            title="Receivables aging"
+            description="Open customer balances by days overdue."
+            report={arAging.data}
+            loading={arAging.isLoading}
+            currency={currency}
+            href="/reports/ar-aging"
+            overdue={overdue(arAging.data)}
+          />
+          <AgingCard
+            title="Payables aging"
+            description="Open vendor balances by days overdue."
+            report={apAging.data}
+            loading={apAging.isLoading}
+            currency={currency}
+            href="/reports/ap-aging"
+            overdue={overdue(apAging.data)}
           />
         </div>
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
+        <FinancialHealth className="lg:col-span-1" />
+        <Card className="lg:col-span-1">
           <CardHeader>
-            <CardTitle>Financial overview</CardTitle>
-            <CardDescription>
-              Figures are derived from the general ledger and become available as each accounting
-              phase ships.
-            </CardDescription>
+            <CardTitle>Financial control center</CardTitle>
+            <CardDescription>Items that need a decision.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              {canReport ? (
-                <>
-                  <LiveKpi
-                    label="Cash and bank"
-                    value={cash?.toString()}
-                    currency={currency}
-                    href="/reports/financial-statements"
-                  />
-                  <LiveKpi
-                    label="Net income (MTD)"
-                    value={mtd.data?.netIncome}
-                    currency={currency}
-                    href="/reports/financial-statements"
-                  />
-                  <LiveKpi
-                    label="Net income (YTD)"
-                    value={ytd.data?.netIncome}
-                    currency={currency}
-                    href="/reports/financial-statements"
-                  />
-                  <LiveKpi
-                    label="Revenue (YTD)"
-                    value={ytd.data?.revenue.total}
-                    currency={currency}
-                    href="/reports/financial-statements"
-                  />
-                  <LiveKpi
-                    label="Total assets"
-                    value={bs.data?.totalAssets}
-                    currency={currency}
-                    href="/reports/financial-statements"
-                  />
-                  <LiveKpi
-                    label="Accounts receivable"
-                    value={arAging.data?.totals.net}
-                    currency={currency}
-                    href="/reports/ar-aging"
-                  />
-                  <LiveKpi
-                    label="Overdue receivables"
-                    value={overdue(arAging.data)}
-                    currency={currency}
-                    href="/reports/ar-aging"
-                  />
-                  <LiveKpi
-                    label="Accounts payable"
-                    value={apAging.data?.totals.net}
-                    currency={currency}
-                    href="/reports/ap-aging"
-                  />
-                  <LiveKpi
-                    label="Overdue payables"
-                    value={overdue(apAging.data)}
-                    currency={currency}
-                    href="/reports/ap-aging"
-                  />
-                  <LiveKpi
-                    label="Awaiting approval"
-                    value={pending.data ? String(pending.data.total) : undefined}
-                    plain
-                    href="/accounting/journal-entries?status=SUBMITTED"
-                  />
-                </>
-              ) : null}
-              {PLANNED_KPIS.map((kpi) => (
-                <div key={kpi.label} className="rounded-md border border-dashed p-3">
-                  <div className="text-xs text-muted-foreground">{kpi.label}</div>
-                  <div className="mt-1 flex items-center justify-between">
-                    <span className="tabular text-lg font-semibold text-muted-foreground">-</span>
-                    <Badge variant="secondary">Phase {kpi.phase}</Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <CardContent className="space-y-1">
+            {canJournals ? (
+              <ControlRow
+                icon={Inbox}
+                label="Journals awaiting approval"
+                href="/accounting/journal-entries?status=SUBMITTED"
+                value={
+                  pending.data ? (
+                    <StatusBadge tone={pending.data.total > 0 ? 'warning' : 'positive'} size="sm">
+                      {pending.data.total}
+                    </StatusBadge>
+                  ) : (
+                    <Skeleton className="h-4 w-8" />
+                  )
+                }
+              />
+            ) : null}
+            {canReport ? (
+              <>
+                <ControlRow
+                  icon={ClipboardList}
+                  label="Overdue receivables"
+                  href="/reports/ar-aging"
+                  value={
+                    overdue(arAging.data) !== undefined ? (
+                      <CurrencyDisplay
+                        value={overdue(arAging.data)!}
+                        currency={currency}
+                        className="text-sm font-medium"
+                      />
+                    ) : (
+                      <Skeleton className="h-4 w-20" />
+                    )
+                  }
+                />
+                <ControlRow
+                  icon={ClipboardList}
+                  label="Overdue payables"
+                  href="/reports/ap-aging"
+                  value={
+                    overdue(apAging.data) !== undefined ? (
+                      <CurrencyDisplay
+                        value={overdue(apAging.data)!}
+                        currency={currency}
+                        className="text-sm font-medium"
+                      />
+                    ) : (
+                      <Skeleton className="h-4 w-20" />
+                    )
+                  }
+                />
+                <ControlRow
+                  icon={Building2}
+                  label="Total assets"
+                  href="/reports/financial-statements"
+                  value={
+                    bs.data ? (
+                      <CurrencyDisplay
+                        value={bs.data.totalAssets}
+                        currency={currency}
+                        className="text-sm font-medium"
+                      />
+                    ) : (
+                      <Skeleton className="h-4 w-20" />
+                    )
+                  }
+                />
+              </>
+            ) : null}
+            {!canReport && !canJournals ? (
+              <p className="text-sm text-muted-foreground">
+                Financial controls appear here once you are granted reporting access.
+              </p>
+            ) : null}
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="lg:col-span-1">
           <CardHeader>
             <CardTitle>Recent activity</CardTitle>
             <CardDescription>Latest entries in the audit trail.</CardDescription>
@@ -211,96 +359,215 @@ export default function DashboardPage() {
               <p className="text-sm text-muted-foreground">
                 You do not have access to the audit trail.
               </p>
+            ) : audit.isLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-8" />
+                ))}
+              </div>
             ) : audit.data?.items.length ? (
               <>
-                {audit.data.items.map((log) => (
-                  <div key={log.id} className="flex items-start justify-between gap-2 text-sm">
-                    <div className="min-w-0">
-                      <div className="truncate">
-                        <span className="font-medium">{log.action}</span>{' '}
-                        <span className="text-muted-foreground">{log.entityType}</span>
+                <ul className="divide-y">
+                  {audit.data.items.map((log) => (
+                    <li
+                      key={log.id}
+                      className="flex items-start justify-between gap-2 py-1.5 text-sm"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate">
+                          <span className="font-medium">{log.action}</span>{' '}
+                          <span className="text-muted-foreground">{log.entityType}</span>
+                        </div>
+                        <div className="truncate text-xs text-muted-foreground">
+                          {log.userEmail ?? 'system'}
+                        </div>
                       </div>
-                      <div className="truncate text-xs text-muted-foreground">
-                        {log.userEmail ?? 'system'}
+                      <div className="shrink-0 text-xs text-muted-foreground tabular">
+                        {formatDateTime(log.occurredAt)}
                       </div>
-                    </div>
-                    <div className="shrink-0 text-xs text-muted-foreground">
-                      {formatDateTime(log.occurredAt)}
-                    </div>
-                  </div>
-                ))}
-                <Button variant="link" size="sm" className="px-0" asChild>
+                    </li>
+                  ))}
+                </ul>
+                <Button variant="link" size="sm" asChild>
                   <Link href="/admin/audit-logs">
                     View audit trail <ArrowRight />
                   </Link>
                 </Button>
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">No activity yet.</p>
+              <EmptyState
+                compact
+                title="No activity yet"
+                description="Audit events appear here as work is recorded."
+              />
             )}
           </CardContent>
         </Card>
       </div>
+
+      {canAdmin ? (
+        <section aria-label="Administration" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <FinancialMetricCard
+            plain
+            label="Companies"
+            value={companies.data ? String(companies.data.length) : undefined}
+            hint={`${companies.data?.filter((c) => c.status === 'ACTIVE').length ?? 0} active`}
+            icon={Building2}
+            href="/admin/organization"
+            animate={false}
+          />
+          <FinancialMetricCard
+            plain
+            label="Users"
+            value={users.data ? String(users.data.total) : undefined}
+            hint="in this organization"
+            icon={Users}
+            href="/admin/users"
+            animate={false}
+          />
+          <FinancialMetricCard
+            plain
+            label="Roles"
+            value={roles.data ? String(roles.data.length) : undefined}
+            hint={`${roles.data?.filter((r) => !r.isSystem).length ?? 0} custom`}
+            icon={ShieldCheck}
+            href="/admin/roles"
+            animate={false}
+          />
+          <FinancialMetricCard
+            plain
+            label="Audit events"
+            value={audit.data ? String(audit.data.total) : undefined}
+            hint="recorded"
+            icon={ClipboardList}
+            href="/admin/audit-logs"
+            animate={false}
+          />
+        </section>
+      ) : null}
     </>
   );
 }
 
-function LiveKpi({
+function Sep() {
+  return (
+    <span className="text-subtle-foreground" aria-hidden>
+      ·
+    </span>
+  );
+}
+
+function ControlRow({
+  icon: Icon,
   label,
-  value,
-  currency,
   href,
-  plain,
+  value,
 }: {
+  icon: React.ComponentType<{ className?: string }>;
   label: string;
-  value: string | undefined;
-  currency?: string;
   href: string;
-  plain?: boolean;
+  value: React.ReactNode;
 }) {
   return (
-    <Link href={href} className="rounded-md border p-3 transition-colors hover:bg-accent/40">
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="mt-1 text-lg font-semibold">
-        {value === undefined ? (
-          <span className="text-muted-foreground">...</span>
-        ) : plain ? (
-          <span className="tabular">{value}</span>
-        ) : (
-          <Amount value={value} currency={currency} className="text-left" />
-        )}
-      </div>
+    <Link
+      href={href}
+      className="flex items-center justify-between gap-3 rounded-sm px-1 py-1.5 text-sm transition-colors duration-fast hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <span className="inline-flex items-center gap-2 text-muted-foreground">
+        <Icon className="size-4 text-subtle-foreground" />
+        {label}
+      </span>
+      {value}
     </Link>
   );
 }
 
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  hint,
+function AgingCard({
+  title,
+  description,
+  report,
+  loading,
+  currency,
   href,
+  overdue,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: number | undefined;
-  hint?: string;
+  title: string;
+  description: string;
+  report: ReturnType<typeof useAging>['data'];
+  loading: boolean;
+  currency: string;
   href: string;
+  overdue: string | undefined;
 }) {
+  // Current is healthy; overdue buckets step from info to warning to critical.
+  const tones = [
+    'var(--positive)',
+    'var(--info)',
+    'var(--warning)',
+    'var(--warning)',
+    'var(--critical)',
+  ];
+  const total = report ? Number(report.totals.outstanding) : 0;
   return (
-    <Link href={href} className="block">
-      <Card className="transition-colors hover:bg-accent/40">
-        <CardContent className="flex items-center gap-3 p-4">
-          <div className="rounded-md bg-muted p-2">
-            <Icon className="h-4 w-4 text-muted-foreground" />
+    <Card>
+      <CardHeader className="flex-row items-start justify-between space-y-0">
+        <div className="space-y-1">
+          <CardTitle>{title}</CardTitle>
+          <CardDescription>{description}</CardDescription>
+        </div>
+        <Button variant="ghost" size="sm" asChild>
+          <Link href={href}>
+            Report <ArrowRight />
+          </Link>
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {loading || !report ? (
+          <div className="flex items-center gap-4">
+            <Skeleton className="size-[140px] rounded-full" />
+            <div className="flex-1 space-y-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-3" />
+              ))}
+            </div>
           </div>
-          <div className="min-w-0">
-            <div className="text-xs text-muted-foreground">{label}</div>
-            <div className="tabular text-xl font-semibold leading-tight">{value ?? '-'}</div>
-            {hint ? <div className="truncate text-xs text-muted-foreground">{hint}</div> : null}
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
+        ) : total === 0 ? (
+          <EmptyState
+            compact
+            title="Nothing outstanding"
+            description="No open balances on this ledger."
+          />
+        ) : (
+          <DonutChart
+            ariaLabel={title}
+            segments={AGING_BUCKETS.map((b, i) => ({
+              key: b.key,
+              label: b.key === 'current' ? 'Current' : `${b.label} days`,
+              value: Number(report.totals[b.key]),
+              color: tones[i]!,
+            }))}
+            formatValue={(v) =>
+              new Intl.NumberFormat('en-PH', {
+                notation: 'compact',
+                maximumFractionDigits: 1,
+              }).format(v)
+            }
+            center={
+              <div>
+                <div className="type-label">Overdue</div>
+                <CurrencyDisplay
+                  value={overdue ?? '0'}
+                  currency={currency}
+                  variant="metric"
+                  tone={false}
+                  fractionDigits={0}
+                  className="text-sm font-semibold"
+                />
+              </div>
+            }
+          />
+        )}
+      </CardContent>
+    </Card>
   );
 }

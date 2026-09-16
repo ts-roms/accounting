@@ -33,7 +33,7 @@ export function NotificationsMenu() {
         >
           <Bell />
           {count > 0 ? (
-            <span className="absolute -right-0.5 -top-0.5 rounded-full bg-destructive px-1 text-[10px] font-semibold leading-4 text-destructive-foreground">
+            <span className="absolute -right-0.5 -top-0.5 rounded-full bg-destructive px-1 text-[10px] font-semibold leading-4 text-critical-foreground">
               {count > 99 ? '99+' : count}
             </span>
           ) : null}

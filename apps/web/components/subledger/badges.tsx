@@ -1,6 +1,7 @@
 'use client';
 import type { AccountingStatus, PaymentStatus, SubledgerDocumentStatus } from '@accounting/types';
-import { Badge } from '@accounting/ui';
+import { Badge, StatusBadge } from '@accounting/ui';
+import { toneOf } from '@/components/status';
 
 const DOC_VARIANT: Record<
   SubledgerDocumentStatus,
@@ -23,7 +24,7 @@ export function DocumentStatusBadge({
 }) {
   return (
     <span className="inline-flex items-center gap-1">
-      <Badge variant={DOC_VARIANT[status]}>{status.replace('_', ' ')}</Badge>
+      <StatusBadge tone={toneOf(DOC_VARIANT[status])}>{status.replace('_', ' ')}</StatusBadge>
       {accountingStatus && accountingStatus !== 'POSTED' && status !== 'DRAFT' ? (
         <Badge variant="outline" className="text-[10px]">
           {accountingStatus}
@@ -40,5 +41,5 @@ const PAY_VARIANT: Record<PaymentStatus, 'secondary' | 'success' | 'destructive'
 };
 
 export function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
-  return <Badge variant={PAY_VARIANT[status]}>{status}</Badge>;
+  return <StatusBadge tone={toneOf(PAY_VARIANT[status])}>{status}</StatusBadge>;
 }

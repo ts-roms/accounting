@@ -15,7 +15,6 @@ import {
   Alert,
   AlertDescription,
   AlertTitle,
-  Badge,
   Button,
   Card,
   CardContent,
@@ -50,6 +49,7 @@ import {
   TableHeader,
   TableRow,
   Textarea,
+  StatusBadge,
 } from '@accounting/ui';
 import { describeError } from '@/lib/api/client';
 import {
@@ -71,6 +71,7 @@ import { BankAccountSelect } from '@/components/banking/shared';
 import { DimensionsPopover, TaxCodeSelect, estimateRate } from '@/components/dimensions/pickers';
 import { Field } from '@/components/fixed-assets/shared';
 import { AttachmentsPanel } from '@/components/enterprise/attachments-panel';
+import { toneOf } from '@/components/status';
 
 export const CLAIMS_PATH = '/budgeting/expense-claims';
 type ClaimFormInput = z.input<typeof createExpenseClaimSchema>;
@@ -89,7 +90,7 @@ const STATUS_VARIANT: Record<
 };
 
 export function ClaimStatusBadge({ status }: { status: ExpenseClaimStatus }) {
-  return <Badge variant={STATUS_VARIANT[status]}>{titleCase(status)}</Badge>;
+  return <StatusBadge tone={toneOf(STATUS_VARIANT[status])}>{titleCase(status)}</StatusBadge>;
 }
 
 export function ExpenseClaimsPage() {

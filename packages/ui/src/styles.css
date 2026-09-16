@@ -1,68 +1,150 @@
-/* Design tokens (shadcn/ui conventions) on Tailwind v4. Neutral, dense, professional. */
-@import "tailwindcss";
+/*
+ * Executive Finance design tokens (shadcn/ui conventions on Tailwind v4).
+ *
+ * This file is the single source of truth for the visual system:
+ *   - colour tokens (dark is the primary experience, light is a sibling, not an inversion)
+ *   - financial semantic colours (positive / warning / critical / info)
+ *   - typography, radius, shadow and motion tokens
+ *   - the small enter/exit animation layer used by overlays
+ *
+ * Business modules never hard-code colours, durations or radii: they use the
+ * semantic utilities generated from these tokens. See docs/design-system/.
+ */
+@import 'tailwindcss';
 @source "./components";
 
 @custom-variant dark (&:is(.dark *));
 
+/* ------------------------------------------------------------------ light */
 :root {
-  --background: oklch(0.985 0.002 250);
-  --foreground: oklch(0.17 0.01 260);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.17 0.01 260);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.17 0.01 260);
-  --primary: oklch(0.32 0.06 260);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.95 0.005 250);
-  --secondary-foreground: oklch(0.25 0.02 260);
-  --muted: oklch(0.955 0.004 250);
-  --muted-foreground: oklch(0.48 0.015 260);
-  --accent: oklch(0.94 0.01 250);
-  --accent-foreground: oklch(0.2 0.02 260);
-  --destructive: oklch(0.55 0.2 25);
-  --destructive-foreground: oklch(0.985 0 0);
-  --success: oklch(0.55 0.14 150);
-  --warning: oklch(0.72 0.16 70);
-  --border: oklch(0.9 0.005 250);
-  --input: oklch(0.88 0.006 250);
-  --ring: oklch(0.55 0.08 260);
-  --sidebar: oklch(0.21 0.02 262);
-  --sidebar-foreground: oklch(0.9 0.005 250);
-  --sidebar-muted: oklch(0.65 0.01 255);
-  --sidebar-accent: oklch(0.28 0.025 262);
-  --sidebar-accent-foreground: oklch(0.98 0 0);
-  --sidebar-border: oklch(0.3 0.02 262);
-  --radius: 0.4rem;
+  --background: #f7f8fa;
+  --foreground: #111827;
+  --card: #ffffff;
+  --card-foreground: #111827;
+  --popover: #ffffff;
+  --popover-foreground: #111827;
+  --surface: #ffffff;
+  --surface-elevated: #ffffff;
+  --primary: #1f5fd6;
+  --primary-foreground: #ffffff;
+  --secondary: #eef1f5;
+  --secondary-foreground: #1f2937;
+  --muted: #f1f3f6;
+  --muted-foreground: #64748b;
+  --subtle-foreground: #94a3b8;
+  --accent: #e9eef6;
+  --accent-foreground: #111827;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: #e5e7eb;
+  --border-strong: #d1d5db;
+  --input: #d6dbe3;
+  --ring: #2f6fe4;
+
+  /* Financial semantics: colour never carries meaning alone (see StatusBadge). */
+  --positive: #059669;
+  --positive-foreground: #ffffff;
+  --warning: #b45309;
+  --warning-foreground: #ffffff;
+  --critical: #dc2626;
+  --critical-foreground: #ffffff;
+  --info: #1f5fd6;
+  --info-foreground: #ffffff;
+  --neutral: #64748b;
+  --neutral-foreground: #ffffff;
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1f2937;
+  --sidebar-muted: #6b7280;
+  --sidebar-accent: #eef2f8;
+  --sidebar-accent-foreground: #111827;
+  --sidebar-border: #e5e7eb;
+
+  --chart-1: #1f5fd6;
+  --chart-2: #059669;
+  --chart-3: #b45309;
+  --chart-4: #7c3aed;
+  --chart-5: #64748b;
+
+  --radius: 0.375rem; /* 6px controls; cards/dialogs derive from it */
+
+  --elevation-sm: 0 1px 2px 0 rgb(15 23 42 / 0.06);
+  --elevation-md: 0 2px 6px -1px rgb(15 23 42 / 0.1), 0 1px 2px -1px rgb(15 23 42 / 0.06);
+  --elevation-lg: 0 10px 24px -6px rgb(15 23 42 / 0.16), 0 4px 8px -4px rgb(15 23 42 / 0.08);
+  --elevation-overlay: 0 16px 40px -8px rgb(15 23 42 / 0.24), 0 0 0 1px rgb(15 23 42 / 0.04);
+
+  /* Motion tokens. Components never use arbitrary durations. */
+  --motion-fast: 100ms;
+  --motion-normal: 150ms;
+  --motion-medium: 200ms;
+  --motion-slow: 400ms;
+  --motion-data: 700ms;
+  --easing-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --easing-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --easing-spring-subtle: cubic-bezier(0.2, 0.9, 0.3, 1.05);
+
+  color-scheme: light;
 }
 
+/* ------------------------------------------------------------------- dark */
 .dark {
-  --background: oklch(0.15 0.01 260);
-  --foreground: oklch(0.95 0.005 250);
-  --card: oklch(0.19 0.012 260);
-  --card-foreground: oklch(0.95 0.005 250);
-  --popover: oklch(0.19 0.012 260);
-  --popover-foreground: oklch(0.95 0.005 250);
-  --primary: oklch(0.8 0.04 255);
-  --primary-foreground: oklch(0.18 0.02 260);
-  --secondary: oklch(0.26 0.015 260);
-  --secondary-foreground: oklch(0.95 0.005 250);
-  --muted: oklch(0.25 0.012 260);
-  --muted-foreground: oklch(0.68 0.012 255);
-  --accent: oklch(0.28 0.015 260);
-  --accent-foreground: oklch(0.95 0.005 250);
-  --destructive: oklch(0.6 0.19 25);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.28 0.012 260);
-  --input: oklch(0.32 0.012 260);
-  --ring: oklch(0.6 0.06 255);
-  --sidebar: oklch(0.13 0.012 262);
-  --sidebar-foreground: oklch(0.9 0.005 250);
-  --sidebar-muted: oklch(0.6 0.01 255);
-  --sidebar-accent: oklch(0.22 0.02 262);
-  --sidebar-accent-foreground: oklch(0.98 0 0);
-  --sidebar-border: oklch(0.24 0.015 262);
+  --background: #0b0f14;
+  --foreground: #f4f7fa;
+  --card: #11161d;
+  --card-foreground: #f4f7fa;
+  --popover: #171d26;
+  --popover-foreground: #f4f7fa;
+  --surface: #11161d;
+  --surface-elevated: #171d26;
+  --primary: #3d7ff2;
+  --primary-foreground: #ffffff;
+  --secondary: #1a212b;
+  --secondary-foreground: #e5eaf0;
+  --muted: #161c25;
+  --muted-foreground: #9aa5b1;
+  --subtle-foreground: #66717e;
+  --accent: #1c242f;
+  --accent-foreground: #f4f7fa;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #252d38;
+  --border-strong: #303a47;
+  --input: #2b3441;
+  --ring: #5b93ff;
+
+  --positive: #34d399;
+  --positive-foreground: #052e1c;
+  --warning: #fbbf24;
+  --warning-foreground: #2b1d02;
+  --critical: #f87171;
+  --critical-foreground: #2b0606;
+  --info: #60a5fa;
+  --info-foreground: #06204a;
+  --neutral: #9aa5b1;
+  --neutral-foreground: #0b0f14;
+
+  --sidebar: #0b0f14;
+  --sidebar-foreground: #d5dce4;
+  --sidebar-muted: #7d8794;
+  --sidebar-accent: #171d26;
+  --sidebar-accent-foreground: #f4f7fa;
+  --sidebar-border: #1c232d;
+
+  --chart-1: #60a5fa;
+  --chart-2: #34d399;
+  --chart-3: #fbbf24;
+  --chart-4: #a78bfa;
+  --chart-5: #9aa5b1;
+
+  --elevation-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+  --elevation-md: 0 2px 8px -2px rgb(0 0 0 / 0.5);
+  --elevation-lg: 0 12px 28px -8px rgb(0 0 0 / 0.6);
+  --elevation-overlay: 0 20px 48px -12px rgb(0 0 0 / 0.7), 0 0 0 1px rgb(255 255 255 / 0.04);
+
+  color-scheme: dark;
 }
 
+/* ------------------------------------------------------------- tailwind map */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -70,19 +152,33 @@
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+  --color-subtle-foreground: var(--subtle-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
-  --color-success: var(--success);
+  --color-positive: var(--positive);
+  --color-positive-foreground: var(--positive-foreground);
   --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-critical: var(--critical);
+  --color-critical-foreground: var(--critical-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-neutral: var(--neutral);
+  --color-neutral-foreground: var(--neutral-foreground);
+  /* Legacy alias kept so existing `text-success` usages keep working. */
+  --color-success: var(--positive);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-sidebar: var(--sidebar);
@@ -91,23 +187,288 @@
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
-  --radius-sm: calc(var(--radius) - 2px);
-  --radius-md: var(--radius);
-  --radius-lg: calc(var(--radius) + 2px);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+
+  --shadow-sm: var(--elevation-sm);
+  --shadow-md: var(--elevation-md);
+  --shadow-lg: var(--elevation-lg);
+  --shadow-overlay: var(--elevation-overlay);
+
+  --ease-out: var(--easing-out);
+  --ease-in-out: var(--easing-in-out);
+  --ease-spring-subtle: var(--easing-spring-subtle);
+
+  --font-sans:
+    var(--font-geist-sans, 'Inter'), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-mono:
+    var(--font-geist-mono, 'JetBrains Mono'), ui-monospace, SFMono-Regular, Menlo, Consolas,
+    'Liberation Mono', monospace;
+
+  --animate-spin: spin 1s linear infinite;
+  --animate-pulse: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-pulse-ring: pulse-ring 2.4s var(--easing-in-out) infinite;
+  --animate-shimmer: shimmer 1.6s var(--easing-in-out) infinite;
 }
 
+/* --------------------------------------------------------------- keyframes */
+@keyframes ds-enter {
+  from {
+    opacity: var(--enter-opacity, 1);
+    transform: translate3d(var(--enter-x, 0), var(--enter-y, 0), 0) scale(var(--enter-scale, 1));
+  }
+}
+@keyframes ds-exit {
+  to {
+    opacity: var(--exit-opacity, 1);
+    transform: translate3d(var(--exit-x, 0), var(--exit-y, 0), 0) scale(var(--exit-scale, 1));
+  }
+}
+@keyframes pulse-ring {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 45%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 0%, transparent);
+  }
+}
+@keyframes shimmer {
+  0% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.55;
+  }
+}
+@keyframes check-draw {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* -------------------------------------------------------- motion utilities */
+/* Overlay enter/exit. Compose: `data-[state=open]:animate-enter data-[state=open]:fade-in data-[state=open]:scale-in-98` */
+@utility animate-enter {
+  animation: ds-enter var(--motion-normal) var(--easing-out) both;
+}
+@utility animate-enter-fast {
+  animation: ds-enter var(--motion-fast) var(--easing-out) both;
+}
+@utility animate-enter-medium {
+  animation: ds-enter var(--motion-medium) var(--easing-out) both;
+}
+@utility animate-exit {
+  animation: ds-exit var(--motion-fast) var(--easing-in-out) both;
+}
+@utility fade-in {
+  --enter-opacity: 0;
+}
+@utility fade-out {
+  --exit-opacity: 0;
+}
+@utility scale-in-98 {
+  --enter-scale: 0.98;
+}
+@utility scale-in-95 {
+  --enter-scale: 0.95;
+}
+@utility scale-in-80 {
+  --enter-scale: 0.8;
+}
+@utility scale-out-98 {
+  --exit-scale: 0.98;
+}
+@utility slide-in-up-1 {
+  --enter-y: 4px;
+}
+@utility slide-in-up-2 {
+  --enter-y: 8px;
+}
+@utility slide-in-down-1 {
+  --enter-y: -4px;
+}
+@utility slide-in-left-1 {
+  --enter-x: -4px;
+}
+@utility slide-in-right-1 {
+  --enter-x: 4px;
+}
+@utility slide-in-from-right {
+  --enter-x: 100%;
+}
+@utility slide-out-to-right {
+  --exit-x: 100%;
+}
+@utility slide-in-from-left {
+  --enter-x: -100%;
+}
+@utility slide-out-to-left {
+  --exit-x: -100%;
+}
+/* Tooltip/popover side awareness: slide 2px against the placement side. */
+@utility slide-from-side {
+  --enter-y: 0;
+}
+
+@utility duration-fast {
+  transition-duration: var(--motion-fast);
+}
+@utility duration-normal {
+  transition-duration: var(--motion-normal);
+}
+@utility duration-medium {
+  transition-duration: var(--motion-medium);
+}
+@utility duration-slow {
+  transition-duration: var(--motion-slow);
+}
+@utility duration-data {
+  transition-duration: var(--motion-data);
+}
+
+/* Checkmark draw for success states (used by AnimatedCheck). */
+@utility animate-check-draw {
+  stroke-dasharray: 24;
+  animation: check-draw var(--motion-slow) var(--easing-out) both;
+}
+
+/* ------------------------------------------------------ typography utilities */
+@utility type-display {
+  font-size: 1.75rem;
+  line-height: 2.125rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+@utility type-h1 {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+@utility type-h2 {
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+@utility type-h3 {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 600;
+}
+@utility type-h4 {
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  font-weight: 600;
+}
+@utility type-body {
+  font-size: 0.875rem;
+  line-height: 1.375rem;
+}
+@utility type-body-sm {
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+}
+@utility type-caption {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: var(--muted-foreground);
+}
+@utility type-label {
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+@utility type-mono {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+@utility type-financial {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings:
+    'tnum' 1,
+    'lnum' 1;
+  letter-spacing: -0.005em;
+}
+
+/* ------------------------------------------------------------------- base */
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
   body {
     @apply bg-background text-foreground antialiased;
-    font-feature-settings: "tnum" 1, "cv11" 1;
+    font-feature-settings:
+      'tnum' 1,
+      'cv11' 1,
+      'ss01' 1;
+    text-rendering: optimizeLegibility;
   }
   /* Financial figures always align on tabular numerals. */
   .tabular {
     font-variant-numeric: tabular-nums;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--primary) 28%, transparent);
+  }
+  /* Keyboard users always know where focus is (WCAG 2.4.7 / 2.4.11). */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  /* Quiet scrollbars that still meet contrast in both themes. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--muted-foreground) 35%, transparent) transparent;
+  }
+}
+
+/* Unlayered so it wins over the :root token declarations above. */
+/* Reduced motion: non-essential motion is removed; state changes stay visible. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-normal: 0ms;
+    --motion-medium: 0ms;
+    --motion-slow: 0ms;
+    --motion-data: 0ms;
+  }
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* Activity indicators are essential feedback: keep them moving, slowly. */
+  .animate-spin {
+    animation-duration: 1.5s !important;
+    animation-iteration-count: infinite !important;
   }
 }

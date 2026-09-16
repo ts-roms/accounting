@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import type { z } from 'zod';
 import {
   ACCOUNT_SUBTYPES,
+  CASH_FLOW_ACTIVITIES,
   ACCOUNT_TYPES,
   NORMAL_BALANCES,
   NORMAL_BALANCE_BY_TYPE,
@@ -69,6 +70,8 @@ export function AccountDialog({
       parentId: account?.parentId ?? parent?.id ?? null,
       currency: account?.currency ?? null,
       isHeader: account?.isHeader ?? false,
+      isReconciliation: account?.isReconciliation ?? false,
+      cashFlowActivity: account?.cashFlowActivity ?? null,
       description: account?.description ?? undefined,
     }),
     [account, parent],
@@ -93,6 +96,8 @@ export function AccountDialog({
           subtype: values.subtype ?? null,
           parentId: values.parentId ?? null,
           description: values.description,
+          isReconciliation: values.isReconciliation,
+          cashFlowActivity: values.cashFlowActivity ?? null,
         });
         toast.success(`Account ${account.code} updated.`);
       } else {
@@ -282,6 +287,49 @@ export function AccountDialog({
                 )}
               />
             ) : null}
+            <FormField
+              control={form.control}
+              name="isReconciliation"
+              render={({ field }) => (
+                <FormItem className="flex items-center gap-2 space-y-0">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value ?? false}
+                      onCheckedChange={(v) => field.onChange(v === true)}
+                    />
+                  </FormControl>
+                  <FormLabel className="font-normal">Reconciliation account</FormLabel>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="cashFlowActivity"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Cash-flow activity</FormLabel>
+                  <Select
+                    value={field.value ?? 'AUTO'}
+                    onValueChange={(v) => field.onChange(v === 'AUTO' ? null : v)}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="AUTO">Derived from subtype</SelectItem>
+                      {CASH_FLOW_ACTIVITIES.map((a) => (
+                        <SelectItem key={a} value={a}>
+                          {titleCase(a)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="description"

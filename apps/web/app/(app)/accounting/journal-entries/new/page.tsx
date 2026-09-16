@@ -1,5 +1,6 @@
 'use client';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { JOURNAL_TYPES, type JournalType } from '@accounting/types';
 import { toast } from 'sonner';
 import { describeError } from '@/lib/api/client';
 import { useCreateJournalEntry } from '@/lib/api/accounting-hooks';
@@ -12,6 +13,16 @@ export default function NewJournalEntryPage() {
   const { activeCompany } = useSession();
   const create = useCreateJournalEntry();
   const currency = activeCompany?.baseCurrency ?? 'PHP';
+  // Deep links (e.g. the suspense monitor's Clear button) pre-fill the header and first line.
+  const params = useSearchParams();
+  const typeParam = params.get('journalType');
+  const prefill = {
+    journalType: (JOURNAL_TYPES as readonly string[]).includes(typeParam ?? '')
+      ? (typeParam as JournalType)
+      : undefined,
+    description: params.get('description') ?? undefined,
+    accountId: params.get('accountId') ?? undefined,
+  };
 
   return (
     <>
@@ -21,6 +32,7 @@ export default function NewJournalEntryPage() {
       />
       <JournalEntryForm
         currency={currency}
+        prefill={prefill}
         submitting={create.isPending}
         onCancel={() => router.push('/accounting/journal-entries')}
         onSubmit={async (values) => {

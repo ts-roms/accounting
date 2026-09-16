@@ -134,6 +134,8 @@ export default function JournalEntriesPage() {
         columns={columns}
         data={entries.data}
         isLoading={entries.isLoading}
+        error={entries.error}
+        onRetry={() => void entries.refetch()}
         isFetching={entries.isFetching}
         pagination={table.pagination}
         sorting={table.sorting}

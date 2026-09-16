@@ -54,6 +54,7 @@ import { formatDateTime, titleCase } from '@/lib/format';
 import { useSession } from '@/lib/auth/session';
 import { Can, ConfirmDialog, PageHeader } from '@/components/ui-ext/page';
 import { Stat } from '@/components/fixed-assets/shared';
+import { SyncProgress } from './sync-progress';
 import {
   DeliveryStatusBadge,
   HealthBadge,
@@ -194,7 +195,7 @@ export function IntegrationDetailPage({ id }: { id: string }) {
         <Stat label="Last success" value={formatDateTime(i.lastSuccessAt)} />
       </div>
       {i.lastError ? (
-        <p className="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive">
+        <p className="rounded-md border border-critical/40 px-3 py-2 text-sm text-critical">
           {i.lastError}
         </p>
       ) : null}
@@ -445,6 +446,7 @@ function AuthenticationTab({ i, onRefresh }: { i: IntegrationView; onRefresh: ()
 
 function SyncTab({ i }: { i: IntegrationView }) {
   const jobs = useSyncJobs(i.id, { pageSize: 25 });
+  const jobItems = jobs.data?.items ?? [];
   const cursors = useExternalReferences(i.id);
   const trigger = useTriggerSync();
   const cancel = useCancelSync();
@@ -452,6 +454,7 @@ function SyncTab({ i }: { i: IntegrationView }) {
   const [mode, setMode] = React.useState<'INCREMENTAL' | 'FULL'>('INCREMENTAL');
   return (
     <div className="space-y-3">
+      <SyncProgress jobs={jobItems} />
       <Can permissions={[P['integration.manage']]}>
         <div className="flex flex-wrap items-end gap-2 rounded-md border p-3">
           <div className="space-y-1">
@@ -543,7 +546,7 @@ function SyncTab({ i }: { i: IntegrationView }) {
                 <TableCell className="text-right font-mono">{j.recordsUpdated}</TableCell>
                 <TableCell className="text-right font-mono">{j.recordsSkipped}</TableCell>
                 <TableCell
-                  className={`text-right font-mono ${j.recordsFailed ? 'text-destructive' : ''}`}
+                  className={`text-right font-mono ${j.recordsFailed ? 'text-critical' : ''}`}
                 >
                   {j.recordsFailed}
                 </TableCell>
@@ -588,7 +591,7 @@ function SyncTab({ i }: { i: IntegrationView }) {
                 <TableRow>
                   <TableCell colSpan={13} className="bg-muted/30 text-xs">
                     {j.errorMessage ? (
-                      <div className="text-destructive">
+                      <div className="text-critical">
                         {j.errorCode}: {j.errorMessage}
                       </div>
                     ) : null}
@@ -694,7 +697,7 @@ function WebhooksTab({ i }: { i: IntegrationView }) {
                   </Badge>
                 </TableCell>
                 <TableCell>{e.attempts}</TableCell>
-                <TableCell className="max-w-80 truncate text-xs text-destructive">
+                <TableCell className="max-w-80 truncate text-xs text-critical">
                   {e.lastError}
                 </TableCell>
               </TableRow>
@@ -979,7 +982,7 @@ export function LogTable({
               </Badge>
             </TableCell>
             <TableCell className="font-mono text-xs">{l.httpStatus ?? ''}</TableCell>
-            <TableCell className="font-mono text-xs text-destructive">
+            <TableCell className="font-mono text-xs text-critical">
               {l.errorCode ?? ''}
             </TableCell>
             <TableCell className="text-right font-mono text-xs">{l.durationMs ?? ''}</TableCell>
@@ -1014,7 +1017,7 @@ function HealthTab({ i }: { i: IntegrationView }) {
         <CardContent className="p-4">
           <div className="flex items-center gap-3">
             <div
-              className={`text-4xl font-semibold ${h.score >= 80 ? 'text-success' : h.score >= 50 ? 'text-warning' : 'text-destructive'}`}
+              className={`text-4xl font-semibold ${h.score >= 80 ? 'text-success' : h.score >= 50 ? 'text-warning' : 'text-critical'}`}
               data-testid="health-score"
             >
               {h.score}
@@ -1060,7 +1063,7 @@ function HealthTab({ i }: { i: IntegrationView }) {
               {h.deductions.map((d) => (
                 <li key={d.code} className="flex justify-between py-1">
                   <span>{d.detail}</span>
-                  <span className="font-mono text-destructive">-{d.points}</span>
+                  <span className="font-mono text-critical">-{d.points}</span>
                 </li>
               ))}
             </ul>

@@ -12,6 +12,8 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: 'standalone',
+  // A second dev instance (e.g. a verification stack on other ports) must not share .next.
+  ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
   poweredByHeader: false,
   // Source-level workspace packages compiled by Next.
   transpilePackages: ['@accounting/ui'],

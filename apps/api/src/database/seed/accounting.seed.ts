@@ -9,6 +9,7 @@ import {
 import * as schema from '../schema';
 import type { Tx } from './seed';
 import { insertEntry } from './seed-ledger';
+import { seedAccountingCore } from './accounting-core.seed';
 import { seedAssetsBanking } from './assets-banking.seed';
 import { seedBudgetingTax } from './budgeting-tax.seed';
 import { seedInventory } from './inventory.seed';
@@ -28,6 +29,8 @@ interface CoaRow {
   system?: boolean;
   /** Eliminated in consolidated reports (Phase 8). */
   intercompany?: boolean;
+  /** Reconciled against an external source (bank, subledger, authority). */
+  reconciliation?: boolean;
 }
 
 /** A compact Philippine SME chart of accounts. Codes are stable identifiers. */
@@ -60,6 +63,14 @@ const CHART: CoaRow[] = [
     intercompany: true,
   },
   { code: '1300', name: 'Inventory', type: 'ASSET', parent: '1100', subtype: 'INVENTORY' },
+  {
+    code: '1900',
+    name: 'Suspense / Clearing',
+    type: 'ASSET',
+    parent: '1100',
+    subtype: 'SUSPENSE',
+    reconciliation: true,
+  },
   { code: '1400', name: 'Prepaid Expenses', type: 'ASSET', parent: '1100', subtype: 'PREPAID' },
   {
     code: '1460',
@@ -168,6 +179,14 @@ const CHART: CoaRow[] = [
     type: 'EQUITY',
     parent: '3000',
     subtype: 'RETAINED_EARNINGS',
+    system: true,
+  },
+  {
+    code: '3900',
+    name: 'Opening Balance Equity',
+    type: 'EQUITY',
+    parent: '3000',
+    subtype: 'OTHER_EQUITY',
     system: true,
   },
   { code: '4000', name: 'Revenue', type: 'REVENUE', header: true },
@@ -302,6 +321,17 @@ const CHART: CoaRow[] = [
     parent: '6000',
     subtype: 'OTHER_EXPENSE',
   },
+  { code: '7000', name: 'Other Income', type: 'OTHER_INCOME', header: true },
+  { code: '7100', name: 'Interest Income', type: 'OTHER_INCOME', parent: '7000', subtype: 'OTHER_INCOME' },
+  { code: '8000', name: 'Other Expenses', type: 'OTHER_EXPENSE', header: true },
+  {
+    code: '8100',
+    name: 'Interest Expense',
+    type: 'OTHER_EXPENSE',
+    parent: '8000',
+    subtype: 'OTHER_EXPENSE',
+  },
+  { code: '6150', name: 'Project Consulting Fees', type: 'EXPENSE', parent: '6000' },
 ];
 
 const MAPPINGS: Array<[AccountMappingKey, string]> = [
@@ -333,6 +363,8 @@ const MAPPINGS: Array<[AccountMappingKey, string]> = [
   ['INPUT_VAT', '1450'],
   ['WITHHOLDING_TAX_PAYABLE', '2140'],
   ['BANK_CHARGES', '6600'],
+  ['OPENING_BALANCE_EQUITY', '3900'],
+  ['SUSPENSE', '1900'],
 ];
 
 interface SampleLine {
@@ -460,6 +492,7 @@ export async function seedAccounting(
     await seedInventory(tx, company, adminUserId, log);
     await seedAssetsBanking(tx, company, codeToId, log);
     await seedBudgetingTax(tx, company, codeToId, adminUserId, log);
+    await seedAccountingCore(tx, company, codeToId, adminUserId, log);
   }
   await seedExchangeRates(tx, organizationId, adminUserId, log);
 }
@@ -510,6 +543,7 @@ async function ensureChart(tx: Tx, companyId: string, log: Log): Promise<Map<str
         isHeader: row.header ?? false,
         isSystem: row.system ?? false,
         isIntercompany: row.intercompany ?? false,
+        isReconciliation: row.reconciliation ?? false,
       })
       .returning({ id: schema.accounts.id });
     codeToId.set(row.code, inserted!.id);

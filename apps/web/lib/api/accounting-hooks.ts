@@ -272,9 +272,10 @@ export const useBalanceSheet = (query: BalanceSheetQuery, enabled = true) =>
 
 // ---------------------------------------------------------------- integrity
 
-export const useIntegrityReport = (asOf: string) =>
+export const useIntegrityReport = (asOf: string, enabled = true) =>
   useQuery({
     queryKey: ['integrity', getActiveCompanyId() ?? 'none', asOf] as const,
     queryFn: () => api.get<IntegrityReport>('/integrity', { query: { asOf } }),
     staleTime: 30_000,
+    enabled,
   });

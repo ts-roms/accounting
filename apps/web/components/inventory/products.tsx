@@ -166,7 +166,7 @@ export function ProductsPage() {
             return <span className="text-muted-foreground">-</span>;
           const below = Number(p.quantityOnHand) <= Number(p.reorderLevel);
           return (
-            <span className={below ? 'flex items-center gap-1 text-destructive' : ''}>
+            <span className={below ? 'flex items-center gap-1 text-critical' : ''}>
               {below ? <AlertTriangle className="h-3.5 w-3.5" /> : null}
               at {qty(p.reorderLevel)}
             </span>
@@ -971,7 +971,7 @@ function Stat({
     <Card>
       <CardContent className="p-4">
         <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
-        <div className={`mt-1 text-lg font-semibold ${danger ? 'text-destructive' : ''}`}>
+        <div className={`mt-1 text-lg font-semibold ${danger ? 'text-critical' : ''}`}>
           {value}
         </div>
       </CardContent>

@@ -366,7 +366,7 @@ export function FxRevaluationsPage() {
               />
             </div>
             {preview.isError ? (
-              <p className="text-sm text-destructive">{describeError(preview.error)}</p>
+              <p className="text-sm text-critical">{describeError(preview.error)}</p>
             ) : preview.isLoading ? (
               <Skeleton className="h-24" />
             ) : (
@@ -454,7 +454,7 @@ export function FxRevaluationsPage() {
                       </TableCell>
                       <TableCell className="text-right text-xs tabular">
                         <div>+{r.unrealizedGain}</div>
-                        <div className="text-destructive">−{r.unrealizedLoss}</div>
+                        <div className="text-critical">−{r.unrealizedLoss}</div>
                       </TableCell>
                     </TableRow>
                   ))

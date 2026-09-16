@@ -175,7 +175,17 @@ import type {
   AccountMappingKey,
   AccountSubtype,
   AccountType,
+  CashFlowActivity,
+  CashFlowActivity as CashFlowSectionKey,
+  DimensionRuleScope,
   FiscalPeriodStatus,
+  PostingRuleAccountSource,
+  PostingSide,
+  PrepaymentScheduleStatus,
+  PrepaymentStatus,
+  RecurringFrequency,
+  RecurringJournalMode,
+  RecurringJournalStatus,
   FiscalYearStatus,
   JournalStatus,
   JournalType,
@@ -194,6 +204,10 @@ export interface Account {
   isHeader: boolean;
   isSystem: boolean;
   currency: string | null;
+  isReconciliation: boolean;
+  cashFlowActivity: CashFlowActivity | null;
+  ownerUserId: string | null;
+  allowedBranchIds: string[];
   description: string | null;
   status: EntityStatus;
   createdAt: string;
@@ -249,6 +263,9 @@ export interface JournalLineView {
   departmentId: string | null;
   costCenterId: string | null;
   projectId: string | null;
+  foreignDebit: string | null;
+  foreignCredit: string | null;
+  exchangeRate: string | null;
 }
 
 export interface JournalEntryView {
@@ -261,9 +278,13 @@ export interface JournalEntryView {
   status: JournalStatus;
   entryDate: string;
   postingDate: string | null;
+  documentDate: string | null;
+  autoReverseDate: string | null;
   description: string;
   reference: string | null;
   currency: string;
+  transactionCurrency: string | null;
+  exchangeRate: string | null;
   totalDebit: string;
   totalCredit: string;
   sourceType: string | null;
@@ -387,7 +408,11 @@ export interface IncomeStatementReport {
   costOfSales: StatementSection;
   grossProfit: string;
   expenses: StatementSection;
+  operatingIncome: string;
+  otherIncome: StatementSection;
+  otherExpenses: StatementSection;
   netIncome: string;
+  comparative?: Omit<IncomeStatementReport, 'comparative'>;
 }
 
 export interface BalanceSheetReport {
@@ -2076,3 +2101,230 @@ export interface CloseDetail extends CloseView {
   tasks: CloseTaskView[];
   blockers: CloseBlocker[];
 }
+
+// ------------------------------------------------------- accounting core extensions
+
+export interface CashFlowLine {
+  accountId: string;
+  code: string;
+  name: string;
+  amount: string;
+  drill: { accountId: string; from: string; to: string };
+}
+
+export interface CashFlowSection {
+  key: CashFlowSectionKey;
+  title: string;
+  lines: CashFlowLine[];
+  total: string;
+}
+
+export interface CashFlowStatement {
+  method: 'INDIRECT';
+  from: string;
+  to: string;
+  currency: string;
+  netIncome: string;
+  operating: CashFlowSection;
+  investing: CashFlowSection;
+  financing: CashFlowSection;
+  netChangeInCash: string;
+  openingCash: string;
+  closingCash: string;
+  balanced: boolean;
+  cashAccounts: Array<{ accountId: string; code: string; name: string; opening: string; closing: string }>;
+}
+
+export interface RecurringJournalLine {
+  accountId: string;
+  debit: string;
+  credit: string;
+  description?: string | null;
+  branchId?: string | null;
+  departmentId?: string | null;
+  costCenterId?: string | null;
+  projectId?: string | null;
+}
+
+export interface RecurringJournal {
+  id: string;
+  companyId: string;
+  name: string;
+  description: string;
+  reference: string | null;
+  journalType: JournalType;
+  frequency: RecurringFrequency;
+  interval: number;
+  startDate: string;
+  endDate: string | null;
+  maxOccurrences: number | null;
+  nextRunDate: string | null;
+  lastRunDate: string | null;
+  occurrences: number;
+  mode: RecurringJournalMode;
+  autoReverse: boolean;
+  branchId: string | null;
+  lines: RecurringJournalLine[];
+  status: RecurringJournalStatus;
+  createdBy: string | null;
+  autoPostApprovedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RecurringJournalRun {
+  id: string;
+  runDate: string;
+  journalEntryId: string | null;
+  documentNumber: string | null;
+  journalStatus: JournalStatus | null;
+  createdAt: string;
+}
+
+export interface RecurringJournalDetail extends RecurringJournal {
+  runs: RecurringJournalRun[];
+}
+
+export interface RecurringRunResult {
+  asOf: string;
+  generated: Array<{
+    recurringJournalId: string;
+    name: string;
+    runDate: string;
+    journalEntryId: string;
+    documentNumber: string;
+    status: string;
+  }>;
+  skipped: Array<{ recurringJournalId: string; name: string; runDate: string; reason: string }>;
+}
+
+export interface PrepaymentSchedule {
+  id: string;
+  sequence: number;
+  recognitionDate: string;
+  amount: string;
+  status: PrepaymentScheduleStatus;
+  journalEntryId: string | null;
+  documentNumber: string | null;
+  recognizedAt: string | null;
+}
+
+export interface Prepayment {
+  id: string;
+  name: string;
+  description: string | null;
+  reference: string | null;
+  prepaidAccountId: string;
+  expenseAccountId: string;
+  creditAccountId: string | null;
+  currency: string;
+  amount: string;
+  recognizedAmount: string;
+  remainingAmount: string;
+  startDate: string;
+  months: number;
+  status: PrepaymentStatus;
+  branchId: string | null;
+  departmentId: string | null;
+  costCenterId: string | null;
+  projectId: string | null;
+  initialEntryId: string | null;
+  prepaidAccountCode: string;
+  expenseAccountCode: string;
+  createdAt: string;
+}
+
+export interface PrepaymentDetail extends Prepayment {
+  schedules: PrepaymentSchedule[];
+  initialDocumentNumber: string | null;
+}
+
+export interface RecognitionResult {
+  asOf: string;
+  recognized: Array<{
+    prepaymentId: string;
+    name: string;
+    sequence: number;
+    recognitionDate: string;
+    amount: string;
+    journalEntryId: string;
+    documentNumber: string;
+  }>;
+  skipped: Array<{ prepaymentId: string; reason: string }>;
+}
+
+export interface PostingRuleLine {
+  side: PostingSide;
+  accountSource: PostingRuleAccountSource;
+  mappingKey?: AccountMappingKey | null;
+  accountId?: string | null;
+  accountKey?: string | null;
+  amountKey: string;
+  description?: string | null;
+}
+
+export interface PostingRule {
+  id: string;
+  transactionType: string;
+  name: string;
+  description: string | null;
+  journalType: JournalType;
+  lines: PostingRuleLine[];
+  status: EntityStatus;
+  requirements: { amountKeys: string[]; accountKeys: string[]; mappingKeys: string[] };
+  updatedAt: string;
+}
+
+export interface ResolvedPostingRule {
+  transactionType: string;
+  journalType: JournalType;
+  lines: Array<{ accountId: string; debit: string; credit: string; description: string | null }>;
+  accounts: Array<{ accountId: string; code: string; name: string }>;
+}
+
+export interface DimensionRule {
+  id: string;
+  name: string;
+  scope: DimensionRuleScope;
+  accountId: string | null;
+  accountCode: string | null;
+  accountType: AccountType | null;
+  codePrefix: string | null;
+  dimensionType: DimensionType;
+  status: EntityStatus;
+}
+
+export interface SuspenseLine {
+  journalEntryId: string;
+  documentNumber: string;
+  entryDate: string;
+  description: string | null;
+  reference: string | null;
+  sourceType: string | null;
+  debit: string;
+  credit: string;
+  ageDays: number;
+}
+
+export interface SuspenseAccountView {
+  accountId: string;
+  code: string;
+  name: string;
+  balance: string;
+  unresolvedCount: number;
+  oldestDate: string | null;
+  oldestAgeDays: number;
+  ownerUserId: string | null;
+  ownerEmail: string | null;
+  ownerName: string | null;
+  lines: SuspenseLine[];
+}
+
+export interface SuspenseReport {
+  asOf: string;
+  currency: string;
+  totalAbsoluteBalance: string;
+  accounts: SuspenseAccountView[];
+}
+
+export type { CashFlowActivity };

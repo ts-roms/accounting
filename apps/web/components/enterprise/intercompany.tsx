@@ -46,6 +46,7 @@ import {
   TableRow,
   Textarea,
   cn,
+  StatusBadge,
 } from '@accounting/ui';
 import { api, describeError } from '@/lib/api/client';
 import {
@@ -63,6 +64,7 @@ import { Can, PageHeader } from '@/components/ui-ext/page';
 import { Amount, DateRange, startOfYear, today } from '@/components/accounting/primitives';
 import { Stat } from '@/components/fixed-assets/shared';
 import { useQuery } from '@tanstack/react-query';
+import { toneOf } from '@/components/status';
 
 type IctFormInput = z.input<typeof createIntercompanySchema>;
 const STATUS_VARIANT: Record<IntercompanyStatus, 'secondary' | 'success' | 'outline'> = {
@@ -172,9 +174,9 @@ export function IntercompanyPage() {
         header: 'Status',
         enableSorting: false,
         cell: ({ row }) => (
-          <Badge variant={STATUS_VARIANT[row.original.status]}>
+          <StatusBadge tone={toneOf(STATUS_VARIANT[row.original.status])}>
             {titleCase(row.original.status)}
-          </Badge>
+          </StatusBadge>
         ),
       },
     ],
@@ -462,7 +464,7 @@ function IntercompanyDetailDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <span className="font-mono">{c.documentNumber}</span>
-            <Badge variant={STATUS_VARIANT[c.status]}>{titleCase(c.status)}</Badge>
+            <StatusBadge tone={toneOf(STATUS_VARIANT[c.status])}>{titleCase(c.status)}</StatusBadge>
           </DialogTitle>
           <DialogDescription>
             {c.transactionDate} · {c.description}
@@ -615,7 +617,7 @@ export function ConsolidationPage() {
         }
       />
       {report.isError ? (
-        <p className="text-sm text-destructive">{describeError(report.error)}</p>
+        <p className="text-sm text-critical">{describeError(report.error)}</p>
       ) : report.isLoading || !r ? (
         <Skeleton className="h-96" />
       ) : (
@@ -696,7 +698,7 @@ export function ConsolidationPage() {
                       key={row.code}
                       className={cn(
                         'hover:bg-transparent',
-                        row.isIntercompany && 'bg-amber-50/60 dark:bg-amber-950/20',
+                        row.isIntercompany && 'bg-warning/8',
                       )}
                       data-testid="consolidation-row"
                     >

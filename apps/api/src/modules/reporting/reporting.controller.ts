@@ -4,6 +4,7 @@ import { createZodDto } from 'nestjs-zod';
 import { P } from '@accounting/types';
 import {
   balanceSheetQuerySchema,
+  cashFlowQuerySchema,
   incomeStatementQuerySchema,
   trialBalanceQuerySchema,
 } from '@accounting/validation';
@@ -16,6 +17,7 @@ import { ReportingService } from './reporting.service';
 class TrialBalanceQueryDto extends createZodDto(trialBalanceQuerySchema) {}
 class IncomeStatementQueryDto extends createZodDto(incomeStatementQuerySchema) {}
 class BalanceSheetQueryDto extends createZodDto(balanceSheetQuerySchema) {}
+class CashFlowQueryDto extends createZodDto(cashFlowQuerySchema) {}
 
 @ApiTags('Reports')
 @Controller('reports')
@@ -40,5 +42,12 @@ export class ReportingController {
   @RequirePermissions(P['reports.view'])
   balanceSheet(@CurrentUser() user: AuthenticatedUser, @Query() query: BalanceSheetQueryDto) {
     return this.service.balanceSheet(user.companyId!, query);
+  }
+
+  @Get('cash-flow')
+  @RequirePermissions(P['reports.view'])
+  @ApiOperation({ summary: 'Cash-flow statement (indirect method) derived from ledger movements' })
+  cashFlow(@CurrentUser() user: AuthenticatedUser, @Query() query: CashFlowQueryDto) {
+    return this.service.cashFlow(user.companyId!, query);
   }
 }

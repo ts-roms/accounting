@@ -73,9 +73,9 @@ export function MatchCard({ cfg, bill }: { cfg: SubledgerConfig; bill: Subledger
             {exceptions.map((e, i) => (
               <li
                 key={`${e.code}-${i}`}
-                className="rounded-md border border-destructive/40 bg-destructive/5 px-2.5 py-1.5"
+                className="rounded-md border border-critical/40 bg-destructive/5 px-2.5 py-1.5"
               >
-                <div className="text-xs font-medium uppercase tracking-wide text-destructive">
+                <div className="text-xs font-medium uppercase tracking-wide text-critical">
                   {titleCase(e.code)}
                 </div>
                 <div>{e.message}</div>
@@ -84,7 +84,7 @@ export function MatchCard({ cfg, bill }: { cfg: SubledgerConfig; bill: Subledger
           </ul>
         )}
         {bill.matchStatus === 'EXCEPTION' ? (
-          <p className="text-xs text-destructive">
+          <p className="text-xs text-critical">
             Payment is on hold until an approver reviews these exceptions.
           </p>
         ) : null}

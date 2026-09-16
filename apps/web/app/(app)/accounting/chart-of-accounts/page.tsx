@@ -5,7 +5,6 @@ import { BookOpenText, Lock, MoreHorizontal, Plus, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { ACCOUNT_MAPPING_KEYS, ACCOUNT_TYPES, P, type AccountType } from '@accounting/types';
 import {
-  Badge,
   Button,
   Card,
   CardContent,
@@ -33,6 +32,7 @@ import {
   TabsList,
   TabsTrigger,
   cn,
+  StatusBadge,
 } from '@accounting/ui';
 import { describeError } from '@/lib/api/client';
 import {
@@ -54,6 +54,7 @@ import {
 } from '@/components/ui-ext/page';
 import { AccountCombobox } from '@/components/accounting/primitives';
 import { AccountDialog } from './account-dialog';
+import { toneOf } from '@/components/status';
 
 const TYPE_VARIANT: Record<
   AccountType,
@@ -65,6 +66,8 @@ const TYPE_VARIANT: Record<
   REVENUE: 'success',
   COST_OF_SALES: 'destructive',
   EXPENSE: 'destructive',
+  OTHER_INCOME: 'success',
+  OTHER_EXPENSE: 'destructive',
 };
 
 export default function ChartOfAccountsPage() {
@@ -200,7 +203,9 @@ export default function ChartOfAccountsPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={TYPE_VARIANT[a.type]}>{titleCase(a.type)}</Badge>
+                        <StatusBadge tone={toneOf(TYPE_VARIANT[a.type])}>
+                          {titleCase(a.type)}
+                        </StatusBadge>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {a.subtype ? titleCase(a.subtype) : '-'}
@@ -209,9 +214,9 @@ export default function ChartOfAccountsPage() {
                         {a.normalBalance === 'DEBIT' ? 'Dr' : 'Cr'}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={a.status === 'ACTIVE' ? 'success' : 'secondary'}>
+                        <StatusBadge tone={toneOf(a.status === 'ACTIVE' ? 'success' : 'secondary')}>
                           {a.status}
-                        </Badge>
+                        </StatusBadge>
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -254,7 +259,7 @@ export default function ChartOfAccountsPage() {
                                 ) : null}
                                 {!a.isSystem ? (
                                   <DropdownMenuItem
-                                    className="text-destructive"
+                                    className="text-critical"
                                     onSelect={() => setConfirm({ account: a, action: 'delete' })}
                                   >
                                     Delete (unused only)

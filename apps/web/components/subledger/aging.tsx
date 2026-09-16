@@ -117,7 +117,7 @@ export function AgingPage({ cfg }: { cfg: SubledgerConfig }) {
                             className={cn(
                               b.key === 'over90' &&
                                 r.buckets[b.key] !== '0.0000' &&
-                                'text-destructive',
+                                'text-critical',
                             )}
                           />
                         </TableCell>
@@ -195,7 +195,7 @@ export function ReconciliationCard({ cfg, asOf }: { cfg: SubledgerConfig; asOf: 
             r.reconciled ? (
               <CheckCircle2 className="h-4 w-4 text-success" />
             ) : (
-              <XCircle className="h-4 w-4 text-destructive" />
+              <XCircle className="h-4 w-4 text-critical" />
             )
           ) : null}
           Subledger vs. control account
@@ -220,14 +220,14 @@ export function ReconciliationCard({ cfg, asOf }: { cfg: SubledgerConfig; asOf: 
             <dd>
               <Amount value={r.ledgerBalance} currency={r.currency} />
             </dd>
-            <dt className={cn('font-medium', r.reconciled ? 'text-success' : 'text-destructive')}>
+            <dt className={cn('font-medium', r.reconciled ? 'text-success' : 'text-critical')}>
               {r.reconciled ? 'Reconciled' : 'Difference'}
             </dt>
             <dd>
               <Amount
                 value={r.difference}
                 currency={r.currency}
-                className={cn('font-semibold', !r.reconciled && 'text-destructive')}
+                className={cn('font-semibold', !r.reconciled && 'text-critical')}
                 zeroAsDash
               />
             </dd>

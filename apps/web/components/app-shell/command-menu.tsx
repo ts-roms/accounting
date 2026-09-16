@@ -2,13 +2,24 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import {
+  BookOpenText,
+  Building2,
   Cable,
+  FileText,
   KeyRound,
+  Loader2,
   LogOut,
+  Moon,
+  PanelLeft,
+  Plus,
+  Receipt,
   RefreshCw,
+  Scale,
   ScrollText,
   ShieldCheck,
+  Sun,
   UserCheck,
+  Users,
   Webhook,
   Zap,
 } from 'lucide-react';
@@ -21,35 +32,176 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
+  CommandShortcut,
+  useTheme,
 } from '@accounting/ui';
 import { NAVIGATION } from '@/lib/navigation';
 import { useSession } from '@/lib/auth/session';
+import { useGlobalSearch } from '@/lib/api/search-hooks';
+import { useSidebar } from './sidebar';
 
 /**
- * Global command palette (Ctrl/Cmd+K). Phase 1 offers navigation and session
- * actions; global record search (customers, invoices, journals...) plugs in
- * here as those modules ship.
+ * Global command palette (Ctrl/Cmd+K) and record search (Ctrl+/).
+ * Commands: create actions, navigation, integration platform, session.
+ * Search: invoices, bills, journals, customers, vendors, accounts by number,
+ * code or name - grouped by category.
  */
 export function CommandMenu({
   open,
   onOpenChange,
+  mode = 'commands',
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  mode?: 'commands' | 'search';
 }) {
   const router = useRouter();
-  const { hasAnyPermission, logout, me, setActiveCompany } = useSession();
+  const { hasAnyPermission, hasPermission, logout, me, setActiveCompany } = useSession();
+  const { setTheme, resolved } = useTheme();
+  const sidebar = useSidebar();
+  const [term, setTerm] = React.useState('');
+  const search = useGlobalSearch(term, open);
+
+  React.useEffect(() => {
+    if (!open) setTerm('');
+  }, [open]);
 
   const go = (href: string) => {
     onOpenChange(false);
     router.push(href);
   };
+  const can = (...keys: Array<keyof typeof P>) => hasAnyPermission(...keys.map((k) => P[k]));
+
+  const createActions = [
+    {
+      label: 'Create journal entry',
+      href: '/accounting/journal-entries/new',
+      icon: FileText,
+      ok: hasPermission(P['journal.create']),
+    },
+    {
+      label: 'Create invoice',
+      href: '/sales/invoices/new',
+      icon: Receipt,
+      ok: hasPermission(P['invoice.create']),
+    },
+    {
+      label: 'Create bill',
+      href: '/purchasing/bills/new',
+      icon: FileText,
+      ok: hasPermission(P['bill.create']),
+    },
+    {
+      label: 'Create customer',
+      href: '/sales/customers?action=create',
+      icon: Users,
+      ok: hasPermission(P['customer.manage']),
+    },
+    {
+      label: 'Create vendor',
+      href: '/purchasing/vendors?action=create',
+      icon: Building2,
+      ok: hasPermission(P['vendor.manage']),
+    },
+    {
+      label: 'Create delegation',
+      href: '/admin/delegations?action=create',
+      icon: ShieldCheck,
+      ok: hasPermission(P['delegation.create']),
+    },
+  ].filter((a) => a.ok);
+
+  const quickOpen = [
+    {
+      label: 'Open general ledger',
+      href: '/accounting/general-ledger',
+      icon: BookOpenText,
+      ok: can('journal.view'),
+    },
+    {
+      label: 'Open trial balance',
+      href: '/accounting/trial-balance',
+      icon: Scale,
+      ok: can('reports.view'),
+    },
+    {
+      label: 'Open integrations',
+      href: '/admin/integrations',
+      icon: Cable,
+      ok: can('integration.view'),
+    },
+  ].filter((a) => a.ok);
+
+  const searching = search.active;
+  const placeholder =
+    mode === 'search'
+      ? 'Search invoice #, journal #, customer, vendor, account...'
+      : 'Type a command, page or record number...';
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange} title="Command menu">
-      <CommandInput placeholder="Type a page name or command..." />
+      <CommandInput
+        placeholder={placeholder}
+        value={term}
+        onValueChange={setTerm}
+        autoFocus
+        data-testid="command-input"
+      />
       <CommandList>
-        <CommandEmpty>No results found.</CommandEmpty>
+        <CommandEmpty>
+          {search.isFetching ? (
+            <span className="inline-flex items-center gap-2">
+              <Loader2 className="size-4 animate-spin" /> Searching…
+            </span>
+          ) : (
+            'No results found.'
+          )}
+        </CommandEmpty>
+
+        {searching && search.categories.length > 0 ? (
+          <>
+            {search.categories.map((cat) => (
+              <CommandGroup key={cat.key} heading={cat.label}>
+                {cat.hits.map((hit) => (
+                  <CommandItem
+                    key={hit.id}
+                    value={`${cat.label} ${hit.title} ${hit.subtitle ?? ''}`}
+                    onSelect={() => go(hit.href)}
+                  >
+                    <span className={hit.mono ? 'font-mono text-xs' : undefined}>{hit.title}</span>
+                    {hit.subtitle ? (
+                      <span className="ml-auto truncate pl-4 text-xs text-muted-foreground">
+                        {hit.subtitle}
+                      </span>
+                    ) : null}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            ))}
+            <CommandSeparator />
+          </>
+        ) : null}
+
+        {createActions.length ? (
+          <CommandGroup heading="Create">
+            {createActions.map((a) => (
+              <CommandItem key={a.href} value={a.label} onSelect={() => go(a.href)}>
+                <Plus /> {a.label}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        ) : null}
+
+        {quickOpen.length ? (
+          <CommandGroup heading="Open">
+            {quickOpen.map((a) => (
+              <CommandItem key={a.href} value={a.label} onSelect={() => go(a.href)}>
+                <a.icon /> {a.label}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        ) : null}
+
         {NAVIGATION.map((section) => {
           const items = section.items.filter((i) => hasAnyPermission(...(i.permissions ?? [])));
           if (items.length === 0) return null;
@@ -58,10 +210,13 @@ export function CommandMenu({
               {items.map((item) => (
                 <CommandItem
                   key={item.href}
-                  value={`${section.title} ${item.title}`}
+                  value={`${section.title} ${item.group ?? ''} ${item.title}`}
                   onSelect={() => go(item.href)}
                 >
                   {item.icon ? <item.icon /> : null}
+                  {item.group ? (
+                    <span className="text-muted-foreground">{item.group} /</span>
+                  ) : null}
                   {item.title}
                   {item.phase ? (
                     <span className="ml-auto text-xs text-muted-foreground">
@@ -73,16 +228,12 @@ export function CommandMenu({
             </CommandGroup>
           );
         })}
-        {hasAnyPermission(
-          P['integration.manage'],
-          P['api-key.manage'],
-          P['delegation.create'],
-          P['delegation.view'],
-        ) ? (
+
+        {can('integration.manage', 'api-key.manage', 'delegation.create', 'delegation.view') ? (
           <>
             <CommandSeparator />
             <CommandGroup heading="Integration platform">
-              {hasAnyPermission(P['integration.manage']) ? (
+              {can('integration.manage') ? (
                 <>
                   <CommandItem
                     value="connect integration provider"
@@ -104,7 +255,7 @@ export function CommandMenu({
                   </CommandItem>
                 </>
               ) : null}
-              {hasAnyPermission(P['integration.view']) ? (
+              {can('integration.view') ? (
                 <CommandItem
                   value="view integration logs"
                   onSelect={() => go('/admin/integration-logs')}
@@ -112,7 +263,7 @@ export function CommandMenu({
                   <ScrollText /> View integration logs
                 </CommandItem>
               ) : null}
-              {hasAnyPermission(P['api-key.manage']) ? (
+              {can('api-key.manage') ? (
                 <>
                   <CommandItem
                     value="create api key"
@@ -125,7 +276,7 @@ export function CommandMenu({
                   </CommandItem>
                 </>
               ) : null}
-              {hasAnyPermission(P['webhook.manage']) ? (
+              {can('webhook.manage') ? (
                 <CommandItem
                   value="create webhook subscription"
                   onSelect={() => go('/admin/webhooks?action=create')}
@@ -133,15 +284,7 @@ export function CommandMenu({
                   <Webhook /> Create webhook
                 </CommandItem>
               ) : null}
-              {hasAnyPermission(P['delegation.create']) ? (
-                <CommandItem
-                  value="create delegation delegate authority"
-                  onSelect={() => go('/admin/delegations?action=create')}
-                >
-                  <ShieldCheck /> Create delegation
-                </CommandItem>
-              ) : null}
-              {hasAnyPermission(P['delegation.view']) ? (
+              {can('delegation.view') ? (
                 <>
                   <CommandItem
                     value="view active delegations"
@@ -160,6 +303,7 @@ export function CommandMenu({
             </CommandGroup>
           </>
         ) : null}
+
         {me.companies.length > 1 ? (
           <>
             <CommandSeparator />
@@ -179,7 +323,30 @@ export function CommandMenu({
             </CommandGroup>
           </>
         ) : null}
+
         <CommandSeparator />
+        <CommandGroup heading="Preferences">
+          <CommandItem
+            value="toggle theme dark light"
+            onSelect={() => {
+              setTheme(resolved === 'dark' ? 'light' : 'dark');
+              onOpenChange(false);
+            }}
+          >
+            {resolved === 'dark' ? <Sun /> : <Moon />}
+            Switch to {resolved === 'dark' ? 'light' : 'dark'} theme
+          </CommandItem>
+          <CommandItem
+            value="toggle sidebar collapse expand"
+            onSelect={() => {
+              sidebar.toggle();
+              onOpenChange(false);
+            }}
+          >
+            <PanelLeft /> {sidebar.collapsed ? 'Expand' : 'Collapse'} sidebar
+            <CommandShortcut>Ctrl B</CommandShortcut>
+          </CommandItem>
+        </CommandGroup>
         <CommandGroup heading="Session">
           <CommandItem value="sign out logout" onSelect={() => void logout()}>
             <LogOut /> Sign out

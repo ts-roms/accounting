@@ -8,6 +8,7 @@ import {
 } from '@accounting/types';
 import type {
   BalanceSheetQuery,
+  CashFlowQuery,
   IncomeStatementQuery,
   TrialBalanceQuery,
 } from '@accounting/validation';
@@ -18,6 +19,9 @@ import {
 } from '@/modules/accounting/ledger/general-ledger.service';
 import { DRIZZLE, type Database } from '@/database/database.types';
 import { accounts, type Account } from '@/database/schema';
+import { buildCashFlowStatement, type CashFlowStatement } from './cash-flow.logic';
+
+export type { CashFlowStatement } from './cash-flow.logic';
 
 /** Branch and dimension filters forwarded to the ledger. */
 const dims = (q: {
@@ -83,7 +87,13 @@ export interface IncomeStatementReport {
   costOfSales: StatementSection;
   grossProfit: string;
   expenses: StatementSection;
+  /** Gross profit - operating expenses. */
+  operatingIncome: string;
+  otherIncome: StatementSection;
+  otherExpenses: StatementSection;
   netIncome: string;
+  /** Same structure for the comparative window, when one was requested. */
+  comparative?: Omit<IncomeStatementReport, 'comparative'>;
 }
 
 export interface BalanceSheetReport {
@@ -217,11 +227,16 @@ export class ReportingService {
     const revenue = section('revenue', 'Revenue', 'REVENUE');
     const costOfSales = section('costOfSales', 'Cost of sales', 'COST_OF_SALES');
     const expenses = section('expenses', 'Operating expenses', 'EXPENSE');
+    const otherIncome = section('otherIncome', 'Other income', 'OTHER_INCOME');
+    const otherExpenses = section('otherExpenses', 'Other expenses', 'OTHER_EXPENSE');
     const grossProfit = Money.of(revenue.total, currency).subtract(
       Money.of(costOfSales.total, currency),
     );
-    const netIncome = grossProfit.subtract(Money.of(expenses.total, currency));
-    return {
+    const operatingIncome = grossProfit.subtract(Money.of(expenses.total, currency));
+    const netIncome = operatingIncome
+      .add(Money.of(otherIncome.total, currency))
+      .subtract(Money.of(otherExpenses.total, currency));
+    const report: IncomeStatementReport = {
       from: query.from,
       to: query.to,
       currency,
@@ -229,8 +244,59 @@ export class ReportingService {
       costOfSales,
       grossProfit: grossProfit.toString(),
       expenses,
+      operatingIncome: operatingIncome.toString(),
+      otherIncome,
+      otherExpenses,
       netIncome: netIncome.toString(),
     };
+    if (query.compareFrom && query.compareTo) {
+      const { compareFrom: _f, compareTo: _t, ...rest } = query;
+      report.comparative = await this.incomeStatement(companyId, {
+        ...rest,
+        from: query.compareFrom,
+        to: query.compareTo,
+      });
+    }
+    return report;
+  }
+
+  /**
+   * Indirect cash-flow statement from ledger movements. Year-end CLOSING
+   * journals are excluded: they only move unclosed profit into retained
+   * earnings and would otherwise cancel net income in a window that spans a
+   * year end.
+   */
+  async cashFlow(companyId: string, query: CashFlowQuery): Promise<CashFlowStatement> {
+    const currency = await this.ledger.currency(companyId);
+    const dayBefore = previousDay(query.from);
+    const [opening, period, chart] = await Promise.all([
+      this.ledger.activity({
+        companyId,
+        to: dayBefore,
+        branchId: query.branchId,
+        excludeJournalTypes: ['CLOSING'],
+      }),
+      this.ledger.activity({
+        companyId,
+        from: query.from,
+        to: query.to,
+        branchId: query.branchId,
+        excludeJournalTypes: ['CLOSING'],
+      }),
+      this.db
+        .select()
+        .from(accounts)
+        .where(eq(accounts.companyId, companyId))
+        .orderBy(asc(accounts.code)),
+    ]);
+    return buildCashFlowStatement({
+      chart,
+      opening,
+      period,
+      currency,
+      from: query.from,
+      to: query.to,
+    });
   }
 
   async balanceSheet(companyId: string, query: BalanceSheetQuery): Promise<BalanceSheetReport> {

@@ -4,7 +4,6 @@ import { Check, ChevronsUpDown } from 'lucide-react';
 import { formatMoney } from '@accounting/money';
 import type { AccountSubtype, AccountType, JournalStatus } from '@accounting/types';
 import {
-  Badge,
   Button,
   Command,
   CommandEmpty,
@@ -18,9 +17,11 @@ import {
   PopoverContent,
   PopoverTrigger,
   cn,
+  StatusBadge,
 } from '@accounting/ui';
 import { useAccounts } from '@/lib/api/accounting-hooks';
 import type { AccountNode } from '@/lib/api/types';
+import { toneOf } from '@/components/status';
 
 /** Right-aligned tabular money cell. Zero renders muted; negatives in parentheses. */
 export function Amount({
@@ -29,11 +30,17 @@ export function Amount({
   className,
   zeroAsDash = false,
 }: {
-  value: string;
+  value: string | null | undefined;
   currency?: string;
   className?: string;
   zeroAsDash?: boolean;
 }) {
+  // A missing figure renders as a dash instead of throwing inside a table.
+  if (value === null || value === undefined || value === '') {
+    return (
+      <span className={cn('tabular block text-right text-muted-foreground', className)}>-</span>
+    );
+  }
   const zero = /^-?0(\.0+)?$/.test(value);
   return (
     <span className={cn('tabular block text-right', zero && 'text-muted-foreground', className)}>
@@ -56,7 +63,7 @@ const STATUS_VARIANT: Record<
 };
 
 export function JournalStatusBadge({ status }: { status: JournalStatus }) {
-  return <Badge variant={STATUS_VARIANT[status]}>{status}</Badge>;
+  return <StatusBadge tone={toneOf(STATUS_VARIANT[status])}>{status}</StatusBadge>;
 }
 
 /** Searchable account picker (postable accounts by default). */

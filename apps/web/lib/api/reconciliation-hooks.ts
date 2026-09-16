@@ -22,10 +22,11 @@ import type {
 const ROOT = 'reconciliations';
 const key = (...rest: unknown[]) => [ROOT, getActiveCompanyId() ?? 'none', ...rest] as const;
 
-export const useReconciliationSummary = (asOf: string) =>
+export const useReconciliationSummary = (asOf: string, enabled = true) =>
   useQuery({
     queryKey: key('summary', asOf),
     queryFn: () => api.get<ReconciliationSummary>('/reconciliations/summary', { query: { asOf } }),
+    enabled,
   });
 
 export const useReconciliations = (query: Partial<ListReconciliationsQuery>) =>

@@ -18,7 +18,6 @@ import {
 } from '@accounting/types';
 import { createWorkflowSchema, type CreateWorkflowInput } from '@accounting/validation';
 import {
-  Badge,
   Button,
   Card,
   CardContent,
@@ -54,6 +53,9 @@ import {
   TabsList,
   TabsTrigger,
   Textarea,
+  StatusBadge,
+  StepTimeline,
+  type TimelineStep,
 } from '@accounting/ui';
 import { describeError } from '@/lib/api/client';
 import { DelegatedAuthorityNotice } from '@/components/delegations/delegated-authority-notice';
@@ -71,6 +73,7 @@ import { useSession } from '@/lib/auth/session';
 import { DataTable, useTableState } from '@/components/ui-ext/data-table';
 import { Can, EmptyState, PageHeader, TableSkeleton } from '@/components/ui-ext/page';
 import { Amount } from '@/components/accounting/primitives';
+import { toneOf } from '@/components/status';
 
 type WorkflowFormInput = z.input<typeof createWorkflowSchema>;
 
@@ -160,9 +163,9 @@ export function WorkflowsPage() {
                     </TableCell>
                     <TableCell className="text-right tabular">{w.openRequests}</TableCell>
                     <TableCell>
-                      <Badge variant={w.status === 'ACTIVE' ? 'success' : 'secondary'}>
+                      <StatusBadge tone={toneOf(w.status === 'ACTIVE' ? 'success' : 'secondary')}>
                         {w.status}
-                      </Badge>
+                      </StatusBadge>
                     </TableCell>
                     {canManage ? (
                       <TableCell className="text-right">
@@ -574,9 +577,9 @@ export function ApprovalsPage() {
         header: 'Status',
         enableSorting: false,
         cell: ({ row }) => (
-          <Badge variant={STATUS_VARIANT[row.original.status]}>
+          <StatusBadge tone={toneOf(STATUS_VARIANT[row.original.status])}>
             {titleCase(row.original.status)}
-          </Badge>
+          </StatusBadge>
         ),
       },
     ],
@@ -688,62 +691,74 @@ function ApprovalDialog({
                 >
                   {r.documentNumber}
                 </Link>
-                <Badge variant={STATUS_VARIANT[r.status]}>{titleCase(r.status)}</Badge>
+                <StatusBadge tone={toneOf(STATUS_VARIANT[r.status])}>
+                  {titleCase(r.status)}
+                </StatusBadge>
               </DialogTitle>
               <DialogDescription>
                 {titleCase(r.documentType)} · {r.amount} {r.currency} · {r.workflowName} · requested
                 by {r.requestedByName ?? '-'} {formatDateTime(r.createdAt)}
               </DialogDescription>
             </DialogHeader>
-            <ol className="space-y-2 text-sm">
-              {r.steps.map((s, i) => {
-                const decisions = r.decisions.filter((d) => d.step === i);
-                const state =
-                  i < r.currentStep || r.status === 'APPROVED'
-                    ? 'done'
-                    : i === r.currentStep && r.status === 'PENDING'
-                      ? 'current'
-                      : decisions.some((d) => d.decision === 'REJECT')
-                        ? 'rejected'
-                        : 'waiting';
-                return (
-                  <li key={i} className="rounded-md border p-2" data-testid="approval-step">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">
-                        {i + 1}. {s.name}{' '}
-                        <span className="font-mono text-xs text-muted-foreground">
+            <StepTimeline
+              animate
+              steps={[
+                {
+                  key: 'created',
+                  label: 'Submitted',
+                  state: 'complete',
+                  meta: `${formatDateTime(r.createdAt)}${r.requestedByName ? ` · ${r.requestedByName}` : ''}`,
+                },
+                ...r.steps.map((s, i): TimelineStep => {
+                  const decisions = r.decisions.filter((d) => d.step === i);
+                  const rejected = decisions.some((d) => d.decision === 'REJECT');
+                  const state: TimelineStep['state'] = rejected
+                    ? 'failed'
+                    : i < r.currentStep || r.status === 'APPROVED'
+                      ? 'complete'
+                      : i === r.currentStep && r.status === 'PENDING'
+                        ? 'current'
+                        : r.status === 'CANCELLED'
+                          ? 'skipped'
+                          : 'upcoming';
+                  return {
+                    key: `step-${i}`,
+                    label: (
+                      <span data-testid="approval-step" data-state={state}>
+                        {s.name}{' '}
+                        <span className="font-mono text-xs font-normal text-muted-foreground">
                           {s.requiredPermission}
                         </span>
                       </span>
-                      <Badge
-                        variant={
-                          state === 'done'
-                            ? 'success'
-                            : state === 'current'
-                              ? 'warning'
-                              : state === 'rejected'
-                                ? 'destructive'
-                                : 'outline'
-                        }
-                      >
-                        {state}
-                      </Badge>
-                    </div>
-                    {decisions.map((d) => (
-                      <div key={d.id} className="mt-1 text-xs text-muted-foreground">
-                        {d.decision === 'APPROVE' ? (
-                          <Check className="mr-1 inline h-3 w-3 text-emerald-600" />
-                        ) : (
-                          <X className="mr-1 inline h-3 w-3 text-destructive" />
-                        )}
-                        {d.decidedByName ?? d.decidedBy} · {formatDateTime(d.decidedAt)}
-                        {d.comment ? ` · ${d.comment}` : ''}
-                      </div>
-                    ))}
-                  </li>
-                );
-              })}
-            </ol>
+                    ),
+                    state,
+                    meta:
+                      decisions.length > 0
+                        ? decisions
+                            .map(
+                              (d) =>
+                                `${d.decision === 'APPROVE' ? 'Approved' : 'Rejected'} by ${d.decidedByName ?? d.decidedBy} · ${formatDateTime(d.decidedAt)}${d.comment ? ` · ${d.comment}` : ''}`,
+                            )
+                            .join(' / ')
+                        : s.minApprovers > 1
+                          ? `${s.minApprovers} approvers required`
+                          : undefined,
+                  };
+                }),
+                {
+                  key: 'done',
+                  label: r.status === 'REJECTED' ? 'Rejected' : r.status === 'CANCELLED' ? 'Cancelled' : 'Approved',
+                  state:
+                    r.status === 'APPROVED'
+                      ? 'complete'
+                      : r.status === 'REJECTED'
+                        ? 'failed'
+                        : r.status === 'CANCELLED'
+                          ? 'skipped'
+                          : 'upcoming',
+                },
+              ]}
+            />
             {r.canDecide && r.steps[r.currentStep] ? (
               <DelegatedAuthorityNotice
                 permission={r.steps[r.currentStep]!.requiredPermission as PermissionKey}

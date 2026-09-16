@@ -16,6 +16,10 @@ const account = (overrides: Partial<Account>): Account => ({
   isIntercompany: false,
   isSystem: false,
   currency: null,
+  isReconciliation: false,
+  cashFlowActivity: null,
+  ownerUserId: null,
+  allowedBranchIds: [],
   description: null,
   status: 'ACTIVE',
   createdAt: new Date(),
@@ -29,6 +33,7 @@ const fakeTx = (rows: Account[]): DbExecutor =>
 
 describe('AccountingPostingService.validateLines', () => {
   const service = new AccountingPostingService(
+    {} as never,
     {} as never,
     {} as never,
     {} as never,
@@ -117,6 +122,7 @@ const periodTx = (status: string): DbExecutor =>
 
 describe('AccountingPostingService period states and authority', () => {
   const service = new AccountingPostingService(
+    {} as never,
     {} as never,
     {} as never,
     {} as never,

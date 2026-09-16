@@ -398,14 +398,14 @@ export function PaymentForm({
                     currency={currency}
                     className={
                       unallocated.isNegative()
-                        ? 'inline font-semibold text-destructive'
+                        ? 'inline font-semibold text-critical'
                         : 'inline font-semibold'
                     }
                   />
                 </span>
               </div>
               {unallocated.isNegative() ? (
-                <p className="mt-1 text-right text-xs text-destructive">
+                <p className="mt-1 text-right text-xs text-critical">
                   Allocations exceed the {cfg.payment.singular.toLowerCase()} amount.
                 </p>
               ) : null}

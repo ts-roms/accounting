@@ -38,6 +38,7 @@ import {
   TabsList,
   TabsTrigger,
   Textarea,
+  StatusBadge,
 } from '@accounting/ui';
 import { describeError } from '@/lib/api/client';
 import {
@@ -59,6 +60,7 @@ import { useSession } from '@/lib/auth/session';
 import { DataTable, useTableState } from '@/components/ui-ext/data-table';
 import { Can, ConfirmDialog, EmptyState, PageHeader } from '@/components/ui-ext/page';
 import { Stat } from '@/components/fixed-assets/shared';
+import { toneOf } from '@/components/status';
 
 const STATUS_VARIANT: Record<
   DelegationStatus,
@@ -73,7 +75,7 @@ const STATUS_VARIANT: Record<
 };
 
 export function DelegationStatusBadge({ status }: { status: DelegationStatus }) {
-  return <Badge variant={STATUS_VARIANT[status]}>{titleCase(status)}</Badge>;
+  return <StatusBadge tone={toneOf(STATUS_VARIANT[status])}>{titleCase(status)}</StatusBadge>;
 }
 
 type Section = 'mine' | 'created' | 'approve' | 'active' | 'pending' | 'expired';

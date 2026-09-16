@@ -97,6 +97,10 @@ export class AccountsService {
             parentId: parent?.id ?? null,
             currency: input.currency ?? null,
             isHeader: input.isHeader,
+            isReconciliation: input.isReconciliation,
+            cashFlowActivity: input.cashFlowActivity ?? null,
+            ownerUserId: input.ownerUserId ?? null,
+            allowedBranchIds: input.allowedBranchIds ?? [],
             description: input.description ?? null,
           })
           .returning();
@@ -174,6 +178,13 @@ export class AccountsService {
           parentId: input.parentId === undefined ? existing.parentId : input.parentId,
           description: input.description === undefined ? existing.description : input.description,
           status: input.status ?? existing.status,
+          isReconciliation: input.isReconciliation ?? existing.isReconciliation,
+          cashFlowActivity:
+            input.cashFlowActivity === undefined
+              ? existing.cashFlowActivity
+              : input.cashFlowActivity,
+          ownerUserId: input.ownerUserId === undefined ? existing.ownerUserId : input.ownerUserId,
+          allowedBranchIds: input.allowedBranchIds ?? existing.allowedBranchIds,
         })
         .where(eq(accounts.id, id))
         .returning();

@@ -1,8 +1,9 @@
 'use client';
-/* Page-level building blocks: header, empty state, loading skeleton, confirm dialog, permission gate. */
+/*
+ * Page-level building blocks: header, confirm dialog, permission gate, and
+ * re-exports of the shared feedback states so existing imports keep working.
+ */
 import * as React from 'react';
-import type { LucideIcon } from 'lucide-react';
-import { Inbox } from 'lucide-react';
 import type { PermissionKey } from '@accounting/types';
 import {
   Button,
@@ -12,103 +13,85 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  Skeleton,
   cn,
 } from '@accounting/ui';
 import { useSession } from '@/lib/auth/session';
+
+export {
+  EmptyState,
+  ErrorState,
+  SuccessState,
+  TableSkeleton,
+  CardSkeleton,
+  FormSkeleton,
+  ChartSkeleton,
+  MetricSkeleton,
+  DashboardSkeleton,
+} from '@accounting/ui';
 
 export function PageHeader({
   title,
   description,
   actions,
+  eyebrow,
   className,
 }: {
   title: React.ReactNode;
   description?: React.ReactNode;
   actions?: React.ReactNode;
+  /** Small label above the title (module / context). */
+  eyebrow?: React.ReactNode;
   className?: string;
 }) {
   return (
     <div className={cn('flex flex-wrap items-start justify-between gap-3', className)}>
-      <div className="space-y-0.5">
-        <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
+      <div className="min-w-0 space-y-0.5">
+        {eyebrow ? <div className="type-label">{eyebrow}</div> : null}
+        <h1 className="type-h1 flex flex-wrap items-center gap-2">{title}</h1>
         {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
       </div>
-      {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
+      {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </div>
   );
 }
 
-export function EmptyState({
-  icon: Icon = Inbox,
-  title,
-  description,
-  action,
-  className,
-}: {
-  icon?: LucideIcon;
-  title: string;
-  description?: string;
-  action?: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        'flex flex-col items-center justify-center rounded-lg border border-dashed px-6 py-12 text-center',
-        className,
-      )}
-    >
-      <Icon className="mb-3 h-8 w-8 text-muted-foreground" />
-      <p className="text-sm font-medium">{title}</p>
-      {description ? (
-        <p className="mt-1 max-w-sm text-sm text-muted-foreground">{description}</p>
-      ) : null}
-      {action ? <div className="mt-4">{action}</div> : null}
-    </div>
-  );
-}
-
-export function TableSkeleton({ rows = 6, columns = 5 }: { rows?: number; columns?: number }) {
-  return (
-    <div className="space-y-2 p-3">
-      {Array.from({ length: rows }).map((_, r) => (
-        <div key={r} className="flex gap-3">
-          {Array.from({ length: columns }).map((_, c) => (
-            <Skeleton key={c} className="h-6 flex-1" />
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
-
+/**
+ * Confirmation for consequential actions. Destructive confirmations state the
+ * consequence in the description and use the destructive button style.
+ */
 export function ConfirmDialog({
   open,
   onOpenChange,
   title,
   description,
   confirmLabel = 'Confirm',
+  loadingLabel,
   destructive = false,
   loading = false,
   onConfirm,
+  children,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
   description?: React.ReactNode;
   confirmLabel?: string;
+  /** Label while the action runs, e.g. "Posting..." */
+  loadingLabel?: string;
   destructive?: boolean;
   loading?: boolean;
   onConfirm: () => void | Promise<void>;
+  /** Optional body (e.g. an OperationProgress) rendered between header and footer. */
+  children?: React.ReactNode;
 }) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(o) => (!o && loading ? undefined : onOpenChange(o))}>
       <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {description ? <DialogDescription>{description}</DialogDescription> : null}
         </DialogHeader>
+        {children}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
             Cancel
@@ -117,6 +100,8 @@ export function ConfirmDialog({
             variant={destructive ? 'destructive' : 'default'}
             onClick={() => void onConfirm()}
             loading={loading}
+            loadingText={loadingLabel}
+            autoFocus
           >
             {confirmLabel}
           </Button>

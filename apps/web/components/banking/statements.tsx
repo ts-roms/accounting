@@ -93,7 +93,7 @@ export function BankStatementsPage() {
             <span className="text-xs">
               {s.matchedCount}/{s.lineCount} matched
               {s.exceptionCount > 0 ? (
-                <span className="ml-1 text-destructive">· {s.exceptionCount} exceptions</span>
+                <span className="ml-1 text-critical">· {s.exceptionCount} exceptions</span>
               ) : null}
               {s.unmatchedCount > 0 ? (
                 <span className="ml-1 text-muted-foreground">· {s.unmatchedCount} unmatched</span>
@@ -368,7 +368,7 @@ export function ImportStatementPage() {
             </div>
             {expectedClosing ? (
               <p
-                className={`text-xs ${closingOk === false ? 'text-destructive' : 'text-muted-foreground'}`}
+                className={`text-xs ${closingOk === false ? 'text-critical' : 'text-muted-foreground'}`}
               >
                 Opening + {parsed?.lines.length ?? 0} lines = {expectedClosing.toString()}
                 {closingOk === false ? ' — does not equal the closing balance.' : ''}

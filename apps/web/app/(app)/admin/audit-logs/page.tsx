@@ -17,12 +17,14 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  StatusBadge,
 } from '@accounting/ui';
 import { useAuditLogs } from '@/lib/api/hooks';
 import type { AuditLog } from '@/lib/api/types';
 import { formatDateTime } from '@/lib/format';
 import { DataTable, useTableState } from '@/components/ui-ext/data-table';
 import { EmptyState, PageHeader } from '@/components/ui-ext/page';
+import { toneOf } from '@/components/status';
 
 const ACTION_VARIANT: Partial<
   Record<AuditAction, 'success' | 'destructive' | 'warning' | 'secondary'>
@@ -74,9 +76,9 @@ function AuditLogsContent() {
         accessorKey: 'action',
         header: 'Action',
         cell: ({ row }) => (
-          <Badge variant={ACTION_VARIANT[row.original.action] ?? 'secondary'}>
+          <StatusBadge tone={toneOf(ACTION_VARIANT[row.original.action] ?? 'secondary')}>
             {row.original.action}
-          </Badge>
+          </StatusBadge>
         ),
       },
       { accessorKey: 'module', header: 'Module' },
@@ -180,9 +182,9 @@ function AuditLogsContent() {
             <>
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
-                  <Badge variant={ACTION_VARIANT[detail.action] ?? 'secondary'}>
+                  <StatusBadge tone={toneOf(ACTION_VARIANT[detail.action] ?? 'secondary')}>
                     {detail.action}
-                  </Badge>
+                  </StatusBadge>
                   {detail.entityType}
                 </DialogTitle>
                 <DialogDescription>{formatDateTime(detail.occurredAt)}</DialogDescription>

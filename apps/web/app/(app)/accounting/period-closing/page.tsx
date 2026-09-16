@@ -4,7 +4,6 @@ import { CalendarPlus, Lock, LockKeyhole, LockOpen, ShieldAlert } from 'lucide-r
 import { toast } from 'sonner';
 import { P } from '@accounting/types';
 import {
-  Badge,
   Button,
   Card,
   CardContent,
@@ -26,6 +25,7 @@ import {
   TableHeader,
   TableRow,
   Textarea,
+  StatusBadge,
 } from '@accounting/ui';
 import { describeError } from '@/lib/api/client';
 import {
@@ -38,6 +38,7 @@ import type { FiscalPeriod, FiscalYear } from '@/lib/api/types';
 import { useSession } from '@/lib/auth/session';
 import { formatDateTime } from '@/lib/format';
 import { Can, ConfirmDialog, EmptyState, PageHeader } from '@/components/ui-ext/page';
+import { toneOf } from '@/components/status';
 
 type PeriodAction = 'soft-close' | 'close' | 'lock' | 'reopen';
 const CLOSED_STATES = new Set<FiscalPeriod['status']>(['CLOSED', 'LOCKED']);
@@ -136,9 +137,9 @@ export default function PeriodClosingPage() {
               <div className="space-y-1">
                 <CardTitle className="flex items-center gap-2">
                   {year.name}
-                  <Badge variant={year.status === 'CLOSED' ? 'secondary' : 'success'}>
+                  <StatusBadge tone={toneOf(year.status === 'CLOSED' ? 'secondary' : 'success')}>
                     {year.status}
-                  </Badge>
+                  </StatusBadge>
                 </CardTitle>
                 <CardDescription>
                   {year.startDate} to {year.endDate}
@@ -185,9 +186,12 @@ export default function PeriodClosingPage() {
                           {p.startDate} - {p.endDate}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={STATUS_VARIANT[p.status]} data-testid="period-status">
+                          <StatusBadge
+                            tone={toneOf(STATUS_VARIANT[p.status])}
+                            data-testid="period-status"
+                          >
                             {p.status.replace('_', ' ')}
-                          </Badge>
+                          </StatusBadge>
                           {p.reopenReason ? (
                             <div className="mt-0.5 text-xs text-muted-foreground">
                               reopened: {p.reopenReason}

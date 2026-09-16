@@ -523,7 +523,7 @@ function AllocateDialog({
             <Amount
               value={remaining.toString()}
               currency={currency}
-              className={remaining.isNegative() ? 'inline text-destructive' : 'inline'}
+              className={remaining.isNegative() ? 'inline text-critical' : 'inline'}
             />
           </div>
           <Button variant="outline" onClick={() => onOpenChange(false)}>

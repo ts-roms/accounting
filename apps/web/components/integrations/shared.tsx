@@ -9,7 +9,6 @@ import type {
   WebhookDeliveryStatus,
 } from '@accounting/types';
 import {
-  Badge,
   Button,
   Dialog,
   DialogContent,
@@ -17,8 +16,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  StatusBadge,
 } from '@accounting/ui';
 import { titleCase } from '@/lib/format';
+import { toneOf } from '@/components/status';
 
 type Variant = 'secondary' | 'warning' | 'success' | 'outline' | 'destructive' | 'default';
 
@@ -55,12 +56,13 @@ const DELIVERY_VARIANT: Record<WebhookDeliveryStatus, Variant> = {
 
 export function IntegrationStatusBadge({ status }: { status: IntegrationStatus }) {
   return (
-    <Badge variant={STATUS_VARIANT[status]} data-testid="integration-status">
-      {status === 'SYNCING' ? (
-        <span className="mr-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
-      ) : null}
+    <StatusBadge
+      tone={toneOf(STATUS_VARIANT[status])}
+      active={status === 'SYNCING' || status === 'CONNECTING'}
+      data-testid="integration-status"
+    >
       {titleCase(status)}
-    </Badge>
+    </StatusBadge>
   );
 }
 export function HealthBadge({
@@ -71,19 +73,19 @@ export function HealthBadge({
   score?: number | null;
 }) {
   return (
-    <Badge variant={HEALTH_VARIANT[status]}>
+    <StatusBadge tone={toneOf(HEALTH_VARIANT[status])}>
       {titleCase(status)}
       {score !== null && score !== undefined ? (
         <span className="ml-1 font-mono">{score}</span>
       ) : null}
-    </Badge>
+    </StatusBadge>
   );
 }
 export function JobStatusBadge({ status }: { status: SyncJobStatus }) {
-  return <Badge variant={JOB_VARIANT[status]}>{titleCase(status)}</Badge>;
+  return <StatusBadge tone={toneOf(JOB_VARIANT[status])}>{titleCase(status)}</StatusBadge>;
 }
 export function DeliveryStatusBadge({ status }: { status: WebhookDeliveryStatus }) {
-  return <Badge variant={DELIVERY_VARIANT[status]}>{titleCase(status)}</Badge>;
+  return <StatusBadge tone={toneOf(DELIVERY_VARIANT[status])}>{titleCase(status)}</StatusBadge>;
 }
 
 /** Copy-to-clipboard with a brief confirmation (the only animation the secret dialog uses). */

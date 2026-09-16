@@ -117,7 +117,7 @@ export function DocumentsPage({
           <span className="whitespace-nowrap">
             {row.original.dueDate}
             {row.original.daysOverdue > 0 ? (
-              <span className="ml-1 text-xs text-destructive">+{row.original.daysOverdue}d</span>
+              <span className="ml-1 text-xs text-critical">+{row.original.daysOverdue}d</span>
             ) : null}
           </span>
         ),
@@ -173,6 +173,8 @@ export function DocumentsPage({
         columns={columns}
         data={documents.data}
         isLoading={documents.isLoading}
+        error={documents.error}
+        onRetry={() => void documents.refetch()}
         isFetching={documents.isFetching}
         pagination={table.pagination}
         sorting={table.sorting}

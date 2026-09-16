@@ -46,6 +46,7 @@ import {
   TableHeader,
   TableRow,
   Textarea,
+  StatusBadge,
 } from '@accounting/ui';
 import { describeError } from '@/lib/api/client';
 import {
@@ -65,6 +66,7 @@ import { Amount, today } from '@/components/accounting/primitives';
 import { trimAmount } from '@/components/subledger/document-detail';
 import { parseSerials, ProductCombobox, WarehouseSelect } from './pickers';
 import { PRODUCTS_PATH } from './products';
+import { toneOf } from '@/components/status';
 
 export interface StockDocumentConfig {
   type: StockDocumentType;
@@ -176,7 +178,9 @@ export function StockDocumentsPage({ cfg }: { cfg: StockDocumentConfig }) {
         header: 'Status',
         enableSorting: false,
         cell: ({ row }) => (
-          <Badge variant={STATUS_VARIANT[row.original.status]}>{row.original.status}</Badge>
+          <StatusBadge tone={toneOf(STATUS_VARIANT[row.original.status])}>
+            {row.original.status}
+          </StatusBadge>
         ),
       },
     ],
@@ -640,7 +644,7 @@ export function StockDocumentDetailPage({ cfg, id }: { cfg: StockDocumentConfig;
         title={
           <span className="flex items-center gap-2">
             <span className="font-mono">{d.documentNumber}</span>
-            <Badge variant={STATUS_VARIANT[d.status]}>{d.status}</Badge>
+            <StatusBadge tone={toneOf(STATUS_VARIANT[d.status])}>{d.status}</StatusBadge>
             {d.reason ? <Badge variant="outline">{titleCase(d.reason)}</Badge> : null}
           </span>
         }
@@ -737,7 +741,7 @@ export function StockDocumentDetailPage({ cfg, id }: { cfg: StockDocumentConfig;
                       </>
                     ) : null}
                     <TableCell
-                      className={`tabular text-right ${cfg.type !== 'TRANSFER' && l.direction === 'OUT' ? 'text-destructive' : ''}`}
+                      className={`tabular text-right ${cfg.type !== 'TRANSFER' && l.direction === 'OUT' ? 'text-critical' : ''}`}
                     >
                       {cfg.type !== 'TRANSFER' ? (l.direction === 'OUT' ? '-' : '+') : ''}
                       {qty(l.quantity)} {l.unitOfMeasure}
