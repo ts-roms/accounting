@@ -217,6 +217,17 @@ export const OUTBOUND_EVENT_TYPES = [
   'inventory.issued',
   'bank.transaction.imported',
   'bank.transaction.matched',
+  'bank_transfer.approved',
+  'bank_transfer.sent',
+  'bank_transfer.settled',
+  'payment_file.generated',
+  'payment_file.transmitted',
+  'payment_file.acknowledged',
+  'payment_file.rejected',
+  'petty_cash.voucher_posted',
+  'petty_cash.replenished',
+  'cash.below_minimum',
+  'cash.forecast_shortfall',
   'period.closed',
   'webhook.test',
 ] as const;
@@ -307,6 +318,11 @@ export const API_SCOPE_DEFINITIONS = [
     'purchase-orders:write',
     'Create draft purchase orders (never approves them)',
     ['purchase-order.view', 'vendor.view', 'purchase-order.create'],
+  ],
+  [
+    'treasury:read',
+    'Read cash position, forecast, transfers and payment files',
+    ['treasury.view', 'bank-account.view'],
   ],
   [
     'payment-runs:read',
@@ -411,5 +427,12 @@ export const NOTIFICATION_EVENT_TYPES = [
   'AP_RECONCILIATION_DIFFERENCE',
   'INTEGRITY_ALERT',
   'JOB_FAILED',
+  'CASH_BELOW_MINIMUM',
+  'FORECAST_SHORTFALL',
+  'BANK_TRANSFER_APPROVAL_REQUIRED',
+  'BANK_TRANSFER_UNSETTLED',
+  'PAYMENT_FILE_REJECTED',
+  'PETTY_CASH_APPROVAL_REQUIRED',
+  'PETTY_CASH_LOW',
 ] as const;
 export type NotificationEventType = (typeof NOTIFICATION_EVENT_TYPES)[number];

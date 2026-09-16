@@ -338,6 +338,15 @@ const STATUS_TONE: Record<string, Variant> = {
   REVERSED: 'outline',
   LOW: 'secondary',
   OK: 'success',
+  SENT: 'warning',
+  SETTLED: 'success',
+  GENERATED: 'secondary',
+  TRANSMITTED: 'warning',
+  ACKNOWLEDGED: 'success',
+  ACTIVE: 'success',
+  SUSPENDED: 'warning',
+  INFLOW: 'success',
+  OUTFLOW: 'outline',
 };
 
 export function StatusBadge({ status, className }: { status: string; className?: string }) {

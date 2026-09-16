@@ -188,6 +188,28 @@ Non-blocking warnings returned as `warnings[{ code, message, details }]`:
 AP error codes (422): `VENDOR_ON_HOLD`, `VENDOR_NOT_APPROVED`, `BILL_ON_HOLD`, `PAYMENT_RUN_INVALID`, `ACCRUAL_INVALID`;
 held bills fail settlement with `MATCH_EXCEPTION_UNREVIEWED` like an unreviewed three-way match.
 
+### Cash management & treasury (Prompt #8; all require `X-Company-Id`; see `docs/treasury/`)
+
+| Method                      | Path                                                                                                                                                   | Permission                                                                      |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| GET                         | `/treasury/dashboard?asOf` (KPIs, position, base forecast, unreconciled aging, transfers, files, petty cash)                                           | `treasury.view`                                                                 |
+| GET                         | `/treasury/position?asOf&currency` (GL book balance per bank account, statement, unmatched lines, in transit, limits, base)                            | `treasury.view`                                                                 |
+| GET                         | `/treasury/forecast?asOf&horizonDays&granularity&scenario&bankAccountId&save`; `/treasury/forecast/snapshots`                                          | `treasury.view`                                                                 |
+| GET / POST / PATCH / DELETE | `/treasury/forecast/items` (planned flows; never post)                                                                                                 | `treasury.view` / `treasury.forecast-manage`                                    |
+| GET / PUT                   | `/treasury/settings` (horizon, scenarios, probabilities, floor, approval threshold, file defaults, voucher limit)                                      | `treasury.view` / `treasury-settings.manage`                                    |
+| GET / PUT                   | `/treasury/bank-accounts/:id/profile` (type, minimum / target / overdraft, routing, file format, defaults, exclude)                                    | `treasury.view` / `treasury-settings.manage`                                    |
+| GET / POST                  | `/treasury/transfers?status&bankAccountId&from&to`, `/treasury/transfers` `{ from, to, transferDate, amount, receivedAmount?, feeAmount?, purpose }`   | `treasury.view` / `bank-transfer.create`                                        |
+| POST                        | `/treasury/transfers/:id/submit` / `approve` / `send` / `settle { settlementDate?, receivedAmount?, bankReference? }` / `cancel { reason }`            | `bank-transfer.create` / `.approve` (delegable) / `.post` / `.post` / `.create` |
+| GET / POST                  | `/treasury/payment-files?status&bankAccountId&format`, `/treasury/payment-files` `{ bankAccountId, format, paymentRunId \| paymentIds[], valueDate? }` | `treasury.view` / `payment-file.manage`                                         |
+| GET / POST                  | `/treasury/payment-files/:id/download` (file content), `/treasury/payment-files/:id/status { status, bankReference?, note? }`                          | `payment-file.manage`                                                           |
+| GET / POST / PATCH          | `/treasury/petty-cash/funds`, `/treasury/petty-cash/funds/:id/replenish { bankAccountId, replenishmentDate, amount?, reference? }`                     | `treasury.view` / `treasury-settings.manage` / `petty-cash.post`                |
+| GET / POST / PATCH          | `/treasury/petty-cash/vouchers?fundId&status&from&to`, `/treasury/petty-cash/vouchers[/:id]`                                                           | `treasury.view` / `petty-cash.manage`                                           |
+| POST                        | `/treasury/petty-cash/vouchers/:id/approve` / `post` / `void { reason, voidDate? }`                                                                    | `petty-cash.approve` (delegable) / `petty-cash.post`                            |
+| GET / POST                  | `/treasury/integrity?asOf`, `/treasury/sweep?asOf`                                                                                                     | `treasury.view` / `treasury-settings.manage`                                    |
+
+Treasury error codes (422): `DOCUMENT_INVALID_STATE` (lifecycle, threshold not met), `SOD_VIOLATION` (creator approving a transfer),
+`ALLOCATION_EXCEEDS_BALANCE` (voucher above the fund's expected cash on hand), `CURRENCY_MISMATCH` / `VALIDATION_FAILED` (payment file selection).
+
 ### Sales & purchasing (all require `X-Company-Id`)
 
 Four order resources share one shape: `/quotations`, `/sales-orders`,

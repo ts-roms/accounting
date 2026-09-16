@@ -129,6 +129,15 @@ describe('navigation', () => {
         'reconciliation',
         'settings',
       ].map((p) => `/payables/${p}`),
+      ...[
+        'dashboard',
+        'position',
+        'forecast',
+        'transfers',
+        'payment-files',
+        'petty-cash',
+        'settings',
+      ].map((p) => `/treasury/${p}`),
     ]);
     for (const section of NAVIGATION) {
       for (const item of section.items) {
