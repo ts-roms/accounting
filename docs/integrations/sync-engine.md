@@ -46,6 +46,7 @@ start / finish time, duration, start / last / next cursor.
 | `RETRY`     | Automatic re-queue after a transient failure (max 3, backoff)           |
 | `RESUME`    | `POST /integrations/:id/sync` with `resumeJobId` of a failed/paused job |
 | `WEBHOOK`   | A connector asked for a sync after an inbound event                     |
+| `EVENT`     | An outbound push scheduled by a domain event (see below)                |
 
 Only one job per integration may be queued or running (`422 SYNC_IN_PROGRESS`).
 
@@ -109,5 +110,21 @@ for entity of (job.entity ?? connector.entities):
   like a pull; a provider rejection is a per-record failure listed on the job.
 - **Schedules** pull when the connector can and push otherwise, so a push-only
   provider runs on its cron like any other.
+- **Events** (`sync/push-trigger.service.ts`): the outbox dispatcher hands
+  every domain event to a second consumer that schedules a debounced
+  incremental push (trigger `EVENT`) for each CONNECTED, PUSH-capable
+  integration of the company whose entities cover the change - so an
+  e-invoicing authority receives a posted invoice seconds after posting
+  without polling. `entitiesForEvent` (pure) maps `customer.* / vendor.* /
+product.*` to master data, `invoice.posted / voided / paid`,
+  `credit_note.posted`, `bill.posted` and `journal.posted / reversed` (by
+  `sourceType` AR_DOCUMENT / AP_DOCUMENT) to documents; draft events are
+  ignored because the exporters only send what left UNPOSTED. The queue job
+  id is fixed per integration + entity (`push-on-event:<id>:<entity>`) with a
+  5 s delay, so a burst collapses into one push; if another job holds the
+  integration the trigger re-queues itself with backoff (up to 20 times) so a
+  change made during a running job is still sent. Operators opt out per
+  integration with `config.pushOnEvents: false` (connectors spread
+  `pushConfigSchema` into their config schema to expose it).
 - Nothing here writes to the domain: a push cannot post, approve or change a
   document - it can only tell a provider what already happened.

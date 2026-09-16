@@ -1,4 +1,5 @@
 import type { ZodType } from 'zod';
+import { z } from 'zod';
 import type {
   ConnectorCapability,
   InboundEventType,
@@ -243,3 +244,12 @@ export abstract class BaseConnector implements IntegrationConnector {
     throw new Error(`${this.descriptor.provider} cannot pull ${req.entity}.`);
   }
 }
+
+/**
+ * Config keys every PUSH-capable connector should spread into its configSchema:
+ * `pushOnEvents` lets an operator turn event-driven pushes off (default on) - the
+ * platform only reads keys the schema kept.
+ */
+export const pushConfigSchema = {
+  pushOnEvents: z.boolean().default(true),
+};

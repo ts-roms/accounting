@@ -41,6 +41,7 @@ import { QUEUES } from '@/modules/jobs/queue.service';
 import { CredentialsService } from '../core/credentials.service';
 import { IntegrationError } from '../core/integration-error';
 import { OUTBOX_ENQUEUED_EVENT, OutboxService } from '../events/outbox.service';
+import { PushTriggerService } from '../sync/push-trigger.service';
 import { JobRunnerService } from '@/modules/jobs/job-runner.service';
 import { IntegrationLogsService } from '../logs/integration-logs.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -82,6 +83,7 @@ export class OutboundWebhooksService implements OnModuleInit {
     private readonly logs: IntegrationLogsService,
     private readonly notifications: NotificationsService,
     private readonly config: AppConfigService,
+    private readonly pushTriggers: PushTriggerService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(OutboundWebhooksService.name);
@@ -432,6 +434,8 @@ export class OutboundWebhooksService implements OnModuleInit {
           for (const r of rows)
             await this.jobs.enqueue(QUEUES.WEBHOOK_DELIVERY, JOB_DELIVER, { deliveryId: r.id });
         }
+        // Same event, second consumer: PUSH-capable integrations get a debounced incremental push.
+        await this.pushTriggers.onEvent(event);
         await this.outbox.markProcessed(event.id);
       } catch (err) {
         await this.outbox.markFailed(
