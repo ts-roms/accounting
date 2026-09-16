@@ -56,10 +56,21 @@ See `.env.example`. Production requirements:
 
 ## Health & observability
 
-- `GET /api/v1/health` (DB + Redis) for readiness, `/health/live` for liveness.
+- `GET /api/v1/health/live` for liveness, `/health/ready` for readiness
+  (200 only when the database answers, every bundled migration is applied and
+  the instance is not draining - wire this one into the load balancer),
+  `/health` for dependency detail (DB + Redis).
+- Graceful shutdown: on SIGTERM readiness flips to 503 first, inline jobs
+  drain, then workers and the pool close (`docs/operations.md`).
 - Structured logs via pino; every response carries `x-correlation-id`.
-- Queue health and error tracking (e.g. Sentry) are planned additions to the
-  health endpoint and logger transport.
+- `GET /api/v1/metrics` - Prometheus text (request counts / latency per route
+  template, job runs, queue depths); set `METRICS_TOKEN` to require a bearer
+  token. Scrape every instance.
+- Run more than one API instance freely: scheduled jobs are serialised with
+  PostgreSQL advisory locks and every deployment sharing a Redis needs its own
+  `QUEUE_PREFIX`. Administration → Operations shows jobs, dead letters and
+  the nightly integrity outcomes.
+- Error tracking (e.g. Sentry) remains a planned logger transport.
 
 ## CI (recommended pipeline)
 

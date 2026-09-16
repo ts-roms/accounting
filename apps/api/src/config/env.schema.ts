@@ -56,6 +56,15 @@ export const envSchema = z.object({
    * Cron pattern in server time; empty string disables the job.
    */
   ACCOUNTING_SCHEDULES_CRON: z.string().trim().default('15 2 * * *'),
+  /**
+   * Operations (H8). Nightly financial integrity check per company (cron, server
+   * time; empty disables); BullMQ key prefix so several deployments (or dev
+   * checkouts) can share one Redis without consuming each other's jobs; optional
+   * bearer token protecting GET /metrics.
+   */
+  INTEGRITY_CHECK_CRON: z.string().trim().default('45 3 * * *'),
+  QUEUE_PREFIX: z.string().trim().regex(/^[A-Za-z0-9_:-]{1,40}$/).default('accounting'),
+  METRICS_TOKEN: z.string().trim().min(16).optional(),
 
   /**
    * Integration platform (Prompt #4). The encryption key protects provider

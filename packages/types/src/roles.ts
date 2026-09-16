@@ -32,6 +32,7 @@ export interface SystemRoleDefinition {
 const RESTRICTED_VIEWS: readonly PermissionKey[] = [
   'audit.view',
   'trace.view',
+  'operations.view',
   'integration.view',
   'api-key.view',
   'webhook.view',
@@ -56,6 +57,8 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
     permissions: [
       ...VIEW_ALL,
       P['audit.view'],
+      P['operations.view'],
+      P['operations.manage'],
       P['organization.manage'],
       P['company.manage'],
       P['branch.manage'],
@@ -255,6 +258,7 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
       ...INTEGRATION_VIEWS,
       P['audit.view'],
       P['trace.view'],
+      P['operations.view'],
       P['reports.export'],
       P['integrity.check'],
     ],

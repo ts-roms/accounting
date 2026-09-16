@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { JobRegistryService } from './job-registry.service';
 import { JobRunnerService } from './job-runner.service';
 import { QueueService } from './queue.service';
 import { SessionCleanupJob } from './session-cleanup.job';
@@ -8,7 +9,7 @@ import { SessionCleanupJob } from './session-cleanup.job';
  * depreciation runs...) is queued here instead of blocking HTTP requests.
  */
 @Module({
-  providers: [QueueService, JobRunnerService, SessionCleanupJob],
-  exports: [QueueService, JobRunnerService],
+  providers: [QueueService, JobRegistryService, JobRunnerService, SessionCleanupJob],
+  exports: [QueueService, JobRegistryService, JobRunnerService],
 })
 export class JobsModule {}

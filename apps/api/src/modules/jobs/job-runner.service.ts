@@ -2,6 +2,7 @@ import { Injectable, type OnModuleInit } from '@nestjs/common';
 import type { JobsOptions } from 'bullmq';
 import { PinoLogger } from 'nestjs-pino';
 import { AppConfigService } from '@/config/app-config.service';
+import { JobRegistryService } from './job-registry.service';
 import { QueueService, type QueueName } from './queue.service';
 
 export type JobHandler<T> = (data: T, meta: { jobId: string; attempt: number }) => Promise<unknown>;
@@ -25,6 +26,7 @@ export class JobRunnerService implements OnModuleInit {
     private readonly queues: QueueService,
     private readonly config: AppConfigService,
     private readonly logger: PinoLogger,
+    private readonly registry: JobRegistryService,
   ) {
     this.logger.setContext(JobRunnerService.name);
     this.inline = config.env.INTEGRATION_INLINE_JOBS || config.isTest;
@@ -90,13 +92,33 @@ export class JobRunnerService implements OnModuleInit {
     }
   }
 
-  /** Repeatable job (cron or every-ms); no-op inline. */
+  /**
+   * Repeatable job (cron or every-ms); no-op inline. The occurrence runs
+   * through the job registry (advisory lock + job_runs row), so it also shows
+   * up in the operations console and can be triggered manually.
+   */
   async schedule(
     queue: QueueName,
     name: string,
     repeat: { pattern?: string; every?: number },
     data: object = {},
+    description = name,
   ): Promise<void> {
+    const key = `${queue}:${name}`;
+    const handler = this.handlers.get(key);
+    if (handler) {
+      this.registry.register({
+        name,
+        description,
+        queue,
+        schedule: repeat.pattern ?? (repeat.every ? `every ${repeat.every} ms` : null),
+        enabled: !this.inline,
+        run: () => handler(data, { jobId: 'registry', attempt: 1 }),
+      });
+      this.handlers.set(key, async () => {
+        await this.registry.execute(name, 'SCHEDULED');
+      });
+    }
     if (this.inline) return;
     try {
       await this.queues.queue(queue).upsertJobScheduler(name, repeat, { name, data });

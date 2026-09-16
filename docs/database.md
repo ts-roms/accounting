@@ -228,6 +228,17 @@ Migration: `0021_data_infrastructure.sql`.
 The engine stores no figures: runs read `journal_lines` through the ledger
 service and `budget_lines` of approved versions. Migration: `0023_reporting_engine.sql`.
 
+## Hardening phase 8 (operations)
+
+| Table            | Purpose                                                                                                                                                                          |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `job_runs`       | One row per background job execution: name, trigger (`job_trigger`), status (`job_run_status`: RUNNING / SUCCEEDED / FAILED / SKIPPED_LOCKED), instance, timings, result, error  |
+| `integrity_runs` | Stored outcome of a company integrity check: status (`integrity_run_status`), critical / warning counts, findings (check / severity / count), notified flag, link to the job run |
+
+Concurrency control uses `pg_try_advisory_xact_lock(hashtext('job:<name>'))`,
+not a table. Enum additions: `audit_action` += `JOB_RUN`, `QUEUE_RETRY`,
+`QUEUE_DISCARD`. Migration: `0024_operations.sql`.
+
 ## Posted-journal immutability
 
 Migration `0003_posted_journal_immutability.sql` installs triggers that reject

@@ -1,10 +1,10 @@
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import { lt } from 'drizzle-orm';
 import { PinoLogger } from 'nestjs-pino';
-import { AppConfigService } from '@/config/app-config.service';
 import { DRIZZLE, type Database } from '@/database/database.types';
 import { sessions } from '@/database/schema';
-import { QUEUES, QueueService } from './queue.service';
+import { JobRegistryService } from './job-registry.service';
+import { QUEUES } from './queue.service';
 
 const JOB_NAME = 'session-cleanup';
 
@@ -15,8 +15,7 @@ const JOB_NAME = 'session-cleanup';
 @Injectable()
 export class SessionCleanupJob implements OnModuleInit {
   constructor(
-    private readonly queues: QueueService,
-    private readonly config: AppConfigService,
+    private readonly registry: JobRegistryService,
     private readonly logger: PinoLogger,
     @Inject(DRIZZLE) private readonly db: Database,
   ) {
@@ -24,18 +23,13 @@ export class SessionCleanupJob implements OnModuleInit {
   }
 
   async onModuleInit(): Promise<void> {
-    if (this.config.isTest) return;
-    try {
-      this.queues.registerWorker(QUEUES.MAINTENANCE, async (job) => {
-        if (job.name === JOB_NAME) await this.run();
-      });
-      await this.queues
-        .queue(QUEUES.MAINTENANCE)
-        .upsertJobScheduler(JOB_NAME, { pattern: '0 3 * * *' }, { name: JOB_NAME });
-    } catch (err) {
-      // Redis being unavailable must not prevent the API from serving requests.
-      this.logger.warn({ err }, 'Could not schedule maintenance jobs (is Redis running?)');
-    }
+    await this.registry.scheduleRepeatable({
+      name: JOB_NAME,
+      description: 'Purge refresh sessions expired more than a day ago',
+      queue: QUEUES.MAINTENANCE,
+      repeat: { pattern: '0 3 * * *' },
+      run: async () => ({ deleted: await this.run() }),
+    });
   }
 
   async run(): Promise<number> {

@@ -3,11 +3,11 @@ import { PinoLogger } from 'nestjs-pino';
 import { Inject } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
-import { AppConfigService } from '@/config/app-config.service';
 import { DRIZZLE, type Database } from '@/database/database.types';
 import { users } from '@/database/schema';
 import { SYSTEM_USER_EMAIL } from '@/database/seed/seed';
-import { QUEUES, QueueService } from '@/modules/jobs/queue.service';
+import { JobRegistryService } from '@/modules/jobs/job-registry.service';
+import { QUEUES } from '@/modules/jobs/queue.service';
 import { DepreciationRunsService } from './depreciation-runs.service';
 
 const JOB_NAME = 'depreciation-monthly';
@@ -20,8 +20,7 @@ const JOB_NAME = 'depreciation-monthly';
 @Injectable()
 export class DepreciationJob implements OnModuleInit {
   constructor(
-    private readonly queues: QueueService,
-    private readonly config: AppConfigService,
+    private readonly registry: JobRegistryService,
     private readonly logger: PinoLogger,
     private readonly runs: DepreciationRunsService,
     @Inject(DRIZZLE) private readonly db: Database,
@@ -30,27 +29,25 @@ export class DepreciationJob implements OnModuleInit {
   }
 
   async onModuleInit(): Promise<void> {
-    if (this.config.isTest) return;
-    try {
-      this.queues.registerWorker(QUEUES.MAINTENANCE, async (job) => {
-        if (job.name === JOB_NAME) await this.run();
-      });
-      await this.queues
-        .queue(QUEUES.MAINTENANCE)
-        .upsertJobScheduler(JOB_NAME, { pattern: '0 2 1 * *' }, { name: JOB_NAME });
-    } catch (err) {
-      this.logger.warn({ err }, 'Could not schedule the depreciation job (is Redis running?)');
-    }
+    await this.registry.scheduleRepeatable({
+      name: JOB_NAME,
+      description:
+        "Draft (and post where opted in) every company's depreciation run for the previous period",
+      queue: QUEUES.MAINTENANCE,
+      repeat: { pattern: '0 2 1 * *' },
+      run: () => this.run(),
+    });
   }
 
-  async run(): Promise<void> {
+  async run(): Promise<unknown> {
     const actor = await this.systemActor();
     if (!actor) {
       this.logger.warn('No system scheduler user; skipping depreciation job');
-      return;
+      return { skipped: 'no system scheduler user' };
     }
     const results = await this.runs.runScheduled(new Date().toISOString().slice(0, 10), actor);
     this.logger.info({ results }, 'Depreciation job finished');
+    return results;
   }
 
   /** The seeded scheduler user owns automated postings so audit rows and journals carry a real actor. */

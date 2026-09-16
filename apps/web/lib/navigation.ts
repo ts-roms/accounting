@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import {
+  Activity,
   BadgePercent,
   FileUp,
   Hash,
@@ -343,6 +344,7 @@ export const NAVIGATION: NavSection[] = [
       ]),
       item('Approval Workflows', '/admin/workflows', Workflow, [P['approval.view']]),
       item('Approvals', '/admin/approvals', Inbox, [P['approval.view']]),
+      item('Operations', '/admin/operations', Activity, [P['operations.view']]),
       item('Delegated Authority', '/admin/delegations', UserCheck, [P['delegation.view']]),
       item('Integrations', '/admin/integrations', Cable, [P['integration.view']]),
       item('API Keys', '/admin/api-keys', KeyRound, [P['api-key.view']]),

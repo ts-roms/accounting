@@ -409,5 +409,7 @@ export const NOTIFICATION_EVENT_TYPES = [
   'VENDOR_PAYMENT_APPROVAL_REQUIRED',
   'GRNI_AGED',
   'AP_RECONCILIATION_DIFFERENCE',
+  'INTEGRITY_ALERT',
+  'JOB_FAILED',
 ] as const;
 export type NotificationEventType = (typeof NOTIFICATION_EVENT_TYPES)[number];

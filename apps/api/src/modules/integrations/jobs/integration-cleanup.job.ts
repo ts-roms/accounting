@@ -31,7 +31,13 @@ export class IntegrationCleanupJob implements OnModuleInit {
 
   onModuleInit(): void {
     this.jobs.register(QUEUES.INTEGRATION_MAINTENANCE, JOB, () => this.run());
-    void this.jobs.schedule(QUEUES.INTEGRATION_MAINTENANCE, JOB, { pattern: '30 3 * * *' });
+    void this.jobs.schedule(
+      QUEUES.INTEGRATION_MAINTENANCE,
+      JOB,
+      { pattern: '30 3 * * *' },
+      {},
+      'Purge old integration logs, delivered webhooks and expired idempotency keys',
+    );
   }
 
   async run(): Promise<Record<string, number>> {

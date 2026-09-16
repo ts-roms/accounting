@@ -96,8 +96,20 @@ export class OutboundWebhooksService implements OnModuleInit {
       4,
     );
     this.jobs.register(QUEUES.WEBHOOK_DELIVERY, JOB_RETRY_DUE, () => this.enqueueDueRetries(), 1);
-    void this.jobs.schedule(QUEUES.WEBHOOK_DELIVERY, JOB_DISPATCH, { every: 30_000 });
-    void this.jobs.schedule(QUEUES.WEBHOOK_DELIVERY, JOB_RETRY_DUE, { every: 15_000 });
+    void this.jobs.schedule(
+      QUEUES.WEBHOOK_DELIVERY,
+      JOB_DISPATCH,
+      { every: 30_000 },
+      {},
+      'Deliver pending outbox events to their webhook subscriptions',
+    );
+    void this.jobs.schedule(
+      QUEUES.WEBHOOK_DELIVERY,
+      JOB_RETRY_DUE,
+      { every: 15_000 },
+      {},
+      'Retry webhook deliveries whose back-off has elapsed',
+    );
   }
 
   /** Woken shortly after an outbox row commits; in queue mode this is debounced by the fixed job id. */
