@@ -43,6 +43,7 @@ import type { Importer } from './importers/importer';
 import { InvoicesImporter } from './importers/invoices.importer';
 import { PaymentsImporter } from './importers/payments.importer';
 import { SalesOrdersImporter } from './importers/sales-orders.importer';
+import { PurchaseOrdersImporter } from './importers/purchase-orders.importer';
 import { BillsExporter, InvoicesExporter } from './exporters/documents.exporter';
 import { EXPORT_BATCH_SIZE, type Exporter } from './exporters/exporter';
 import { CustomersExporter, ProductsExporter, VendorsExporter } from './exporters/parties.exporter';
@@ -94,6 +95,7 @@ export class SyncService implements OnModuleInit {
     productsOut: ProductsExporter,
     invoicesOut: InvoicesExporter,
     billsOut: BillsExporter,
+    purchaseOrders: PurchaseOrdersImporter,
   ) {
     this.logger.setContext(SyncService.name);
     this.importers = new Map<SyncEntity, Importer>(
@@ -106,6 +108,7 @@ export class SyncService implements OnModuleInit {
         bills,
         products,
         salesOrders,
+        purchaseOrders,
       ].map((i) => [i.entity, i]),
     );
     this.exporters = new Map<SyncEntity, Exporter>(

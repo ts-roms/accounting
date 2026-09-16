@@ -40,6 +40,8 @@ import {
   paymentTerms,
   writeOffRequests,
 } from './receivables';
+import { goodsReceipts } from './orders';
+import { paymentRuns, vendorGroups, vendorStatusEnum, vendorTypeEnum } from './payables';
 import { users } from './users';
 
 export const customerTypeEnum = pgEnum('customer_type', CUSTOMER_TYPES);
@@ -124,10 +126,33 @@ export const vendors = pgTable(
     defaultExpenseAccountId: uuid('default_expense_account_id').references(() => accounts.id, {
       onDelete: 'set null',
     }),
+    /** Enterprise vendor master (Prompt #7). */
+    vendorType: vendorTypeEnum('vendor_type').notNull().default('SUPPLIER'),
+    /** Onboarding / hold state; only APPROVED vendors can be ordered from, billed or paid. */
+    vendorStatus: vendorStatusEnum('vendor_status').notNull().default('APPROVED'),
+    displayName: text('display_name'),
+    vendorGroupId: uuid('vendor_group_id').references((): AnyPgColumn => vendorGroups.id, {
+      onDelete: 'set null',
+    }),
+    /** Named payment term; when set it overrides paymentTermsDays for due dates. */
+    paymentTermId: uuid('payment_term_id').references((): AnyPgColumn => paymentTerms.id, {
+      onDelete: 'set null',
+    }),
+    defaultWithholdingTaxCodeId: uuid('default_withholding_tax_code_id').references(
+      (): AnyPgColumn => taxCodes.id,
+      { onDelete: 'set null' },
+    ),
+    buyerId: uuid('buyer_id').references(() => users.id, { onDelete: 'set null' }),
+    industry: text('industry'),
+    region: text('region'),
+    branchId: uuid('branch_id').references(() => branches.id, { onDelete: 'set null' }),
+    taxRegistrationType: text('tax_registration_type'),
   },
   (t) => [
     uniqueIndex('vendors_company_code_uq').on(t.companyId, t.code),
     index('vendors_company_name_idx').on(t.companyId, t.name),
+    index('vendors_group_idx').on(t.vendorGroupId),
+    index('vendors_status_idx').on(t.companyId, t.vendorStatus),
   ],
 );
 
@@ -257,6 +282,21 @@ export const vendorBills = pgTable(
     matchReviewedBy: uuid('match_reviewed_by').references(() => users.id, { onDelete: 'set null' }),
     matchReviewedAt: timestamp('match_reviewed_at', { withTimezone: true }),
     matchReviewNote: text('match_review_note'),
+    /** Named payment term and early-payment discount window (Prompt #7). */
+    paymentTermId: uuid('payment_term_id').references((): AnyPgColumn => paymentTerms.id, {
+      onDelete: 'set null',
+    }),
+    discountDate: date('discount_date'),
+    discountAmount: money('discount_amount').notNull().default('0'),
+    /** Amount settled by early-payment discounts (subledger field, reconciled to the GL). */
+    discountTakenAmount: money('discount_taken_amount').notNull().default('0'),
+    goodsReceiptId: uuid('goods_receipt_id').references((): AnyPgColumn => goodsReceipts.id, {
+      onDelete: 'set null',
+    }),
+    /** Denormalised from bill_holds: an active hold keeps the bill out of payment runs. */
+    onHold: boolean('on_hold').notNull().default(false),
+    submittedBy: uuid('submitted_by').references(() => users.id, { onDelete: 'set null' }),
+    submittedAt: timestamp('submitted_at', { withTimezone: true }),
   },
   (t) => [
     uniqueIndex('vendor_bills_company_number_uq').on(t.companyId, t.documentNumber),
@@ -266,6 +306,7 @@ export const vendorBills = pgTable(
     index('vendor_bills_vendor_idx').on(t.vendorId),
     index('vendor_bills_company_status_idx').on(t.companyId, t.status),
     index('vendor_bills_company_due_idx').on(t.companyId, t.dueDate),
+    index('vendor_bills_on_hold_idx').on(t.companyId, t.onHold),
     ...documentChecks(t, 'vendor_bills'),
   ],
 );
@@ -420,11 +461,18 @@ export const vendorPayments = pgTable(
     vendorId: uuid('vendor_id')
       .notNull()
       .references(() => vendors.id, { onDelete: 'restrict' }),
+    /** Payment run that created this payment (Prompt #7). */
+    paymentRunId: uuid('payment_run_id').references((): AnyPgColumn => paymentRuns.id, {
+      onDelete: 'set null',
+    }),
+    /** Early-payment discounts taken in this payment (posted to PURCHASE_DISCOUNT). */
+    discountAmount: money('discount_amount').notNull().default('0'),
   },
   (t) => [
     uniqueIndex('vendor_payments_company_number_uq').on(t.companyId, t.documentNumber),
     uniqueIndex('vendor_payments_idempotency_uq').on(t.companyId, t.idempotencyKey),
     index('vendor_payments_vendor_idx').on(t.vendorId),
+    index('vendor_payments_run_idx').on(t.paymentRunId),
     check(
       'vendor_payments_amount_chk',
       sql`${t.amount} > 0 AND ${t.allocatedAmount} >= 0 AND ${t.allocatedAmount} <= ${t.amount}`,
@@ -482,6 +530,10 @@ export const vendorPaymentAllocations = pgTable(
       .references(() => vendorBills.id, { onDelete: 'restrict' }),
     paymentId: uuid('payment_id').references(() => vendorPayments.id, { onDelete: 'restrict' }),
     creditNoteId: uuid('credit_note_id').references(() => vendorBills.id, { onDelete: 'restrict' }),
+    /** Early-payment discount taken by this payment settling part of the bill (Prompt #7). */
+    discountPaymentId: uuid('discount_payment_id').references(() => vendorPayments.id, {
+      onDelete: 'restrict',
+    }),
     amount: money('amount').notNull(),
     allocationDate: date('allocation_date').notNull(),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
@@ -490,10 +542,11 @@ export const vendorPaymentAllocations = pgTable(
   (t) => [
     index('vendor_payment_allocations_bill_idx').on(t.billId),
     index('vendor_payment_allocations_payment_idx').on(t.paymentId),
+    index('vendor_payment_allocations_discount_idx').on(t.discountPaymentId),
     check('vendor_payment_allocations_amount_chk', sql`${t.amount} > 0`),
     check(
       'vendor_payment_allocations_source_chk',
-      sql`(${t.paymentId} IS NOT NULL)::int + (${t.creditNoteId} IS NOT NULL)::int = 1`,
+      sql`(${t.paymentId} IS NOT NULL)::int + (${t.creditNoteId} IS NOT NULL)::int + (${t.discountPaymentId} IS NOT NULL)::int = 1`,
     ),
   ],
 );

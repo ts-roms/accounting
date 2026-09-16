@@ -485,6 +485,14 @@ export interface Party {
   taxExempt?: boolean;
   creditHold?: boolean;
   riskRating?: 'LOW' | 'MEDIUM' | 'HIGH';
+  /** Vendor master (Prompt #7). */
+  vendorType?: string;
+  vendorStatus?: 'PENDING' | 'APPROVED' | 'ON_HOLD' | 'BLOCKED' | 'INACTIVE';
+  vendorGroupId?: string | null;
+  vendorGroupName?: string | null;
+  withholdingTaxCode?: string | null;
+  buyerName?: string | null;
+  onHold?: boolean;
   contacts?: Array<{
     id: string;
     name: string;
@@ -609,6 +617,16 @@ export interface SubledgerDocument {
   openDisputes?: number;
   writtenOffAmount?: string;
   submittedAt?: string | null;
+  /** AP platform (Prompt #7). */
+  paymentTermId?: string | null;
+  discountDate?: string | null;
+  discountAmount?: string;
+  discountTakenAmount?: string;
+  discountAvailableToday?: string;
+  onHold?: boolean;
+  activeHoldReason?: string | null;
+  purchaseOrderNumber?: string | null;
+  goodsReceiptId?: string | null;
 }
 
 export interface SubledgerDocumentDetail extends SubledgerDocument {
@@ -690,7 +708,8 @@ export interface StatementLine {
     | 'PAYMENT'
     | 'REFUND'
     | 'WRITE_OFF'
-    | 'WRITE_OFF_RECOVERY';
+    | 'WRITE_OFF_RECOVERY'
+    | 'DISCOUNT';
   documentId: string;
   documentNumber: string;
   reference: string | null;

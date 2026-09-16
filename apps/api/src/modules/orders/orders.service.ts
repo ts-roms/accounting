@@ -91,6 +91,12 @@ const SO_EVENTS: Partial<Record<OrderAction, OutboundEventType>> = {
   confirm: 'sales_order.confirmed',
   cancel: 'sales_order.cancelled',
 };
+/** Outbound webhook events raised by purchase-order transitions (Prompt #7). */
+const PO_EVENTS: Partial<Record<OrderAction, OutboundEventType>> = {
+  submit: 'purchase_order.submitted',
+  approve: 'purchase_order.approved',
+  reject: 'purchase_order.rejected',
+};
 /** Document-level segregation of duties: who created it may not approve it. */
 const SOD_PAIR: Partial<Record<OrderType, [string, string]>> = {
   SALES_ORDER: [P['sales-order.create'], P['sales-order.approve']],
@@ -532,6 +538,13 @@ export class OrdersService {
             'Choose a vendor before approving the purchase order.',
           );
       }
+      // Vendor hold / onboarding gate: no purchase order is submitted or approved for an unusable vendor (Prompt #7).
+      if (
+        type === 'PURCHASE_ORDER' &&
+        (action === 'submit' || action === 'approve') &&
+        existing.vendorId
+      )
+        await this.vendorsService.assertUsable(companyId, existing.vendorId, tx, 'purchase order');
       if (
         action === 'cancel' &&
         (existing.receiptStatus !== 'NONE' || existing.billingStatus !== 'NONE')
@@ -583,6 +596,21 @@ export class OrdersService {
         },
         tx,
       );
+      if (type === 'PURCHASE_ORDER' && PO_EVENTS[action]) {
+        await this.outbox.enqueue(tx, {
+          eventType: PO_EVENTS[action]!,
+          companyId,
+          dedupeKey: PO_EVENTS[action] + ':' + id + ':' + to,
+          payload: {
+            purchaseOrderId: id,
+            documentNumber: existing.documentNumber,
+            vendorId: existing.vendorId,
+            total: existing.total,
+            currency: existing.currency,
+            status: to,
+          },
+        });
+      }
       if (type === 'SALES_ORDER' && SO_EVENTS[action]) {
         await this.outbox.enqueue(tx, {
           eventType: SO_EVENTS[action]!,

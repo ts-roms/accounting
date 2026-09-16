@@ -7,6 +7,7 @@ import {
   getTableColumns,
   gte,
   ilike,
+  inArray,
   lte,
   or,
   sql,
@@ -32,6 +33,7 @@ import { ErrorCodes } from '@/common/errors/error-codes';
 import { offsetFor, toPaginatedResult } from '@/common/pagination/pagination';
 import { DRIZZLE, type Database, type DbExecutor } from '@/database/database.types';
 import {
+  companies,
   vendorPayments,
   vendors,
   vendorBills,
@@ -40,6 +42,11 @@ import {
   vendorPaymentAllocations,
   type VendorPayment,
 } from '@/database/schema';
+import { AuthorityService } from '@/modules/delegations/authority.service';
+import { OutboxService } from '@/modules/integrations/events/outbox.service';
+import { NotificationsService } from '@/modules/integrations/notifications/notifications.service';
+import { ApConfigService } from './ap-config.service';
+import { discountAvailable } from './payables.logic';
 import { validateAllocations } from '@/modules/subledger/subledger.logic';
 import { VendorsService } from './vendors.service';
 import { ExchangeRatesService } from '@/modules/fx/exchange-rates.service';
@@ -82,7 +89,19 @@ export class VendorPaymentsService {
     private readonly fx: FxService,
     private readonly approvals: ApprovalsService,
     private readonly sod: SodService,
+    private readonly authority: AuthorityService,
+    private readonly outbox: OutboxService,
+    private readonly notifications: NotificationsService,
+    private readonly config: ApConfigService,
   ) {}
+
+  /** Discounts taken alongside a payment's allocations, per bill (Prompt #7). */
+  private async discountRows(tx: DbExecutor, paymentId: string) {
+    return tx
+      .select()
+      .from(vendorPaymentAllocations)
+      .where(eq(vendorPaymentAllocations.discountPaymentId, paymentId));
+  }
 
   async list(
     companyId: string,
@@ -158,7 +177,24 @@ export class VendorPaymentsService {
     actor: AuthenticatedUser,
     input: CreatePaymentInput,
   ): Promise<VendorPaymentDetail> {
-    const id = await this.db.transaction(async (tx) => {
+    const id = await this.db.transaction((tx) => this.createInTx(tx, companyId, actor, input));
+    return this.get(companyId, id);
+  }
+
+  /**
+   * Creates the payment inside the caller's transaction (payment runs create
+   * one payment per vendor this way). `options.paymentRunId` links it to the
+   * run; discounts on allocations become discount allocation rows that are
+   * validated and posted with the payment.
+   */
+  async createInTx(
+    tx: DbExecutor,
+    companyId: string,
+    actor: AuthenticatedUser,
+    input: CreatePaymentInput,
+    options: { paymentRunId?: string } = {},
+  ): Promise<string> {
+    {
       if (input.idempotencyKey) {
         const [existing] = await tx
           .select({ id: vendorPayments.id })
@@ -171,12 +207,12 @@ export class VendorPaymentsService {
           );
         if (existing) return existing.id;
       }
-      const vendor = await this.vendorsService.getOrThrow(companyId, input.partyId, tx);
-      if (vendor.status !== 'ACTIVE')
-        throw new BusinessRuleError(
-          ErrorCodes.PARTY_INACTIVE,
-          `Vendor ${vendor.code} is inactive.`,
-        );
+      const vendor = await this.vendorsService.assertUsable(
+        companyId,
+        input.partyId,
+        tx,
+        'payment',
+      );
       const currency = vendor.currency;
       const { rate: exchangeRate, baseCurrency } = await this.rates.documentRate(
         companyId,
@@ -201,6 +237,13 @@ export class VendorPaymentsService {
         input.allocations.map((a) => a.documentId),
       );
       validateAllocations(input.allocations, targets, vendor.id, amount, currency);
+      const discounts = await this.validateDiscounts(
+        tx,
+        input.allocations,
+        targets,
+        input.paymentDate,
+        currency,
+      );
       const documentNumber = await this.numbering.allocate(
         companyId,
         'PAY',
@@ -222,12 +265,15 @@ export class VendorPaymentsService {
           method: input.method,
           cashAccountId: input.cashAccountId,
           reference: input.reference ?? null,
+          externalReference: input.externalReference ?? null,
           memo: input.memo ?? null,
           currency,
           exchangeRate,
           baseAmount: amount.convert(baseCurrency, exchangeRate).toString(),
           controlBaseAmount: amount.convert(baseCurrency, exchangeRate).toString(),
           idempotencyKey: input.idempotencyKey ?? null,
+          paymentRunId: options.paymentRunId ?? null,
+          discountAmount: discounts.total.toString(),
           createdBy: actor.id,
         })
         .returning();
@@ -244,6 +290,18 @@ export class VendorPaymentsService {
           })),
         );
       }
+      if (discounts.rows.length > 0) {
+        await tx.insert(vendorPaymentAllocations).values(
+          discounts.rows.map((d) => ({
+            companyId,
+            billId: d.billId,
+            discountPaymentId: created.id,
+            amount: d.amount,
+            allocationDate: input.paymentDate,
+            createdBy: actor.id,
+          })),
+        );
+      }
       await this.audit.record(
         {
           action: 'CREATE',
@@ -255,14 +313,252 @@ export class VendorPaymentsService {
             amount: created.amount,
             paymentType: created.paymentType,
             allocations: input.allocations.length,
+            discountAmount: discounts.total.toString(),
+            paymentRunId: options.paymentRunId ?? null,
           },
           companyId,
         },
         tx,
       );
       return created.id;
+    }
+  }
+
+  /**
+   * Early-payment discounts requested on allocations: each must be available
+   * on the payment date and, together with the cash part, must not exceed the
+   * bill's open balance.
+   */
+  private async validateDiscounts(
+    tx: DbExecutor,
+    allocations: CreatePaymentInput['allocations'],
+    targets: Map<
+      string,
+      { id: string; documentNumber: string; total: string; allocatedAmount: string }
+    >,
+    paymentDate: string,
+    currency: string,
+  ): Promise<{ rows: Array<{ billId: string; amount: string }>; total: Money }> {
+    const rows: Array<{ billId: string; amount: string }> = [];
+    let total = Money.zero(currency);
+    const wanted = allocations.filter((a) => a.discount && Number(a.discount) > 0);
+    if (wanted.length === 0) return { rows, total };
+    const bills = await tx
+      .select({
+        id: vendorBills.id,
+        discountDate: vendorBills.discountDate,
+        discountAmount: vendorBills.discountAmount,
+        discountTakenAmount: vendorBills.discountTakenAmount,
+        total: vendorBills.total,
+        allocatedAmount: vendorBills.allocatedAmount,
+      })
+      .from(vendorBills)
+      .where(
+        inArray(
+          vendorBills.id,
+          wanted.map((a) => a.documentId),
+        ),
+      );
+    const byId = new Map(bills.map((b) => [b.id, b]));
+    for (const a of wanted) {
+      const bill = byId.get(a.documentId);
+      const target = targets.get(a.documentId);
+      if (!bill || !target) continue;
+      const discount = Money.parse(a.discount!, currency);
+      const available = discountAvailable(bill, paymentDate, currency);
+      if (discount.greaterThan(available))
+        throw new BusinessRuleError(
+          ErrorCodes.ALLOCATION_EXCEEDS_BALANCE,
+          `${target.documentNumber}: discount ${discount.toString()} exceeds the ${available.toString()} available on ${paymentDate}.`,
+          { documentId: a.documentId, discountAvailable: available.toString() },
+        );
+      const open = Money.of(target.total, currency).subtract(
+        Money.of(target.allocatedAmount, currency),
+      );
+      if (Money.parse(a.amount, currency).add(discount).greaterThan(open))
+        throw new BusinessRuleError(
+          ErrorCodes.ALLOCATION_EXCEEDS_BALANCE,
+          `${target.documentNumber}: payment plus discount exceed the open balance ${open.toString()}.`,
+          { documentId: a.documentId, remaining: open.toString() },
+        );
+      rows.push({ billId: a.documentId, amount: discount.toString() });
+      total = total.add(discount);
+    }
+    return { rows, total };
+  }
+
+  /** DRAFT -> SUBMITTED: opens the approval workflow and tells approvers (Prompt #7). */
+  async submit(
+    companyId: string,
+    actor: AuthenticatedUser,
+    id: string,
+  ): Promise<VendorPaymentDetail> {
+    await this.db.transaction(async (tx) => {
+      const existing = await this.lock(tx, companyId, id);
+      if (existing.status !== 'DRAFT')
+        throw new BusinessRuleError(
+          ErrorCodes.DOCUMENT_INVALID_STATE,
+          `${existing.documentNumber} is ${existing.status}.`,
+        );
+      await this.approvals.open(tx, this.workflowRef(companyId, existing, actor.id));
+      await tx
+        .update(vendorPayments)
+        .set({ status: 'SUBMITTED', submittedBy: actor.id, submittedAt: new Date() })
+        .where(eq(vendorPayments.id, id));
+      await this.audit.record(
+        {
+          action: 'SUBMIT',
+          module: MODULE,
+          entityType: 'VendorPayment',
+          entityId: id,
+          previousValue: { status: 'DRAFT' },
+          newValue: { status: 'SUBMITTED' },
+          metadata: { documentNumber: existing.documentNumber },
+          companyId,
+        },
+        tx,
+      );
+      await this.notifyOrg(tx, companyId, {
+        eventType: 'VENDOR_PAYMENT_APPROVAL_REQUIRED',
+        title: `Vendor payment ${existing.documentNumber} awaits approval`,
+        body: `${existing.currency} ${existing.amount} submitted for approval by ${actor.email}.`,
+        link: `/purchasing/payments/${id}`,
+        entityId: id,
+        permission: P['vendor-payment.approve'],
+      });
     });
     return this.get(companyId, id);
+  }
+
+  /** Explicit approval step (delegable `vendor-payment.approve`, SoD against the creator). */
+  async approve(
+    companyId: string,
+    actor: AuthenticatedUser,
+    id: string,
+  ): Promise<VendorPaymentDetail> {
+    await this.db.transaction(async (tx) => {
+      const existing = await this.lock(tx, companyId, id);
+      if (existing.status !== 'DRAFT' && existing.status !== 'SUBMITTED')
+        throw new BusinessRuleError(
+          ErrorCodes.DOCUMENT_INVALID_STATE,
+          `${existing.documentNumber} is ${existing.status}.`,
+        );
+      await this.approvals.assertApproved(
+        tx,
+        this.workflowRef(companyId, existing, existing.createdBy ?? actor.id),
+      );
+      const authority = await this.authority.assert(tx, actor, P['vendor-payment.approve'], {
+        companyId,
+        branchId: existing.branchId,
+        amount: existing.amount,
+        currency: existing.currency,
+        documentType: 'VENDOR_PAYMENT',
+        documentId: id,
+        documentNumber: existing.documentNumber,
+        createdBy: existing.createdBy,
+        action: 'Approved vendor payment',
+      });
+      await this.sod.checkActorSeparation(
+        actor.organizationId,
+        [P['vendor-payment.create'], P['vendor-payment.approve']],
+        existing.createdBy,
+        actor.id,
+        tx,
+        {
+          companyId,
+          entityType: 'VendorPayment',
+          entityId: id,
+          documentNumber: existing.documentNumber,
+        },
+      );
+      await tx
+        .update(vendorPayments)
+        .set({ status: 'APPROVED', approvedBy: actor.id, approvedAt: new Date() })
+        .where(eq(vendorPayments.id, id));
+      await this.audit.record(
+        {
+          action: 'APPROVE',
+          module: MODULE,
+          entityType: 'VendorPayment',
+          entityId: id,
+          previousValue: { status: existing.status },
+          newValue: { status: 'APPROVED' },
+          metadata: { documentNumber: existing.documentNumber, ...authority.audit },
+          companyId,
+        },
+        tx,
+      );
+      await this.outbox.enqueue(tx, {
+        eventType: 'vendor_payment.approved',
+        companyId,
+        dedupeKey: 'vendor_payment.approved:' + id,
+        payload: this.eventPayload(existing, 'APPROVED'),
+      });
+    });
+    return this.get(companyId, id);
+  }
+
+  private workflowRef(companyId: string, doc: VendorPayment, requestedBy: string) {
+    return {
+      companyId,
+      documentType: 'VENDOR_PAYMENT' as const,
+      documentId: doc.id,
+      documentNumber: doc.documentNumber,
+      amount: doc.amount,
+      currency: doc.currency,
+      requestedBy,
+      branchId: doc.branchId,
+    };
+  }
+
+  private eventPayload(doc: VendorPayment, status: string) {
+    return {
+      paymentId: doc.id,
+      documentNumber: doc.documentNumber,
+      vendorId: doc.vendorId,
+      paymentType: doc.paymentType,
+      paymentDate: doc.paymentDate,
+      amount: doc.amount,
+      discountAmount: doc.discountAmount,
+      currency: doc.currency,
+      method: doc.method,
+      paymentRunId: doc.paymentRunId,
+      status,
+    };
+  }
+
+  private async notifyOrg(
+    tx: DbExecutor,
+    companyId: string,
+    input: {
+      eventType: 'VENDOR_PAYMENT_APPROVAL_REQUIRED';
+      title: string;
+      body: string;
+      link: string;
+      entityId: string;
+      permission?: string;
+    },
+  ): Promise<void> {
+    const [company] = await tx
+      .select({ organizationId: companies.organizationId })
+      .from(companies)
+      .where(eq(companies.id, companyId));
+    if (!company) return;
+    await this.notifications.notify(
+      {
+        organizationId: company.organizationId,
+        eventType: input.eventType,
+        title: input.title,
+        body: input.body,
+        link: input.link,
+        entityType: 'VendorPayment',
+        entityId: input.entityId,
+        permission: input.permission,
+        companyId,
+        dedupeKey: `${input.eventType}:${input.entityId}`,
+      },
+      tx,
+    );
   }
 
   async update(
@@ -396,24 +692,42 @@ export class VendorPaymentsService {
     actor: AuthenticatedUser,
     id: string,
   ): Promise<VendorPaymentDetail> {
-    await this.db.transaction(async (tx) => {
+    await this.db.transaction((tx) => this.postInTx(tx, companyId, actor, id));
+    return this.get(companyId, id);
+  }
+
+  /**
+   * Posts inside the caller's transaction. `approvedUpstream` lets an approved
+   * payment run post the payments it created without a second approval.
+   */
+  async postInTx(
+    tx: DbExecutor,
+    companyId: string,
+    actor: AuthenticatedUser,
+    id: string,
+    options: { approvedUpstream?: boolean } = {},
+  ): Promise<void> {
+    {
       const existing = await this.lock(tx, companyId, id);
       if (existing.status === 'POSTED') return;
-      if (existing.status !== 'DRAFT')
+      if (existing.status !== 'DRAFT' && existing.status !== 'APPROVED')
         throw new BusinessRuleError(
           ErrorCodes.DOCUMENT_INVALID_STATE,
           `${existing.documentNumber} is ${existing.status}.`,
         );
-      await this.approvals.assertApproved(tx, {
-        companyId,
-        documentType: 'VENDOR_PAYMENT',
-        documentId: id,
-        documentNumber: existing.documentNumber,
-        amount: existing.amount,
-        currency: existing.currency,
-        requestedBy: existing.createdBy ?? actor.id,
-        branchId: existing.branchId,
-      });
+      // Policy: payments may require an explicit approval step and / or a workflow (Prompt #7).
+      const settings = await this.config.settings(companyId, tx);
+      if (!options.approvedUpstream) {
+        if (settings.requirePaymentApproval && existing.status !== 'APPROVED')
+          throw new BusinessRuleError(
+            ErrorCodes.APPROVAL_REQUIRED,
+            `${existing.documentNumber} must be approved before it is posted.`,
+          );
+        await this.approvals.assertApproved(
+          tx,
+          this.workflowRef(companyId, existing, existing.createdBy ?? actor.id),
+        );
+      }
       await this.sod.checkActorSeparation(
         actor.organizationId,
         [P['vendor-payment.create'], P['vendor-payment.post']],
@@ -433,17 +747,32 @@ export class VendorPaymentsService {
         .select()
         .from(vendorPaymentAllocations)
         .where(eq(vendorPaymentAllocations.paymentId, id));
-      const targets = await this.billsService.lockTargets(
-        tx,
-        companyId,
-        draftAllocations.map((a) => a.billId),
-      );
+      const discountRows = await this.discountRows(tx, id);
+      const targets = await this.billsService.lockTargets(tx, companyId, [
+        ...new Set([...draftAllocations, ...discountRows].map((a) => a.billId)),
+      ]);
       const allocated = validateAllocations(
         draftAllocations.map((a) => ({ documentId: a.billId, amount: a.amount })),
         targets,
         existing.vendorId,
         amount,
         currency,
+      );
+      // Discounts are re-validated strictly at posting time against today's window and balances.
+      const discounts = await this.validateDiscounts(
+        tx,
+        draftAllocations.map((a) => ({
+          documentId: a.billId,
+          amount: a.amount,
+          discount: discountRows.find((d) => d.billId === a.billId)?.amount,
+        })),
+        targets,
+        existing.paymentDate,
+        currency,
+      );
+      const discountBase = discounts.total.convert(
+        await this.accounts.companyCurrency(companyId, tx),
+        existing.exchangeRate,
       );
 
       if (existing.paymentType === 'REFUND') {
@@ -476,9 +805,19 @@ export class VendorPaymentsService {
             'AP',
           )
         : Money.zero(baseCurrency);
-      // AP: bank pays baseAmount; the payable relieved is baseAmount + gain.
-      const controlBase = baseAmount.add(gain);
+      // AP: bank pays baseAmount; the payable relieved is baseAmount + gain (+ discount taken).
+      const controlBase = baseAmount.add(gain).add(discountBase);
       const fxLines = await this.fx.realizedLines(tx, companyId, gain);
+      const discountLines = discountBase.isPositive()
+        ? [
+            {
+              accountId: (await this.accounts.resolveMapped(companyId, 'PURCHASE_DISCOUNT', tx)).id,
+              debit: '0',
+              credit: discountBase.toString(),
+              description: `${existing.documentNumber} - early-payment discount taken`,
+            },
+          ]
+        : [];
       const entry = await this.posting.postEvent(
         tx,
         {
@@ -503,6 +842,7 @@ export class VendorPaymentsService {
               credit: isDisbursement ? baseAmount.toString() : '0',
               description: `${existing.documentNumber} ${existing.method.toLowerCase().replace('_', ' ')}`,
             },
+            ...discountLines,
             ...fxLines,
           ],
         },
@@ -512,13 +852,26 @@ export class VendorPaymentsService {
       await this.billsService.applyToTargets(
         tx,
         targets,
-        draftAllocations.map((a) => ({ documentId: a.billId, amount: a.amount })),
+        [
+          ...draftAllocations.map((a) => ({ documentId: a.billId, amount: a.amount })),
+          ...discounts.rows.map((d) => ({ documentId: d.billId, amount: d.amount })),
+        ],
         currency,
       );
+      for (const d of discounts.rows)
+        await tx
+          .update(vendorBills)
+          .set({ discountTakenAmount: sql`${vendorBills.discountTakenAmount} + ${d.amount}` })
+          .where(eq(vendorBills.id, d.billId));
       await tx
         .update(vendorPaymentAllocations)
         .set({ allocationDate: existing.paymentDate })
-        .where(eq(vendorPaymentAllocations.paymentId, id));
+        .where(
+          or(
+            eq(vendorPaymentAllocations.paymentId, id),
+            eq(vendorPaymentAllocations.discountPaymentId, id),
+          ),
+        );
       await tx
         .update(vendorPayments)
         .set({
@@ -526,6 +879,7 @@ export class VendorPaymentsService {
           allocatedAmount: allocated.toString(),
           baseAmount: baseAmount.toString(),
           controlBaseAmount: controlBase.toString(),
+          discountAmount: discounts.total.toString(),
           journalEntryId: entry.id,
           postedBy: actor.id,
           postedAt: new Date(),
@@ -537,7 +891,12 @@ export class VendorPaymentsService {
           module: MODULE,
           entityType: 'VendorPayment',
           entityId: id,
-          newValue: { status: 'POSTED', journalEntryId: entry.id, allocated: allocated.toString() },
+          newValue: {
+            status: 'POSTED',
+            journalEntryId: entry.id,
+            allocated: allocated.toString(),
+            discountTaken: discounts.total.toString(),
+          },
           metadata: {
             documentNumber: existing.documentNumber,
             journalNumber: entry.documentNumber,
@@ -546,8 +905,19 @@ export class VendorPaymentsService {
         },
         tx,
       );
-    });
-    return this.get(companyId, id);
+      await this.outbox.enqueue(tx, {
+        eventType: 'vendor_payment.posted',
+        companyId,
+        dedupeKey: 'vendor_payment.posted:' + id,
+        payload: {
+          ...this.eventPayload(existing, 'POSTED'),
+          allocated: allocated.toString(),
+          discountAmount: discounts.total.toString(),
+          journalEntryId: entry.id,
+          journalNumber: entry.documentNumber,
+        },
+      });
+    }
   }
 
   /** Applies the unallocated part of a posted receipt to open bills (no new ledger entry). */
@@ -660,8 +1030,26 @@ export class VendorPaymentsService {
         .select()
         .from(vendorPaymentAllocations)
         .where(eq(vendorPaymentAllocations.paymentId, id));
-      await this.billsService.releaseFromTargets(tx, companyId, allocations, existing.currency);
-      await tx.delete(vendorPaymentAllocations).where(eq(vendorPaymentAllocations.paymentId, id));
+      const discountRows = await this.discountRows(tx, id);
+      await this.billsService.releaseFromTargets(
+        tx,
+        companyId,
+        [...allocations, ...discountRows],
+        existing.currency,
+      );
+      for (const d of discountRows)
+        await tx
+          .update(vendorBills)
+          .set({ discountTakenAmount: sql`${vendorBills.discountTakenAmount} - ${d.amount}` })
+          .where(eq(vendorBills.id, d.billId));
+      await tx
+        .delete(vendorPaymentAllocations)
+        .where(
+          or(
+            eq(vendorPaymentAllocations.paymentId, id),
+            eq(vendorPaymentAllocations.discountPaymentId, id),
+          ),
+        );
       await this.fx.reverseRealized(
         tx,
         companyId,
@@ -732,6 +1120,12 @@ export class VendorPaymentsService {
         },
         tx,
       );
+      await this.outbox.enqueue(tx, {
+        eventType: 'vendor_payment.voided',
+        companyId,
+        dedupeKey: 'vendor_payment.voided:' + id,
+        payload: { ...this.eventPayload(existing, 'VOID'), reason: input.reason },
+      });
     });
     return this.get(companyId, id);
   }

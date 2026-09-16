@@ -4,6 +4,7 @@ import { exchangeRateValueSchema } from './enterprise';
 import {
   CUSTOMER_TYPES,
   ENTITY_STATUSES,
+  VENDOR_TYPES,
   PAYMENT_METHODS,
   PAYMENT_STATUSES,
   PAYMENT_TYPES,
@@ -64,7 +65,23 @@ export const updateCustomerSchema = createCustomerSchema
 export type UpdateCustomerInput = z.infer<typeof updateCustomerSchema>;
 
 export const createVendorSchema = partyBase.extend({
+  /** Explicit net days; when omitted the named payment term (vendor / group / company default) decides. */
+  paymentTermsDays: z.coerce.number().int().min(0).max(365).optional(),
   defaultExpenseAccountId: uuidSchema.nullable().optional(),
+  /** Enterprise vendor master (Prompt #7). */
+  vendorType: z.enum(VENDOR_TYPES).default('SUPPLIER'),
+  displayName: optionalText(150),
+  vendorGroupId: uuidSchema.nullable().optional(),
+  /** Named payment term; when set it drives the due date instead of paymentTermsDays. */
+  paymentTermId: uuidSchema.nullable().optional(),
+  /** Withholding tax code applied to bill lines by default. */
+  defaultWithholdingTaxCodeId: uuidSchema.nullable().optional(),
+  industry: optionalText(80),
+  region: optionalText(80),
+  branchId: uuidSchema.nullable().optional(),
+  taxRegistrationType: optionalText(40),
+  /** Buyer / category manager responsible for the vendor. */
+  buyerId: uuidSchema.nullable().optional(),
 });
 export type CreateVendorInput = z.infer<typeof createVendorSchema>;
 export const updateVendorSchema = createVendorSchema
@@ -157,6 +174,10 @@ export const createBillSchema = documentBase.extend({
   /** The supplier's own invoice number - used for duplicate detection. */
   vendorInvoiceNumber: optionalText(60),
   scheduledPaymentDate: isoDateSchema.nullable().optional(),
+  /** Named payment term driving the due date and early-payment discount (Prompt #7). */
+  paymentTermId: uuidSchema.nullable().optional(),
+  /** Goods receipt(s) the bill settles; enables receipt-based matching without a PO line reference. */
+  goodsReceiptId: uuidSchema.nullable().optional(),
 });
 export type CreateBillInput = z.infer<typeof createBillSchema>;
 export const updateBillSchema = createBillSchema
@@ -193,6 +214,13 @@ export const listDocumentsQuerySchema = paginationQuerySchema.extend({
   disputedOnly: queryBooleanSchema.optional(),
   branchId: uuidSchema.optional(),
   salesOrderId: uuidSchema.optional(),
+  /** AP: only bills with an active payment hold / only bills free of holds. */
+  onHold: queryBooleanSchema.optional(),
+  purchaseOrderId: uuidSchema.optional(),
+  vendorGroupId: uuidSchema.optional(),
+  /** AP: only bills whose early-payment discount is still available on asOf (default today). */
+  discountAvailableOnly: queryBooleanSchema.optional(),
+  asOf: isoDateSchema.optional(),
 });
 export type ListDocumentsQuery = z.infer<typeof listDocumentsQuerySchema>;
 
@@ -201,6 +229,8 @@ export type ListDocumentsQuery = z.infer<typeof listDocumentsQuerySchema>;
 export const allocationInputSchema = z.object({
   documentId: uuidSchema,
   amount: amountSchema.refine((v) => Number(v) > 0, 'Allocation must be positive'),
+  /** AP: early-payment discount taken on the bill alongside the cash allocation (Prompt #7). */
+  discount: amountSchema.optional(),
 });
 export type AllocationInput = z.infer<typeof allocationInputSchema>;
 

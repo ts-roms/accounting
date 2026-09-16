@@ -15,6 +15,7 @@ import { seedBudgetingTax } from './budgeting-tax.seed';
 import { seedInventory } from './inventory.seed';
 import { seedOrders } from './orders.seed';
 import { seedReceivables } from './receivables.seed';
+import { seedPayables } from './payables.seed';
 import { seedSubledgers } from './subledger.seed';
 
 type Log = (m: string) => void;
@@ -244,6 +245,14 @@ const CHART: CoaRow[] = [
     parent: '5000',
     subtype: 'COST_OF_GOODS_SOLD',
   },
+  // Accounts payable controls (Prompt #7)
+  {
+    code: '5400',
+    name: 'Purchase Discounts Taken',
+    type: 'COST_OF_SALES',
+    parent: '5000',
+    subtype: 'COST_OF_GOODS_SOLD',
+  },
   { code: '6000', name: 'Operating Expenses', type: 'EXPENSE', header: true },
   {
     code: '6100',
@@ -330,7 +339,13 @@ const CHART: CoaRow[] = [
     subtype: 'OTHER_EXPENSE',
   },
   { code: '7000', name: 'Other Income', type: 'OTHER_INCOME', header: true },
-  { code: '7100', name: 'Interest Income', type: 'OTHER_INCOME', parent: '7000', subtype: 'OTHER_INCOME' },
+  {
+    code: '7100',
+    name: 'Interest Income',
+    type: 'OTHER_INCOME',
+    parent: '7000',
+    subtype: 'OTHER_INCOME',
+  },
   { code: '8000', name: 'Other Expenses', type: 'OTHER_EXPENSE', header: true },
   {
     code: '8100',
@@ -392,6 +407,8 @@ const MAPPINGS: Array<[AccountMappingKey, string]> = [
   ['ALLOWANCE_FOR_DOUBTFUL_ACCOUNTS', '1250'],
   ['AR_WRITE_OFF', '6720'],
   ['BAD_DEBT_RECOVERY', '4940'],
+  ['PURCHASE_DISCOUNT', '5400'],
+  ['ACCRUED_EXPENSE', '2120'],
 ];
 
 interface SampleLine {
@@ -515,8 +532,10 @@ export async function seedAccounting(
       await ensureSampleEntries(tx, company, codeToId, adminUserId, log);
     }
     await seedSubledgers(tx, company, codeToId, adminUserId, log);
-    await seedReceivables(tx, company, codeToId, adminUserId, log);
+    // Orders before the AR / AP demo sets: seedOrders skips itself once any order exists.
     await seedOrders(tx, company, codeToId, adminUserId, log);
+    await seedReceivables(tx, company, codeToId, adminUserId, log);
+    await seedPayables(tx, company, codeToId, adminUserId, log);
     await seedInventory(tx, company, adminUserId, log);
     await seedAssetsBanking(tx, company, codeToId, adminUserId, log);
     await seedBudgetingTax(tx, company, codeToId, adminUserId, log);

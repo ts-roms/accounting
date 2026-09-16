@@ -43,6 +43,8 @@ import { DRIZZLE, type Database, type DbExecutor } from '@/database/database.typ
 import {
   vendors,
   billLines,
+  billHolds,
+  companies,
   vendorBills,
   journalEntries,
   vendorPaymentAllocations,
@@ -69,6 +71,10 @@ import { TaxEngineService } from '@/modules/tax/tax-engine.service';
 import { ExchangeRatesService } from '@/modules/fx/exchange-rates.service';
 import { FxService } from '@/modules/fx/fx.service';
 import { AuthorityService } from '@/modules/delegations/authority.service';
+import { OutboxService } from '@/modules/integrations/events/outbox.service';
+import { NotificationsService } from '@/modules/integrations/notifications/notifications.service';
+import { ApConfigService } from './ap-config.service';
+import { discountAvailable, discountWindowFor } from './payables.logic';
 
 const MODULE = 'PAYABLES';
 const NUMBER_TYPE: Record<SubledgerDocumentType, DocumentType> = {
@@ -89,6 +95,10 @@ export interface BillView extends VendorBill {
   journalNumber: string | null;
   balance: string;
   daysOverdue: number;
+  /** Early-payment discount still obtainable today (Prompt #7). */
+  discountAvailableToday: string;
+  purchaseOrderNumber: string | null;
+  activeHoldReason: string | null;
 }
 
 export interface AllocationView {
@@ -136,6 +146,9 @@ export class BillsService {
     private readonly authority: AuthorityService,
     private readonly sod: SodService,
     private readonly approvals: ApprovalsService,
+    private readonly outbox: OutboxService,
+    private readonly notifications: NotificationsService,
+    private readonly config: ApConfigService,
   ) {}
 
   // ----------------------------------------------------------------- queries
@@ -159,6 +172,17 @@ export class BillsService {
         sql`${vendorBills.dueDate} < ${today}`,
         inArray(vendorBills.documentType, ['INVOICE', 'DEBIT_NOTE']),
       );
+    if (query.onHold !== undefined) filters.push(eq(vendorBills.onHold, query.onHold));
+    if (query.purchaseOrderId) filters.push(eq(vendorBills.purchaseOrderId, query.purchaseOrderId));
+    if (query.vendorGroupId) filters.push(eq(vendors.vendorGroupId, query.vendorGroupId));
+    if (query.branchId) filters.push(eq(vendorBills.branchId, query.branchId));
+    if (query.discountAvailableOnly)
+      filters.push(
+        inArray(vendorBills.status, [...OPEN_DOCUMENT_STATUSES]),
+        eq(vendorBills.accountingStatus, 'POSTED'),
+        sql`${vendorBills.discountDate} >= ${query.asOf ?? today}`,
+        sql`${vendorBills.discountAmount} > ${vendorBills.discountTakenAmount}`,
+      );
     if (query.search) {
       const term = `%${query.search}%`;
       filters.push(
@@ -166,6 +190,7 @@ export class BillsService {
           ilike(vendorBills.documentNumber, term),
           ilike(vendorBills.reference, term),
           ilike(vendorBills.description, term),
+          ilike(vendorBills.vendorInvoiceNumber, term),
           ilike(vendors.name, term),
         )!,
       );
@@ -248,12 +273,8 @@ export class BillsService {
           );
         if (existing) return { id: existing.id, warnings: [] as BillWarning[] };
       }
-      const vendor = await this.vendorsService.getOrThrow(companyId, input.vendorId, tx);
-      if (vendor.status !== 'ACTIVE')
-        throw new BusinessRuleError(
-          ErrorCodes.PARTY_INACTIVE,
-          `Vendor ${vendor.code} is inactive.`,
-        );
+      const vendor = await this.vendorsService.assertUsable(companyId, input.vendorId, tx, 'bill');
+      const settings = await this.config.settings(companyId, tx);
       const currency = vendor.currency;
       const { rate: exchangeRate, baseCurrency } = await this.rates.documentRate(
         companyId,
@@ -281,7 +302,30 @@ export class BillsService {
       const total = subtotal.add(taxed.totals.taxTotal).subtract(taxed.totals.withholdingTotal);
       const baseTotal = total.convert(baseCurrency, exchangeRate);
       await this.posting.resolvePeriod(tx, companyId, input.documentDate, { draft: true });
-      const dueDate = input.dueDate ?? addDays(input.documentDate, vendor.paymentTermsDays);
+      // Due date and early-payment window: named term (bill / vendor / company default) or the vendor's net days.
+      // The company default term is applied to new vendors on creation; here the vendor's own term (or net days) decides.
+      const paymentTermId = input.paymentTermId ?? vendor.paymentTermId ?? null;
+      const term = paymentTermId
+        ? await this.config.paymentTerm(companyId, paymentTermId, tx)
+        : null;
+      const window = term
+        ? discountWindowFor(input.documentDate, total.toString(), currency, term)
+        : null;
+      const dueDate =
+        input.dueDate ?? window?.dueDate ?? addDays(input.documentDate, vendor.paymentTermsDays);
+      const discountDate = isDebitDocument(input.documentType)
+        ? (window?.discountDate ?? null)
+        : null;
+      const discountAmount = discountDate ? window!.discountAmount : '0';
+      if (
+        settings.requirePoForStockBills &&
+        !input.purchaseOrderId &&
+        lines.some((l) => l.productId)
+      )
+        throw new BusinessRuleError(
+          ErrorCodes.VALIDATION_FAILED,
+          'Bills for stocked products must reference a purchase order (AP policy).',
+        );
       if (dueDate < input.documentDate)
         throw new BusinessRuleError(
           ErrorCodes.VALIDATION_FAILED,
@@ -336,6 +380,10 @@ export class BillsService {
             description: input.description ?? null,
             vendorInvoiceNumber: input.vendorInvoiceNumber ?? null,
             scheduledPaymentDate: input.scheduledPaymentDate ?? null,
+            paymentTermId,
+            discountDate,
+            discountAmount,
+            goodsReceiptId: input.goodsReceiptId ?? null,
             currency,
             exchangeRate,
             baseTotal: baseTotal.toString(),
@@ -364,6 +412,12 @@ export class BillsService {
       if (created.documentType === 'INVOICE') {
         await this.matching.evaluateBill(tx, companyId, created.id, warnings.length > 0);
       }
+      if (warnings.length && settings.blockDuplicateVendorInvoice && input.vendorInvoiceNumber)
+        throw new BusinessRuleError(
+          ErrorCodes.DUPLICATE_VENDOR_INVOICE,
+          warnings[0]!.message,
+          warnings[0]!.details,
+        );
       await this.audit.record(
         {
           action: 'CREATE',
@@ -380,6 +434,12 @@ export class BillsService {
         },
         tx,
       );
+      await this.outbox.enqueue(tx, {
+        eventType: 'bill.created',
+        companyId,
+        dedupeKey: 'bill.created:' + created.id,
+        payload: this.eventPayload(created, vendor.code),
+      });
       return { id: created.id, warnings };
     }
   }
@@ -586,7 +646,8 @@ export class BillsService {
   async approve(companyId: string, actor: AuthenticatedUser, id: string): Promise<BillDetail> {
     const warnings = await this.db.transaction(async (tx) => {
       const existing = await this.lock(tx, companyId, id);
-      this.assertStatus(existing, ['DRAFT'], 'approved');
+      this.assertStatus(existing, ['DRAFT', 'SUBMITTED'], 'approved');
+      await this.vendorsService.assertUsable(companyId, existing.vendorId, tx, 'bill');
       // Delegated authority (if any) is validated and recorded in this transaction.
       const authority = await this.authority.assert(tx, actor, P['bill.approve'], {
         companyId,
@@ -633,16 +694,72 @@ export class BillsService {
           module: MODULE,
           entityType: 'VendorBill',
           entityId: id,
-          previousValue: { status: 'DRAFT' },
+          previousValue: { status: existing.status },
           newValue: { status: 'APPROVED' },
           metadata: { documentNumber: existing.documentNumber, ...authority.audit },
           companyId,
         },
         tx,
       );
+      await this.outbox.enqueue(tx, {
+        eventType: 'bill.approved',
+        companyId,
+        dedupeKey: 'bill.approved:' + id,
+        payload: { ...this.eventPayload(existing), status: 'APPROVED', approvedBy: actor.email },
+      });
+      if (existing.createdBy && existing.createdBy !== actor.id)
+        await this.notify(tx, companyId, existing, {
+          eventType: 'BILL_APPROVED',
+          title: `${labelFor(existing.documentType)} ${existing.documentNumber} approved`,
+          body: `Approved by ${actor.email}; it can now be posted.`,
+          userIds: [existing.createdBy],
+        });
       return [] as BillWarning[];
     });
     return { ...(await this.get(companyId, id)), warnings };
+  }
+
+  /**
+   * DRAFT -> SUBMITTED: opens the approval workflow when one matches the amount
+   * and tells approvers (Prompt #7). Approval itself stays an explicit step.
+   */
+  async submit(companyId: string, actor: AuthenticatedUser, id: string): Promise<BillDetail> {
+    await this.db.transaction(async (tx) => {
+      const existing = await this.lock(tx, companyId, id);
+      this.assertStatus(existing, ['DRAFT'], 'submitted');
+      await this.vendorsService.assertUsable(companyId, existing.vendorId, tx, 'bill');
+      await this.approvals.open(tx, this.workflowRef(companyId, existing, actor.id));
+      await tx
+        .update(vendorBills)
+        .set({ status: 'SUBMITTED', submittedBy: actor.id, submittedAt: new Date() })
+        .where(eq(vendorBills.id, id));
+      await this.audit.record(
+        {
+          action: 'SUBMIT',
+          module: MODULE,
+          entityType: 'VendorBill',
+          entityId: id,
+          previousValue: { status: 'DRAFT' },
+          newValue: { status: 'SUBMITTED' },
+          metadata: { documentNumber: existing.documentNumber },
+          companyId,
+        },
+        tx,
+      );
+      await this.outbox.enqueue(tx, {
+        eventType: 'bill.submitted',
+        companyId,
+        dedupeKey: 'bill.submitted:' + id,
+        payload: { ...this.eventPayload(existing), status: 'SUBMITTED', submittedBy: actor.email },
+      });
+      await this.notify(tx, companyId, existing, {
+        eventType: 'BILL_APPROVAL_REQUIRED',
+        title: `${labelFor(existing.documentType)} ${existing.documentNumber} awaits approval`,
+        body: `${existing.currency} ${existing.total} from ${existing.vendorInvoiceNumber ?? 'the vendor'} submitted by ${actor.email}.`,
+        permission: P['bill.approve'],
+      });
+    });
+    return this.get(companyId, id);
   }
 
   /** Posts the accounting effect: Dr AR / Cr revenue lines (credit notes mirror it). Idempotent. */
@@ -768,6 +885,17 @@ export class BillsService {
         },
         tx,
       );
+      await this.outbox.enqueue(tx, {
+        eventType: existing.documentType === 'CREDIT_NOTE' ? 'vendor_credit.posted' : 'bill.posted',
+        companyId,
+        dedupeKey: 'bill.posted:' + id,
+        payload: {
+          ...this.eventPayload(existing, vendor.code),
+          accountingStatus: 'POSTED',
+          journalEntryId: entry.id,
+          journalNumber: entry.documentNumber,
+        },
+      });
     });
     return this.get(companyId, id);
   }
@@ -781,8 +909,28 @@ export class BillsService {
   ): Promise<BillDetail> {
     await this.db.transaction(async (tx) => {
       const existing = await this.lock(tx, companyId, id);
-      this.assertStatus(existing, ['DRAFT', 'APPROVED', 'PARTIALLY_PAID', 'PAID'], 'voided');
+      this.assertStatus(
+        existing,
+        ['DRAFT', 'SUBMITTED', 'APPROVED', 'PARTIALLY_PAID', 'PAID'],
+        'voided',
+      );
       await this.approvals.cancelFor(tx, 'VENDOR_BILL', id);
+      if (existing.onHold)
+        await tx
+          .update(billHolds)
+          .set({
+            status: 'RELEASED',
+            releasedBy: actor.id,
+            releasedAt: new Date(),
+            releaseNote: 'Bill voided',
+          })
+          .where(and(eq(billHolds.billId, id), eq(billHolds.status, 'ACTIVE')));
+      await this.outbox.enqueue(tx, {
+        eventType: 'bill.voided',
+        companyId,
+        dedupeKey: 'bill.voided:' + id,
+        payload: { ...this.eventPayload(existing), reason: input.reason },
+      });
       if (!Money.of(existing.allocatedAmount, existing.currency).isZero()) {
         throw new BusinessRuleError(
           ErrorCodes.DOCUMENT_HAS_ALLOCATIONS,
@@ -1012,11 +1160,15 @@ export class BillsService {
         currency: vendorBills.currency,
         exchangeRate: vendorBills.exchangeRate,
         matchStatus: vendorBills.matchStatus,
+        paymentHold: vendorBills.onHold,
       })
       .from(vendorBills)
       .where(and(eq(vendorBills.companyId, companyId), inArray(vendorBills.id, ids)))
       .for('update');
-    return new Map(rows.map((r) => [r.id, { ...r, onHold: r.matchStatus === 'EXCEPTION' }]));
+    // A match exception or an active payment hold keeps the bill out of any settlement.
+    return new Map(
+      rows.map((r) => [r.id, { ...r, onHold: r.matchStatus === 'EXCEPTION' || r.paymentHold }]),
+    );
   }
 
   /** Increases `allocated_amount` on each target and updates its business status. */
@@ -1080,14 +1232,87 @@ export class BillsService {
         journalNumber: sql<
           string | null
         >`(select document_number from journal_entries j where j.id = ${vendorBills.journalEntryId})`,
+        purchaseOrderNumber: sql<
+          string | null
+        >`(select document_number from orders o where o.id = ${vendorBills.purchaseOrderId})`,
+        activeHoldReason: sql<
+          string | null
+        >`(select h.reason::text from bill_holds h where h.bill_id = ${vendorBills.id} and h.status = 'ACTIVE' order by h.placed_at desc limit 1)`,
       })
       .from(vendorBills)
       .innerJoin(vendors, eq(vendors.id, vendorBills.vendorId));
   }
 
+  private eventPayload(doc: VendorBill, vendorCode?: string) {
+    return {
+      billId: doc.id,
+      documentNumber: doc.documentNumber,
+      documentType: doc.documentType,
+      vendorId: doc.vendorId,
+      vendorCode,
+      vendorInvoiceNumber: doc.vendorInvoiceNumber,
+      documentDate: doc.documentDate,
+      dueDate: doc.dueDate,
+      currency: doc.currency,
+      total: doc.total,
+      purchaseOrderId: doc.purchaseOrderId,
+    };
+  }
+
+  private workflowRef(companyId: string, doc: VendorBill, requestedBy: string) {
+    return {
+      companyId,
+      documentType: 'VENDOR_BILL' as const,
+      documentId: doc.id,
+      documentNumber: doc.documentNumber,
+      amount: doc.total,
+      currency: doc.currency,
+      requestedBy,
+      branchId: doc.branchId,
+    };
+  }
+
+  private async notify(
+    tx: DbExecutor,
+    companyId: string,
+    doc: VendorBill,
+    input: {
+      eventType: 'BILL_APPROVAL_REQUIRED' | 'BILL_APPROVED' | 'BILL_POSTED';
+      title: string;
+      body: string;
+      permission?: string;
+      userIds?: string[];
+    },
+  ): Promise<void> {
+    const [company] = await tx
+      .select({ organizationId: companies.organizationId })
+      .from(companies)
+      .where(eq(companies.id, companyId));
+    if (!company) return;
+    await this.notifications.notify(
+      {
+        organizationId: company.organizationId,
+        eventType: input.eventType,
+        title: input.title,
+        body: input.body,
+        link: `/purchasing/bills/${doc.id}`,
+        entityType: 'VendorBill',
+        entityId: doc.id,
+        userIds: input.userIds,
+        permission: input.permission,
+        companyId,
+        dedupeKey: `${input.eventType}:${doc.id}`,
+      },
+      tx,
+    );
+  }
+
   private decorate<
     T extends VendorBill & { vendorCode: string; vendorName: string; journalNumber: string | null },
-  >(row: T, today: string): T & { balance: string; daysOverdue: number } {
+  >(
+    row: T,
+    today: string,
+  ): T & { balance: string; daysOverdue: number; discountAvailableToday: string } {
     const open = OPEN_DOCUMENT_STATUSES.includes(row.status) && row.accountingStatus === 'POSTED';
     const balance = open
       ? Money.of(row.total, row.currency)
@@ -1098,7 +1323,10 @@ export class BillsService {
       open && isDebitDocument(row.documentType) && row.dueDate < today
         ? daysBetween(row.dueDate, today)
         : 0;
-    return { ...row, balance, daysOverdue: overdue };
+    const discountAvailableToday = open
+      ? discountAvailable(row, today, row.currency).toString()
+      : '0.0000';
+    return { ...row, balance, daysOverdue: overdue, discountAvailableToday };
   }
 
   private async lines(billId: string) {

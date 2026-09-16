@@ -129,9 +129,12 @@ export const ORDER_RULES: Record<OrderType, OrderTypeRules> = {
   PURCHASE_ORDER: {
     party: 'VENDOR',
     transitions: {
-      approve: { from: ['DRAFT'], to: 'APPROVED' },
+      /** Prompt #7: submit checks the vendor and opens the approval workflow. */
+      submit: { from: ['DRAFT', 'REJECTED'], to: 'SUBMITTED' },
+      approve: { from: ['DRAFT', 'SUBMITTED'], to: 'APPROVED' },
+      reject: { from: ['SUBMITTED'], to: 'REJECTED' },
       close: { from: ['APPROVED'], to: 'CLOSED' },
-      cancel: { from: ['DRAFT', 'APPROVED'], to: 'CANCELLED' },
+      cancel: { from: ['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED'], to: 'CANCELLED' },
     },
     tracksReceipts: true,
     tracksBilling: true,

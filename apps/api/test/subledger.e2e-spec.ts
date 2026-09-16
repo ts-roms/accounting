@@ -75,7 +75,7 @@ describe('Receivables & payables (e2e)', () => {
     const ar = await expectReconciled('ar');
     expect(ar.subledgerBalance).toBe('1950240.0000');
     const ap = await expectReconciled('ap');
-    expect(ap.subledgerBalance).toBe('9200.0000');
+    expect(ap.subledgerBalance).toBe('1541200.0000');
     const aging = await as(admin, http().get(`/api/v1/reports/ar-aging?asOf=${TODAY}`)).expect(200);
     expect(aging.body.totals.net).toBe(ar.subledgerBalance);
   });
@@ -505,9 +505,9 @@ describe('Receivables & payables (e2e)', () => {
     const bill = await as(admin, http().get(`/api/v1/bills/${billId}`)).expect(200);
     expect(bill.body.status).toBe('PAID');
     const ap = await expectReconciled('ap');
-    expect(ap.subledgerBalance).toBe('9200.0000');
+    expect(ap.subledgerBalance).toBe('1541200.0000');
     const aging = await as(admin, http().get(`/api/v1/reports/ap-aging?asOf=${TODAY}`)).expect(200);
-    expect(aging.body.totals.net).toBe('9200.0000');
+    expect(aging.body.totals.net).toBe('1541200.0000');
   });
 
   it('ledger-level invariants still hold after all subledger activity', async () => {

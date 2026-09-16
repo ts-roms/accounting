@@ -165,6 +165,29 @@ Subledger error codes (422): `DOCUMENT_INVALID_STATE`, `DOCUMENT_HAS_ALLOCATIONS
 Non-blocking warnings returned as `warnings[{ code, message, details }]`:
 `CREDIT_LIMIT_EXCEEDED`, `POSSIBLE_DUPLICATE_BILL`.
 
+### Accounts payable platform (Prompt #7; all require `X-Company-Id`; see `docs/accounts-payable/`)
+
+| Method                | Path                                                                                                                        | Permission                                                     |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| GET / PATCH           | `/ap-settings` (aging buckets, DPO window, horizons, warning windows, approval / duplicate / PO flags, defaults)            | `vendor.view` / `ap-settings.manage`                           |
+| GET / POST / PATCH    | `/vendor-groups`                                                                                                            | `vendor.view` / `ap-settings.manage`                           |
+| GET                   | `/vendors?vendorStatus&vendorGroupId&vendorType&onHold&search` (view carries group, term, balances incl. `onHold`)          | `vendor.view`                                                  |
+| POST                  | `/vendors/:id/approve` `{ decision: APPROVE / REJECT / BLOCK }`, `/vendors/:id/hold` `{ hold, reason, note }`               | `vendor.approve` (delegable)                                   |
+| PATCH / POST / DELETE | `/vendors/:id/profile`, `/vendors/:id/contacts[/:id]`, `/addresses[/:id]`, `/bank-accounts[/:id]` (numbers returned masked) | `vendor.manage`                                                |
+| POST                  | `/purchase-orders/:id/submit`, `/purchase-orders/:id/reject` (vendor gate + workflow)                                       | `purchase-order.create` / `purchase-order.approve`             |
+| POST                  | `/bills/:id/submit` (workflow + approver notification)                                                                      | `bill.create`                                                  |
+| GET / POST            | `/vendor-credits`, `/vendor-debit-notes`                                                                                    | `bill.view` / `bill.create`                                    |
+| POST                  | `/bills/:id/hold` `{ reason, note }`; GET `/bill-holds?status`; POST `/bill-holds/:id/release`                              | `bill.hold` (list: `bill.view`)                                |
+| POST                  | `/vendor-payments/:id/submit`, `/vendor-payments/:id/approve`; allocations accept `discount`                                | `vendor-payment.create` / `vendor-payment.approve` (delegable) |
+| GET / POST / PATCH    | `/payment-runs`, `/payment-runs/:id/lines`                                                                                  | `payment-run.view` / `payment-run.create`                      |
+| POST                  | `/payment-runs/:id/submit` / `approve` / `execute` / `cancel`; GET `/payment-runs/:id/remittance?format`                    | `payment-run.create` / `.approve` (delegable) / `.execute`     |
+| GET / POST / DELETE   | `/ap-accruals`, `/ap-accruals/:id/post`; GET `/grni?asOf&vendorId&minAgeDays`                                               | `ap-accrual.view` / `ap-accrual.post`                          |
+| GET                   | `/ap-dashboard?asOf`, `/cash-requirements?asOf&days&vendorId`, `/vendor-statements?vendorId&from&to`                        | `reports.view` / `payment-run.view` / `vendor.view`            |
+| GET / POST            | `/ap-integrity?asOf`, `/payables/sweep?asOf`                                                                                | `integrity.check` / `ap-settings.manage`                       |
+
+AP error codes (422): `VENDOR_ON_HOLD`, `VENDOR_NOT_APPROVED`, `BILL_ON_HOLD`, `PAYMENT_RUN_INVALID`, `ACCRUAL_INVALID`;
+held bills fail settlement with `MATCH_EXCEPTION_UNREVIEWED` like an unreviewed three-way match.
+
 ### Sales & purchasing (all require `X-Company-Id`)
 
 Four order resources share one shape: `/quotations`, `/sales-orders`,

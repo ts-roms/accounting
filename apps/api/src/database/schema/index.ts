@@ -20,3 +20,4 @@ export * from './integrations';
 export * from './delegations';
 export * from './receivables';
 export * from './data-infrastructure';
+export * from './payables';

@@ -44,6 +44,7 @@ import {
   CustomerCreditCard,
   CustomerMasterTab,
 } from '@/components/receivables/ar-panels';
+import { VendorMasterTab, VendorStatusCard } from '@/components/payables/ap-panels';
 
 export function PartyDetailPage({ cfg, id }: { cfg: SubledgerConfig; id: string }) {
   const { hasPermission } = useSession();
@@ -125,28 +126,19 @@ export function PartyDetailPage({ cfg, id }: { cfg: SubledgerConfig; id: string 
           emphasis
         />
       </div>
-      {cfg.side === 'AR' ? (
-        <CustomerCreditCard customer={p} />
-      ) : (
-        <p className="text-xs text-muted-foreground">
-          Terms {p.paymentTermsDays} days{p.email ? ` - ${p.email}` : ''}
-          {p.phone ? ` - ${p.phone}` : ''}
-        </p>
-      )}
+      {cfg.side === 'AR' ? <CustomerCreditCard customer={p} /> : <VendorStatusCard vendor={p} />}
 
       <Tabs defaultValue="documents">
         <TabsList>
           <TabsTrigger value="documents">{cfg.document.plural}</TabsTrigger>
           <TabsTrigger value="payments">{cfg.payment.plural}</TabsTrigger>
           <TabsTrigger value="statement">Statement</TabsTrigger>
-          {cfg.side === 'AR' ? <TabsTrigger value="master">Profile & contacts</TabsTrigger> : null}
+          <TabsTrigger value="master">Profile & contacts</TabsTrigger>
           {cfg.side === 'AR' ? <TabsTrigger value="collections">Collections</TabsTrigger> : null}
         </TabsList>
-        {cfg.side === 'AR' ? (
-          <TabsContent value="master">
-            <CustomerMasterTab customer={p} />
-          </TabsContent>
-        ) : null}
+        <TabsContent value="master">
+          {cfg.side === 'AR' ? <CustomerMasterTab customer={p} /> : <VendorMasterTab vendor={p} />}
+        </TabsContent>
         {cfg.side === 'AR' ? (
           <TabsContent value="collections">
             <CustomerCollectionsTab customerId={p.id} />

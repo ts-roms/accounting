@@ -25,6 +25,7 @@ import type { Importer } from '../sync/importers/importer';
 import { InvoicesImporter } from '../sync/importers/invoices.importer';
 import { PaymentsImporter } from '../sync/importers/payments.importer';
 import { SalesOrdersImporter } from '../sync/importers/sales-orders.importer';
+import { PurchaseOrdersImporter } from '../sync/importers/purchase-orders.importer';
 
 const JOB_PROCESS = 'process-inbound';
 
@@ -65,6 +66,7 @@ export class InboundWebhooksService implements OnModuleInit {
     bills: BillsImporter,
     products: ProductsImporter,
     salesOrders: SalesOrdersImporter,
+    purchaseOrders: PurchaseOrdersImporter,
   ) {
     this.logger.setContext(InboundWebhooksService.name);
     this.importers = new Map(
@@ -77,6 +79,7 @@ export class InboundWebhooksService implements OnModuleInit {
         bills,
         products,
         salesOrders,
+        purchaseOrders,
       ].map((i) => [i.entity, i]),
     );
   }
