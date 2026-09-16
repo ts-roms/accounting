@@ -36,6 +36,11 @@ export const AUDIT_ACTIONS = [
   'DELEGATION_USE',
   'EXPIRE',
   'CANCEL',
+  'OPENING_BALANCE',
+  'RECURRING_RUN',
+  'RECOGNIZE',
+  'PAUSE',
+  'RESUME',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

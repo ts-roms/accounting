@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, inArray, isNotNull, ne, sql } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNotNull, ne, sql } from 'drizzle-orm';
+import type { PgColumn } from 'drizzle-orm/pg-core';
 import { Money } from '@accounting/money';
 import {
   LEDGER_STATUSES,
@@ -10,6 +11,8 @@ import { DRIZZLE, type Database } from '@/database/database.types';
 import {
   accountMappings,
   accounts,
+  companies,
+  dimensions,
   fiscalPeriods,
   journalEntries,
   journalLines,
@@ -20,7 +23,10 @@ import {
   warehouses,
 } from '@/database/schema';
 import { AccountsService } from '@/modules/accounting/accounts/accounts.service';
+import { findDimensionRuleViolations } from '@/modules/accounting/dimensions/dimension-rules.logic';
+import { DimensionRulesService } from '@/modules/accounting/dimensions/dimension-rules.service';
 import { SubledgerBalancesService } from '@/modules/reconciliation/subledger-balances.service';
+import { ReportingService } from '@/modules/reporting/reporting.service';
 
 export type IntegritySeverity = 'INFO' | 'WARNING' | 'CRITICAL';
 
@@ -70,6 +76,8 @@ export class IntegrityService {
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly accounts: AccountsService,
     private readonly balances: SubledgerBalancesService,
+    private readonly dimensionRules: DimensionRulesService,
+    private readonly reporting: ReportingService,
   ) {}
 
   async run(companyId: string, asOf: string): Promise<IntegrityReport> {
@@ -80,6 +88,12 @@ export class IntegrityService {
       this.postedInClosedPeriods(companyId),
       this.linesOnBadAccounts(companyId),
       this.orphanLines(companyId),
+      this.invalidCurrencies(companyId),
+      this.invalidDimensions(companyId),
+      this.dimensionRuleViolations(companyId),
+      this.accountBranchViolations(companyId),
+      this.duplicateSources(companyId),
+      this.statementsBalance(companyId, asOf, currency),
       this.missingMappings(companyId),
       this.subledger('AR', companyId, asOf, currency),
       this.subledger('AP', companyId, asOf, currency),
@@ -336,6 +350,194 @@ export class IntegrityService {
       'WARNING',
       'No vendor is paid the same amount twice on one day with the same reference',
       rows,
+    );
+  }
+
+  /** Journal headers are always in the company base currency; foreign lines need a header currency. */
+  private async invalidCurrencies(companyId: string): Promise<IntegrityFinding> {
+    const rows = await this.db
+      .select({
+        id: journalEntries.id,
+        documentNumber: journalEntries.documentNumber,
+        currency: journalEntries.currency,
+        transactionCurrency: journalEntries.transactionCurrency,
+        baseCurrency: companies.baseCurrency,
+      })
+      .from(journalEntries)
+      .innerJoin(companies, eq(companies.id, journalEntries.companyId))
+      .where(
+        and(
+          eq(journalEntries.companyId, companyId),
+          sql`(${journalEntries.currency} <> ${companies.baseCurrency}
+            OR ${journalEntries.transactionCurrency} = ${companies.baseCurrency}
+            OR EXISTS (SELECT 1 FROM journal_lines jl WHERE jl.journal_entry_id = ${journalEntries.id}
+                       AND (jl.foreign_debit IS NOT NULL OR jl.foreign_credit IS NOT NULL)
+                       AND ${journalEntries.transactionCurrency} IS NULL))`,
+        ),
+      )
+      .limit(20);
+    return finding(
+      'INVALID_CURRENCY',
+      'CRITICAL',
+      'Journals are in the company base currency',
+      rows,
+    );
+  }
+
+  /** Every dimension reference points at a dimension of this company with the matching type. */
+  private async invalidDimensions(companyId: string): Promise<IntegrityFinding> {
+    const check = (column: PgColumn, type: string) =>
+      this.db
+        .select({
+          lineId: journalLines.id,
+          documentNumber: journalEntries.documentNumber,
+          field: sql<string>`${type}`,
+          dimensionId: column,
+        })
+        .from(journalLines)
+        .innerJoin(journalEntries, eq(journalEntries.id, journalLines.journalEntryId))
+        .leftJoin(dimensions, eq(dimensions.id, column))
+        .where(
+          and(
+            eq(journalLines.companyId, companyId),
+            isNotNull(column),
+            sql`(${dimensions.id} IS NULL OR ${dimensions.companyId} <> ${companyId} OR ${dimensions.dimensionType} <> ${type})`,
+          ),
+        )
+        .limit(20);
+    const rows = (
+      await Promise.all([
+        check(journalLines.departmentId, 'DEPARTMENT'),
+        check(journalLines.costCenterId, 'COST_CENTER'),
+        check(journalLines.projectId, 'PROJECT'),
+      ])
+    ).flat();
+    return finding('INVALID_DIMENSION', 'CRITICAL', 'Dimension references are valid', rows);
+  }
+
+  /** Posted lines satisfy the active dimension rules (rules added after posting surface here). */
+  private async dimensionRuleViolations(companyId: string): Promise<IntegrityFinding> {
+    const rules = await this.dimensionRules.activeRules(companyId);
+    if (rules.length === 0)
+      return finding('DIMENSION_RULE', 'WARNING', 'Posted lines satisfy dimension rules', []);
+    const rows = await this.db
+      .select({
+        lineId: journalLines.id,
+        documentNumber: journalEntries.documentNumber,
+        accountId: journalLines.accountId,
+        code: accounts.code,
+        type: accounts.type,
+        departmentId: journalLines.departmentId,
+        costCenterId: journalLines.costCenterId,
+        projectId: journalLines.projectId,
+      })
+      .from(journalLines)
+      .innerJoin(journalEntries, eq(journalEntries.id, journalLines.journalEntryId))
+      .innerJoin(accounts, eq(accounts.id, journalLines.accountId))
+      .where(
+        and(
+          eq(journalLines.companyId, companyId),
+          inArray(journalEntries.status, [...LEDGER_STATUSES]),
+        ),
+      );
+    const accountsById = new Map(
+      rows.map((r) => [r.accountId, { id: r.accountId, code: r.code, type: r.type }]),
+    );
+    const violations = findDimensionRuleViolations(rules, rows, accountsById).map((v) => ({
+      documentNumber: rows[v.line - 1]?.documentNumber,
+      accountCode: v.accountCode,
+      rule: v.ruleName,
+      dimensionType: v.dimensionType,
+    }));
+    return finding('DIMENSION_RULE', 'WARNING', 'Posted lines satisfy dimension rules', violations);
+  }
+
+  /** Accounts restricted to branches only carry lines of those branches. */
+  private async accountBranchViolations(companyId: string): Promise<IntegrityFinding> {
+    const rows = await this.db
+      .select({
+        lineId: journalLines.id,
+        documentNumber: journalEntries.documentNumber,
+        code: accounts.code,
+        branchId: journalLines.branchId,
+      })
+      .from(journalLines)
+      .innerJoin(journalEntries, eq(journalEntries.id, journalLines.journalEntryId))
+      .innerJoin(accounts, eq(accounts.id, journalLines.accountId))
+      .where(
+        and(
+          eq(journalLines.companyId, companyId),
+          inArray(journalEntries.status, [...LEDGER_STATUSES]),
+          sql`cardinality(${accounts.allowedBranchIds}) > 0`,
+          sql`(${journalLines.branchId} IS NULL OR NOT (${journalLines.branchId} = ANY(${accounts.allowedBranchIds})))`,
+        ),
+      )
+      .limit(20);
+    return finding(
+      'ACCOUNT_BRANCH',
+      'WARNING',
+      'Branch-restricted accounts respect their branches',
+      rows,
+    );
+  }
+
+  /** One ledger entry per source document (the unique index guarantees it; this proves it). */
+  private async duplicateSources(companyId: string): Promise<IntegrityFinding> {
+    const rows = await this.db
+      .select({
+        sourceType: journalEntries.sourceType,
+        sourceId: journalEntries.sourceId,
+        entries: sql<number>`count(*)::int`,
+      })
+      .from(journalEntries)
+      .where(
+        and(
+          eq(journalEntries.companyId, companyId),
+          isNotNull(journalEntries.sourceType),
+          isNotNull(journalEntries.sourceId),
+          inArray(journalEntries.status, [...LEDGER_STATUSES]),
+        ),
+      )
+      .groupBy(journalEntries.sourceType, journalEntries.sourceId)
+      .having(gt(sql`count(*)`, 1))
+      .limit(20);
+    return finding('DUPLICATE_SOURCE', 'CRITICAL', 'No source document is posted twice', rows);
+  }
+
+  /** Trial balance and balance sheet tie as of the report date. */
+  private async statementsBalance(
+    companyId: string,
+    asOf: string,
+    currency: string,
+  ): Promise<IntegrityFinding> {
+    const [tb, bs] = await Promise.all([
+      this.reporting.trialBalance(companyId, { from: '1900-01-01', to: asOf, includeZero: false }),
+      this.reporting.balanceSheet(companyId, { asOf }),
+    ]);
+    const samples: Array<Record<string, unknown>> = [];
+    if (!tb.balanced)
+      samples.push({
+        statement: 'TRIAL_BALANCE',
+        closingDebit: tb.totals.closingDebit,
+        closingCredit: tb.totals.closingCredit,
+        difference: Money.of(tb.totals.closingDebit, currency)
+          .subtract(Money.of(tb.totals.closingCredit, currency))
+          .toString(),
+      });
+    if (!bs.balanced)
+      samples.push({
+        statement: 'BALANCE_SHEET',
+        totalAssets: bs.totalAssets,
+        totalLiabilitiesAndEquity: bs.totalLiabilitiesAndEquity,
+        difference: Money.of(bs.totalAssets, currency)
+          .subtract(Money.of(bs.totalLiabilitiesAndEquity, currency))
+          .toString(),
+      });
+    return finding(
+      'STATEMENTS_BALANCE',
+      'CRITICAL',
+      'Trial balance balances and Assets = Liabilities + Equity',
+      samples,
     );
   }
 

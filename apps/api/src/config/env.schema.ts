@@ -52,6 +52,12 @@ export const envSchema = z.object({
   AI_ANOMALY_SCAN_DAYS: z.coerce.number().int().min(0).max(365).default(7),
 
   /**
+   * Nightly accounting schedules (recurring journals, prepayment recognition).
+   * Cron pattern in server time; empty string disables the job.
+   */
+  ACCOUNTING_SCHEDULES_CRON: z.string().trim().default('15 2 * * *'),
+
+  /**
    * Integration platform (Prompt #4). The encryption key protects provider
    * credentials, OAuth tokens and webhook secrets at rest; production must set
    * it explicitly (32 bytes hex/base64 or a long passphrase).

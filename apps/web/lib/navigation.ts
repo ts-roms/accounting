@@ -140,6 +140,30 @@ export const NAVIGATION: NavSection[] = [
         icon: ShieldCheck,
         permissions: [P['integrity.check']],
       },
+      {
+        title: 'Suspense Accounts',
+        href: '/accounting/suspense',
+        icon: Siren,
+        permissions: [P['journal.view']],
+      },
+      {
+        title: 'Recurring Journals',
+        href: '/accounting/recurring-journals',
+        icon: Workflow,
+        permissions: [P['recurring-journal.view']],
+      },
+      {
+        title: 'Prepayments',
+        href: '/accounting/prepayments',
+        icon: Wallet,
+        permissions: [P['prepayment.view']],
+      },
+      {
+        title: 'Posting Rules',
+        href: '/accounting/posting-rules',
+        icon: SlidersHorizontal,
+        permissions: [P['posting-rule.view']],
+      },
     ],
   },
   {

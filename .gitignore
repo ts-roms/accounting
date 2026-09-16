@@ -5,6 +5,7 @@ node_modules/
 # builds
 dist/
 .next/
+.next-*/
 out/
 .turbo/
 coverage/

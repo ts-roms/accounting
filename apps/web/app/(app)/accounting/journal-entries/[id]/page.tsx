@@ -208,6 +208,25 @@ export default function JournalEntryDetailPage() {
         </Alert>
       ) : null}
 
+      {e.transactionCurrency || e.autoReverseDate ? (
+        <Alert>
+          <AlertDescription className="flex flex-wrap gap-4 text-xs" data-testid="je-core-info">
+            {e.transactionCurrency ? (
+              <span>
+                Entered in <strong>{e.transactionCurrency}</strong> at {e.exchangeRate} {e.currency}
+                ; ledger amounts are in {e.currency}.
+              </span>
+            ) : null}
+            {e.autoReverseDate ? (
+              <span>
+                Auto-reverses on <strong>{e.autoReverseDate}</strong>
+                {e.reversedByNumber ? ` (reversal ${e.reversedByNumber})` : ''}.
+              </span>
+            ) : null}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
@@ -239,7 +258,18 @@ export default function JournalEntryDetailPage() {
                         {l.accountName}
                       </Link>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{l.description ?? ''}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {l.description ?? ''}
+                      {e.transactionCurrency && (l.foreignDebit || l.foreignCredit) ? (
+                        <span className="ml-2 font-mono text-xs">
+                          ({e.transactionCurrency}{' '}
+                          {l.foreignDebit && l.foreignDebit !== '0.0000'
+                            ? `Dr ${l.foreignDebit}`
+                            : `Cr ${l.foreignCredit}`}
+                          )
+                        </span>
+                      ) : null}
+                    </TableCell>
                     <TableCell>
                       <Amount value={l.debit} currency={e.currency} zeroAsDash />
                     </TableCell>

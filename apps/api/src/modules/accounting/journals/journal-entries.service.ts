@@ -13,10 +13,12 @@ import {
   sql,
   type SQL,
 } from 'drizzle-orm';
+import { Money } from '@accounting/money';
 import { P, type PaginatedResult } from '@accounting/types';
 import type {
   CreateJournalEntryInput,
   ListJournalEntriesQuery,
+  OpeningBalancesInput,
   RejectJournalEntryInput,
   CorrectJournalEntryInput,
   ReverseJournalEntryInput,
@@ -33,16 +35,20 @@ import {
   accounts,
   branches,
   companies,
+  exchangeRates,
   fiscalPeriods,
   journalEntries,
   journalLines,
   type JournalEntry,
 } from '@/database/schema';
+import { pickRate } from '@/modules/fx/fx.logic';
+import { AccountsService } from '../accounts/accounts.service';
+import { convertForeignLines, ForeignJournalUnbalancedError } from './fx-lines.logic';
 import { DocumentNumberingService } from '../numbering/document-numbering.service';
 import { DimensionsService } from '../dimensions/dimensions.service';
 import { ApprovalsService } from '@/modules/workflows/approvals.service';
 import { AuthorityService } from '@/modules/delegations/authority.service';
-import { AccountingPostingService } from './posting.service';
+import { AccountingPostingService, type PostingLine } from './posting.service';
 
 const MODULE = 'ACCOUNTING';
 
@@ -59,6 +65,17 @@ export interface JournalLineView {
   departmentId: string | null;
   costCenterId: string | null;
   projectId: string | null;
+  /** Foreign-currency journals only. */
+  foreignDebit: string | null;
+  foreignCredit: string | null;
+  exchangeRate: string | null;
+}
+
+/** Header fields + lines after currency preparation, ready to be written. */
+interface PreparedLines {
+  lines: PostingLine[];
+  transactionCurrency: string | null;
+  exchangeRate: string | null;
 }
 
 export interface JournalEntryView extends JournalEntry {
@@ -109,6 +126,7 @@ export class JournalEntriesService {
     private readonly dimensions: DimensionsService,
     private readonly approvals: ApprovalsService,
     private readonly authority: AuthorityService,
+    private readonly accounts: AccountsService,
   ) {}
 
   // ----------------------------------------------------------------- queries
@@ -245,12 +263,14 @@ export class JournalEntriesService {
         if (existing) return existing.id;
       }
       const currency = await this.companyCurrency(tx, companyId);
-      const validated = await this.posting.validateLines(tx, companyId, currency, input.lines);
-      await this.dimensions.validateRefs(tx, companyId, input.lines, input.entryDate);
+      const prepared = await this.prepareLines(tx, companyId, currency, input.entryDate, input);
+      const validated = await this.posting.validateLines(tx, companyId, currency, prepared.lines);
+      await this.dimensions.validateRefs(tx, companyId, prepared.lines, input.entryDate);
       const period = await this.posting.resolvePeriod(tx, companyId, input.entryDate, {
         draft: true,
       });
       await this.assertBranch(tx, companyId, input.branchId);
+      this.assertAutoReverse(input.entryDate, input.autoReverseDate);
       const documentNumber = await this.numbering.allocate(
         companyId,
         'JE',
@@ -268,9 +288,13 @@ export class JournalEntriesService {
           journalType: input.journalType,
           status: 'DRAFT',
           entryDate: input.entryDate,
+          documentDate: input.documentDate ?? null,
+          autoReverseDate: input.autoReverseDate ?? null,
           description: input.description,
           reference: input.reference ?? null,
           currency,
+          transactionCurrency: prepared.transactionCurrency,
+          exchangeRate: prepared.exchangeRate,
           totalDebit: validated.totalDebit.toString(),
           totalCredit: validated.totalCredit.toString(),
           idempotencyKey: input.idempotencyKey ?? null,
@@ -278,7 +302,7 @@ export class JournalEntriesService {
         })
         .returning();
       if (!entry) throw new Error('Insert returned no row');
-      await this.writeLines(tx, entry, input.lines);
+      await this.writeLines(tx, entry, prepared.lines);
       await this.audit.record(
         {
           action: 'CREATE',
@@ -291,6 +315,10 @@ export class JournalEntriesService {
             description: entry.description,
             totalDebit: entry.totalDebit,
             lines: input.lines.length,
+            journalType: entry.journalType,
+            transactionCurrency: prepared.transactionCurrency,
+            exchangeRate: prepared.exchangeRate,
+            autoReverseDate: entry.autoReverseDate,
           },
           companyId,
         },
@@ -299,6 +327,80 @@ export class JournalEntriesService {
       return entry.id;
     });
     return this.get(companyId, id);
+  }
+
+  /**
+   * Opening balances as an OPENING journal: the caller supplies the balances
+   * per account, the engine offsets any difference against the
+   * OPENING_BALANCE_EQUITY mapping so the entry balances, and the draft goes
+   * through the normal submit / approve / post controls (SoD included).
+   */
+  async openingBalances(
+    companyId: string,
+    actor: AuthenticatedUser,
+    input: OpeningBalancesInput,
+  ): Promise<JournalEntryDetail> {
+    const currency = await this.companyCurrency(this.db, companyId);
+    let debit = Money.zero(currency);
+    let credit = Money.zero(currency);
+    for (const line of input.lines) {
+      debit = debit.add(Money.parse(line.debit, currency));
+      credit = credit.add(Money.parse(line.credit, currency));
+    }
+    const lines: CreateJournalEntryInput['lines'] = input.lines.map((l) => ({
+      accountId: l.accountId,
+      debit: l.debit,
+      credit: l.credit,
+      description: l.description ?? undefined,
+      branchId: l.branchId ?? null,
+      departmentId: l.departmentId ?? null,
+      costCenterId: l.costCenterId ?? null,
+      projectId: l.projectId ?? null,
+    }));
+    const difference = debit.subtract(credit);
+    if (!difference.isZero()) {
+      const offset = await this.accounts.resolveMapped(companyId, 'OPENING_BALANCE_EQUITY');
+      lines.push({
+        accountId: offset.id,
+        debit: difference.isNegative() ? difference.abs().toString() : '0',
+        credit: difference.isPositive() ? difference.toString() : '0',
+        description: 'Opening balance offset',
+        branchId: input.branchId ?? null,
+        departmentId: null,
+        costCenterId: null,
+        projectId: null,
+      });
+    }
+    if (lines.length < 2) {
+      throw new BusinessRuleError(
+        ErrorCodes.JOURNAL_UNBALANCED,
+        'Opening balances need at least one non-zero balance.',
+      );
+    }
+    const detail = await this.create(companyId, actor, {
+      entryDate: input.asOfDate,
+      description: input.description,
+      reference: input.reference,
+      journalType: 'OPENING',
+      branchId: input.branchId ?? null,
+      lines,
+      idempotencyKey: input.idempotencyKey,
+    });
+    await this.audit.record({
+      action: 'OPENING_BALANCE',
+      module: MODULE,
+      entityType: 'JournalEntry',
+      entityId: detail.id,
+      newValue: {
+        documentNumber: detail.documentNumber,
+        asOfDate: input.asOfDate,
+        accounts: input.lines.length,
+        offset: difference.toString(),
+      },
+      companyId,
+      userId: actor.id,
+    });
+    return detail;
   }
 
   async update(
@@ -320,28 +422,54 @@ export class JournalEntriesService {
       const period = await this.posting.resolvePeriod(tx, companyId, entryDate, { draft: true });
       const branchId = input.branchId === undefined ? entry.branchId : input.branchId;
       await this.assertBranch(tx, companyId, branchId);
+      const autoReverseDate =
+        input.autoReverseDate === undefined ? entry.autoReverseDate : input.autoReverseDate;
+      this.assertAutoReverse(entryDate, autoReverseDate);
 
       let totals = { totalDebit: entry.totalDebit, totalCredit: entry.totalCredit };
-      if (input.lines) {
-        const validated = await this.posting.validateLines(tx, companyId, currency, input.lines);
-        await this.dimensions.validateRefs(tx, companyId, input.lines, entryDate);
+      let fx = { transactionCurrency: entry.transactionCurrency, exchangeRate: entry.exchangeRate };
+      const currencyChanged =
+        input.transactionCurrency !== undefined || input.exchangeRate !== undefined;
+      if (input.lines || currencyChanged) {
+        // Re-prepare from the amounts as entered (foreign when the entry is foreign).
+        const entered = input.lines ?? (await this.enteredLines(tx, id));
+        const prepared = await this.prepareLines(tx, companyId, currency, entryDate, {
+          lines: entered,
+          transactionCurrency:
+            input.transactionCurrency === undefined
+              ? (entry.transactionCurrency ?? undefined)
+              : input.transactionCurrency,
+          exchangeRate:
+            input.exchangeRate === undefined
+              ? (entry.exchangeRate ?? undefined)
+              : input.exchangeRate,
+        });
+        const validated = await this.posting.validateLines(tx, companyId, currency, prepared.lines);
+        await this.dimensions.validateRefs(tx, companyId, prepared.lines, entryDate);
         totals = {
           totalDebit: validated.totalDebit.toString(),
           totalCredit: validated.totalCredit.toString(),
         };
+        fx = {
+          transactionCurrency: prepared.transactionCurrency,
+          exchangeRate: prepared.exchangeRate,
+        };
         await tx.delete(journalLines).where(eq(journalLines.journalEntryId, id));
-        await this.writeLines(tx, { id, companyId }, input.lines);
+        await this.writeLines(tx, { id, companyId }, prepared.lines);
       }
 
       await tx
         .update(journalEntries)
         .set({
           entryDate,
+          documentDate: input.documentDate === undefined ? entry.documentDate : input.documentDate,
+          autoReverseDate,
           fiscalPeriodId: period.id,
           description: input.description ?? entry.description,
           reference: input.reference === undefined ? entry.reference : input.reference,
           journalType: input.journalType ?? entry.journalType,
           branchId,
+          ...fx,
           status: 'DRAFT',
           rejectedAt: null,
           rejectedBy: null,
@@ -688,71 +816,14 @@ export class JournalEntriesService {
     entry: JournalEntry,
     input: ReverseJournalEntryInput,
   ): Promise<JournalEntry> {
-    const id = entry.id;
-    {
-      this.assertStatus(entry, ['POSTED', 'LOCKED'], 'reversed');
-      if (input.reversalDate < entry.entryDate) {
-        throw new BusinessRuleError(
-          ErrorCodes.VALIDATION_FAILED,
-          'The reversal date cannot be before the original entry date.',
-        );
-      }
-      const lines = await tx
-        .select()
-        .from(journalLines)
-        .where(eq(journalLines.journalEntryId, id))
-        .orderBy(asc(journalLines.lineNumber));
-
-      const reversal = await this.posting.postEvent(
-        tx,
-        {
-          companyId,
-          entryDate: input.reversalDate,
-          description:
-            input.description ?? `Reversal of ${entry.documentNumber}: ${entry.description}`,
-          reference: entry.documentNumber,
-          journalType: 'REVERSAL',
-          branchId: entry.branchId,
-          lines: lines.map((l) => ({
-            accountId: l.accountId,
-            description: l.description,
-            debit: l.credit,
-            credit: l.debit,
-            branchId: l.branchId,
-            departmentId: l.departmentId,
-            costCenterId: l.costCenterId,
-            projectId: l.projectId,
-          })),
-          sourceType: 'JOURNAL_REVERSAL',
-          sourceId: entry.id,
-          reversalOfId: entry.id,
-          actor,
-        },
-        { permission: P['journal.reverse'] },
-      );
-
-      await tx
-        .update(journalEntries)
-        .set({ status: 'REVERSED', reversedById: reversal.id })
-        .where(eq(journalEntries.id, id));
-      await this.audit.record(
-        {
-          action: 'REVERSE',
-          module: MODULE,
-          entityType: 'JournalEntry',
-          entityId: id,
-          previousValue: { status: entry.status },
-          newValue: { status: 'REVERSED', reversedById: reversal.id },
-          metadata: {
-            documentNumber: entry.documentNumber,
-            reversalDocumentNumber: reversal.documentNumber,
-          },
-          companyId,
-        },
-        tx,
-      );
-      return reversal;
-    }
+    this.assertStatus(entry, ['POSTED', 'LOCKED'], 'reversed');
+    if (entry.companyId !== companyId) throw new NotFoundError('JournalEntry', entry.id);
+    return this.posting.reverseEntry(tx, entry, {
+      reversalDate: input.reversalDate,
+      description: input.description,
+      actor,
+      permission: P['journal.reverse'],
+    });
   }
 
   // --------------------------------------------------------------- internals
@@ -803,6 +874,9 @@ export class JournalEntriesService {
         departmentId: journalLines.departmentId,
         costCenterId: journalLines.costCenterId,
         projectId: journalLines.projectId,
+        foreignDebit: journalLines.foreignDebit,
+        foreignCredit: journalLines.foreignCredit,
+        exchangeRate: journalLines.exchangeRate,
       })
       .from(journalLines)
       .innerJoin(accounts, eq(accounts.id, journalLines.accountId))
@@ -810,10 +884,122 @@ export class JournalEntriesService {
       .orderBy(asc(journalLines.lineNumber));
   }
 
+  /** Lines as the user entered them: foreign amounts for a foreign entry, base otherwise. */
+  private async enteredLines(
+    tx: DbExecutor,
+    entryId: string,
+  ): Promise<CreateJournalEntryInput['lines']> {
+    const rows = await tx
+      .select()
+      .from(journalLines)
+      .where(eq(journalLines.journalEntryId, entryId))
+      .orderBy(asc(journalLines.lineNumber));
+    return rows.map((l) => ({
+      accountId: l.accountId,
+      debit: l.foreignDebit ?? l.debit,
+      credit: l.foreignCredit ?? l.credit,
+      description: l.description ?? undefined,
+      branchId: l.branchId,
+      departmentId: l.departmentId,
+      costCenterId: l.costCenterId,
+      projectId: l.projectId,
+    }));
+  }
+
+  /**
+   * Base-currency lines for the ledger. A foreign transaction currency converts
+   * every line at the explicit rate or the organization's rate table on the
+   * entry date; the foreign amounts stay on the lines.
+   */
+  private async prepareLines(
+    tx: DbExecutor,
+    companyId: string,
+    baseCurrency: string,
+    entryDate: string,
+    input: {
+      lines: CreateJournalEntryInput['lines'];
+      transactionCurrency?: string;
+      exchangeRate?: string;
+    },
+  ): Promise<PreparedLines> {
+    const txCurrency = input.transactionCurrency ?? baseCurrency;
+    if (txCurrency === baseCurrency) {
+      return {
+        lines: input.lines.map((l) => ({ ...l, description: l.description ?? null })),
+        transactionCurrency: null,
+        exchangeRate: null,
+      };
+    }
+    const rate =
+      input.exchangeRate ??
+      (await this.rateFor(tx, companyId, txCurrency, baseCurrency, entryDate));
+    try {
+      return {
+        lines: convertForeignLines(input.lines, txCurrency, baseCurrency, rate),
+        transactionCurrency: txCurrency,
+        exchangeRate: rate,
+      };
+    } catch (err) {
+      if (err instanceof ForeignJournalUnbalancedError) {
+        throw new BusinessRuleError(
+          ErrorCodes.JOURNAL_UNBALANCED,
+          `Journal entry is out of balance in ${txCurrency}: debits ${err.totalDebit} vs credits ${err.totalCredit}.`,
+          { totalDebit: err.totalDebit, totalCredit: err.totalCredit, currency: txCurrency },
+        );
+      }
+      throw err;
+    }
+  }
+
+  /** Rate table lookup (same rule as ExchangeRatesService.rateFor; FxModule depends on this module). */
+  private async rateFor(
+    tx: DbExecutor,
+    companyId: string,
+    from: string,
+    to: string,
+    onDate: string,
+  ): Promise<string> {
+    const [company] = await tx
+      .select({ organizationId: companies.organizationId })
+      .from(companies)
+      .where(eq(companies.id, companyId));
+    if (!company) throw new NotFoundError('Company', companyId);
+    const rows = await tx
+      .select()
+      .from(exchangeRates)
+      .where(
+        and(
+          eq(exchangeRates.organizationId, company.organizationId),
+          lte(exchangeRates.rateDate, onDate),
+          or(
+            and(eq(exchangeRates.fromCurrency, from), eq(exchangeRates.toCurrency, to)),
+            and(eq(exchangeRates.fromCurrency, to), eq(exchangeRates.toCurrency, from)),
+          ),
+        ),
+      );
+    const rate = pickRate(rows, from, to, onDate);
+    if (!rate)
+      throw new BusinessRuleError(
+        ErrorCodes.EXCHANGE_RATE_MISSING,
+        `No ${from}/${to} exchange rate on or before ${onDate}.`,
+        { fromCurrency: from, toCurrency: to, onDate },
+      );
+    return rate;
+  }
+
+  private assertAutoReverse(entryDate: string, autoReverseDate: string | null | undefined): void {
+    if (autoReverseDate && autoReverseDate <= entryDate) {
+      throw new BusinessRuleError(
+        ErrorCodes.VALIDATION_FAILED,
+        'The auto-reverse date must be after the entry date.',
+      );
+    }
+  }
+
   private async writeLines(
     tx: DbExecutor,
     entry: { id: string; companyId: string },
-    lines: CreateJournalEntryInput['lines'],
+    lines: readonly PostingLine[],
   ) {
     await tx.insert(journalLines).values(
       lines.map((line, index) => ({
@@ -828,6 +1014,9 @@ export class JournalEntriesService {
         departmentId: line.departmentId ?? null,
         costCenterId: line.costCenterId ?? null,
         projectId: line.projectId ?? null,
+        foreignDebit: line.foreignDebit ?? null,
+        foreignCredit: line.foreignCredit ?? null,
+        exchangeRate: line.exchangeRate ?? null,
       })),
     );
   }

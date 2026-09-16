@@ -4,6 +4,7 @@ import {
   ACCOUNT_MAPPING_KEYS,
   ACCOUNT_SUBTYPES,
   ACCOUNT_TYPES,
+  CASH_FLOW_ACTIVITIES,
   ENTITY_STATUSES,
   JOURNAL_STATUSES,
   JOURNAL_TYPES,
@@ -12,6 +13,7 @@ import {
 import {
   currencyCodeSchema,
   nameSchema,
+  optionalCurrencyCodeSchema,
   optionalText,
   paginationQuerySchema,
   queryBooleanSchema,
@@ -55,6 +57,14 @@ export const createAccountSchema = z.object({
   parentId: uuidSchema.nullable().optional(),
   currency: currencyCodeSchema.nullable().optional(),
   isHeader: z.boolean().default(false),
+  /** Balances are reconciled against an external source (bank, subledger, tax authority). */
+  isReconciliation: z.boolean().default(false),
+  /** Cash-flow statement classification; NULL derives it from the subtype. */
+  cashFlowActivity: z.enum(CASH_FLOW_ACTIVITIES).nullable().optional(),
+  /** Person / team accountable for clearing the balance (suspense & reconciliation accounts). */
+  ownerUserId: uuidSchema.nullable().optional(),
+  /** Restrict postings to these branches (empty = every branch). */
+  allowedBranchIds: z.array(uuidSchema).max(200).optional(),
   description: optionalText(500),
 });
 export type CreateAccountInput = z.infer<typeof createAccountSchema>;
@@ -65,6 +75,10 @@ export const updateAccountSchema = z.object({
   parentId: uuidSchema.nullable().optional(),
   description: optionalText(500),
   status: z.enum(ENTITY_STATUSES).optional(),
+  isReconciliation: z.boolean().optional(),
+  cashFlowActivity: z.enum(CASH_FLOW_ACTIVITIES).nullable().optional(),
+  ownerUserId: uuidSchema.nullable().optional(),
+  allowedBranchIds: z.array(uuidSchema).max(200).optional(),
 });
 export type UpdateAccountInput = z.infer<typeof updateAccountSchema>;
 
@@ -121,21 +135,51 @@ export const journalLineSchema = dimensionRefsSchema
   });
 export type JournalLineInput = z.infer<typeof journalLineSchema>;
 
-export const createJournalEntrySchema = z.object({
+/** Rate applied to a foreign-currency journal: 1 unit of the transaction currency = rate base units. */
+export const journalExchangeRateSchema = z
+  .string()
+  .trim()
+  .regex(/^\d+(\.\d{1,8})?$/, 'Rate must be a positive decimal with up to 8 places')
+  .refine((v) => Number(v) > 0, 'Rate must be positive');
+
+export const journalEntryHeaderSchema = z.object({
   entryDate: isoDateSchema,
+  /** Date on the underlying document when it differs from the accounting date. */
+  documentDate: isoDateSchema.nullable().optional(),
   description: z.string().trim().min(1, 'Description is required').max(500),
   reference: optionalText(100),
   journalType: z.enum(JOURNAL_TYPES).default('GENERAL'),
   branchId: uuidSchema.nullable().optional(),
+  /**
+   * Currency the lines are entered in. Omitted = the company base currency.
+   * For a foreign currency the engine converts every line to base with
+   * `exchangeRate` (or the rate table) and keeps the foreign amounts on the line.
+   */
+  transactionCurrency: optionalCurrencyCodeSchema,
+  exchangeRate: journalExchangeRateSchema.optional(),
+  /** Accruals: post a mirror REVERSAL on this date (must be after the entry date). */
+  autoReverseDate: isoDateSchema.nullable().optional(),
   lines: z.array(journalLineSchema).min(2, 'At least two lines are required').max(500),
   /** Client-supplied key making the create call idempotent. */
   idempotencyKey: z.string().trim().min(8).max(100).optional(),
 });
+
+const autoReverseAfterEntry = (v: { entryDate?: string; autoReverseDate?: string | null }) =>
+  !v.autoReverseDate || !v.entryDate || v.autoReverseDate > v.entryDate;
+
+export const createJournalEntrySchema = journalEntryHeaderSchema.refine(autoReverseAfterEntry, {
+  message: 'The auto-reverse date must be after the entry date',
+  path: ['autoReverseDate'],
+});
 export type CreateJournalEntryInput = z.infer<typeof createJournalEntrySchema>;
 
-export const updateJournalEntrySchema = createJournalEntrySchema
+export const updateJournalEntrySchema = journalEntryHeaderSchema
   .omit({ idempotencyKey: true })
-  .partial();
+  .partial()
+  .refine(autoReverseAfterEntry, {
+    message: 'The auto-reverse date must be after the entry date',
+    path: ['autoReverseDate'],
+  });
 export type UpdateJournalEntryInput = z.infer<typeof updateJournalEntrySchema>;
 
 export const rejectJournalEntrySchema = z.object({
@@ -202,6 +246,9 @@ export const incomeStatementQuerySchema = dimensionRefsSchema.extend({
   from: isoDateSchema,
   to: isoDateSchema,
   branchId: uuidSchema.optional(),
+  /** Optional comparative window (e.g. the same period last year). */
+  compareFrom: isoDateSchema.optional(),
+  compareTo: isoDateSchema.optional(),
 });
 export type IncomeStatementQuery = z.infer<typeof incomeStatementQuerySchema>;
 

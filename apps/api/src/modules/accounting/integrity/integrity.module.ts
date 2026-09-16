@@ -5,6 +5,7 @@ import { PayablesModule } from '@/modules/payables/payables.module';
 import { RbacModule } from '@/modules/rbac/rbac.module';
 import { ReceivablesModule } from '@/modules/receivables/receivables.module';
 import { ReconciliationModule } from '@/modules/reconciliation/reconciliation.module';
+import { ReportingModule } from '@/modules/reporting/reporting.module';
 import { IntegrityController } from './integrity.controller';
 import { IntegrityService } from './integrity.service';
 
@@ -17,6 +18,7 @@ import { IntegrityService } from './integrity.service';
     PayablesModule,
     InventoryModule,
     ReconciliationModule,
+    ReportingModule,
   ],
   controllers: [IntegrityController],
   providers: [IntegrityService],

@@ -5,6 +5,8 @@ import { AppConfigService } from '@/config/app-config.service';
 
 export const QUEUES = {
   MAINTENANCE: 'maintenance',
+  /** Recurring journals and prepayment recognition (Accounting core). */
+  ACCOUNTING_SCHEDULES: 'accounting-schedules',
   // Integration platform (Prompt #4)
   INTEGRATION_SYNC: 'integration-sync',
   WEBHOOK_DELIVERY: 'webhook-delivery',

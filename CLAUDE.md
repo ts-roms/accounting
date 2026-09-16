@@ -1,7 +1,7 @@
 # Project guide for AI-assisted development
 
-Enterprise accounting platform (modular monolith). Read `docs/architecture.md`
-and `docs/accounting-engine.md` before changing anything financial.
+Enterprise accounting platform (modular monolith). Read `docs/architecture.md`,
+`docs/accounting-engine.md` and `docs/accounting/*.md` before changing anything financial.
 
 ## Non-negotiables
 
@@ -15,7 +15,8 @@ and `docs/accounting-engine.md` before changing anything financial.
 
 ## Workflow
 
-- Every ledger write goes through `AccountingPostingService.postEvent/postEntry`; resolve accounts via `AccountsService.resolveMapped`, never by id. Pass the real `actor` and the module's posting `permission` (`{ permission: P['bill.post'] }`); the gateway validates authority, branches, dimensions, source document and period state (`OPEN / SOFT_CLOSED / CLOSED / LOCKED`). Draft-time period checks use `resolvePeriod(..., { draft: true })`. Give every distinct posting event its own source identity - never reuse a parent id for repeated events (see the realized-FX fix).
+- Every ledger write goes through `AccountingPostingService.postEvent/postEntry` (reversals through `reverseEntry`); resolve accounts via `AccountsService.resolveMapped` or `PostingRulesService.resolve`, never by id. The gateway also enforces dimension rules (`DimensionRulesService`) and account branch applicability; keep `dimension-rules.logic.ts`, `posting-rules.logic.ts`, `fx-lines.logic.ts`, `recurring.logic.ts`, `prepayments.logic.ts` and `reporting/cash-flow.logic.ts` pure. Pass the real `actor` and the module's posting `permission` (`{ permission: P['bill.post'] }`); the gateway validates authority, branches, dimensions, source document and period state (`OPEN / SOFT_CLOSED / CLOSED / LOCKED`). Draft-time period checks use `resolvePeriod(..., { draft: true })`. Give every distinct posting event its own source identity - never reuse a parent id for repeated events (see the realized-FX fix).
+- Accruals set `autoReverseDate`: the engine posts the mirror REVERSAL in the same transaction. Recurring journals (`recurring_journal_runs`) and prepayment instalments (`prepayment_schedules`) are the source identity of the journals they generate; AUTO_POST templates and prepayment activation / recognition are posting decisions (`journal.post` / `prepayment.post`). Opening balances are OPENING drafts offset to `OPENING_BALANCE_EQUITY`.
 - Subledger documents keep business status (DRAFT/APPROVED/PARTIALLY_PAID/PAID/VOID) separate from accounting status (UNPOSTED/POSTED/REVERSED); void = reversal journal, never an edit. Allocations never create journal entries.
 - Orders (quotation / sales order / purchase request / purchase order) share one `orders` table and `OrdersService`; they never post. Fulfilment counters change only via `OrderFulfillmentService` inside the fulfilling document's transaction.
 - Stock only moves through `InventoryService.receive/issue` (movements + FIFO layers + balances); the document that moves it posts the returned cost in the same transaction via `DocumentStockService`. Valuation in `modules/inventory/valuation.ts` is pure - keep it that way.

@@ -32,6 +32,7 @@ import {
   type FiscalPeriod,
   type JournalEntry,
 } from '@/database/schema';
+import { DimensionRulesService } from '../dimensions/dimension-rules.service';
 import { DimensionsService } from '../dimensions/dimensions.service';
 import { DocumentNumberingService } from '../numbering/document-numbering.service';
 
@@ -48,6 +49,10 @@ export interface PostingLine {
   departmentId?: string | null;
   costCenterId?: string | null;
   projectId?: string | null;
+  /** Foreign-currency journals: the amount as entered, kept beside the base amount. */
+  foreignDebit?: string | null;
+  foreignCredit?: string | null;
+  exchangeRate?: string | null;
 }
 
 /**
@@ -77,6 +82,13 @@ export interface AccountingEvent {
   sourceId?: string | null;
   idempotencyKey?: string | null;
   reversalOfId?: string | null;
+  /** Date on the underlying document when it differs from the accounting date. */
+  documentDate?: string | null;
+  /** Set when the lines were entered in a foreign currency (amounts are already base). */
+  transactionCurrency?: string | null;
+  exchangeRate?: string | null;
+  /** Accruals: a mirror REVERSAL is posted on this date right after posting. */
+  autoReverseDate?: string | null;
   actor: PostingActor;
 }
 
@@ -172,6 +184,7 @@ export class AccountingPostingService {
     private readonly audit: AuditService,
     private readonly numbering: DocumentNumberingService,
     private readonly dimensions: DimensionsService,
+    private readonly dimensionRules: DimensionRulesService,
     private readonly events: EventEmitter2,
     private readonly outbox: OutboxService,
     private readonly logger: PinoLogger,
@@ -273,6 +286,44 @@ export class AccountingPostingService {
       );
     }
     return { currency, totalDebit, totalCredit, accountsById };
+  }
+
+  /**
+   * Accounts restricted to branches (`allowed_branch_ids`) reject lines posted
+   * from any other branch; a line without a branch inherits the header's.
+   */
+  assertAccountBranches(
+    accountsById: ReadonlyMap<string, Account>,
+    headerBranchId: string | null | undefined,
+    lines: readonly PostingLine[],
+  ): void {
+    lines.forEach((line, index) => {
+      const account = accountsById.get(line.accountId);
+      if (!account || account.allowedBranchIds.length === 0) return;
+      const branchId = line.branchId ?? headerBranchId ?? null;
+      if (!branchId || !account.allowedBranchIds.includes(branchId)) {
+        throw new BusinessRuleError(
+          ErrorCodes.ACCOUNT_BRANCH_NOT_ALLOWED,
+          `Line ${index + 1}: ${account.code} ${account.name} cannot be posted from this branch.`,
+          { line: index + 1, accountId: account.id, branchId },
+        );
+      }
+    });
+  }
+
+  /** Branch, dimension and dimension-rule validation shared by both posting paths. */
+  private async validateForPosting(
+    tx: DbExecutor,
+    companyId: string,
+    headerBranchId: string | null | undefined,
+    entryDate: string,
+    validated: ValidatedLines,
+    lines: readonly PostingLine[],
+  ): Promise<void> {
+    this.assertAccountBranches(validated.accountsById, headerBranchId, lines);
+    await this.validateBranches(tx, companyId, headerBranchId, lines);
+    await this.dimensions.validateRefs(tx, companyId, lines, entryDate);
+    await this.dimensionRules.assertLines(tx, companyId, lines, validated.accountsById);
   }
 
   /** Branches on the header / lines must belong to the company and be active. */
@@ -430,8 +481,14 @@ export class AccountingPostingService {
 
     const currency = await this.companyCurrency(tx, event.companyId);
     const validated = await this.validateLines(tx, event.companyId, currency, event.lines);
-    await this.validateBranches(tx, event.companyId, event.branchId, event.lines);
-    await this.dimensions.validateRefs(tx, event.companyId, event.lines, event.entryDate);
+    await this.validateForPosting(
+      tx,
+      event.companyId,
+      event.branchId,
+      event.entryDate,
+      validated,
+      event.lines,
+    );
     await this.validateSource(tx, event.companyId, event.sourceType, event.sourceId);
     const period = await this.resolvePeriod(
       tx,
@@ -457,9 +514,13 @@ export class AccountingPostingService {
         journalType: event.journalType ?? 'GENERAL',
         status: 'APPROVED',
         entryDate: event.entryDate,
+        documentDate: event.documentDate ?? null,
+        autoReverseDate: event.autoReverseDate ?? null,
         description: event.description,
         reference: event.reference ?? null,
         currency,
+        transactionCurrency: event.transactionCurrency ?? null,
+        exchangeRate: event.transactionCurrency ? (event.exchangeRate ?? null) : null,
         totalDebit: validated.totalDebit.toString(),
         totalCredit: validated.totalCredit.toString(),
         sourceType: event.sourceType ?? null,
@@ -486,6 +547,9 @@ export class AccountingPostingService {
         departmentId: line.departmentId ?? null,
         costCenterId: line.costCenterId ?? null,
         projectId: line.projectId ?? null,
+        foreignDebit: line.foreignDebit ?? null,
+        foreignCredit: line.foreignCredit ?? null,
+        exchangeRate: line.exchangeRate ?? null,
       })),
     );
 
@@ -524,8 +588,14 @@ export class AccountingPostingService {
       .where(eq(journalLines.journalEntryId, entry.id))
       .orderBy(asc(journalLines.lineNumber));
     const validated = await this.validateLines(tx, entry.companyId, entry.currency, lines);
-    await this.validateBranches(tx, entry.companyId, entry.branchId, lines);
-    await this.dimensions.validateRefs(tx, entry.companyId, lines, entry.entryDate);
+    await this.validateForPosting(
+      tx,
+      entry.companyId,
+      entry.branchId,
+      entry.entryDate,
+      validated,
+      lines,
+    );
     const period = await this.resolvePeriod(tx, entry.companyId, entry.entryDate, options, actor);
 
     const [posted] = await tx
@@ -593,7 +663,110 @@ export class AccountingPostingService {
       },
     });
     this.events.emit(JOURNAL_POSTED_EVENT, payload);
+
+    // Accruals: the mirror entry posts now, dated in the next period, under the
+    // same authority - it is part of the accrual, not a separate decision.
+    if (posted.autoReverseDate) {
+      const reversal = await this.reverseEntry(tx, posted, {
+        reversalDate: posted.autoReverseDate,
+        description: `Auto-reversal of ${posted.documentNumber}: ${posted.description}`,
+        actor,
+        permission: options.permission ?? P['journal.post'],
+      });
+      return { ...posted, status: 'REVERSED', reversedById: reversal.id };
+    }
     return posted;
+  }
+
+  /**
+   * Posts the mirror image of a ledger entry as a REVERSAL and marks the
+   * original REVERSED (it stays in the ledger). Idempotent per original through
+   * the JOURNAL_REVERSAL source identity. Manual reversals, corrections and
+   * auto-reversing accruals all come through here.
+   */
+  async reverseEntry(
+    tx: DbExecutor,
+    entry: JournalEntry,
+    input: {
+      reversalDate: string;
+      description?: string | null;
+      actor: PostingActor;
+      permission?: PermissionKey;
+    },
+  ): Promise<JournalEntry> {
+    if (!(entry.status === 'POSTED' || entry.status === 'LOCKED')) {
+      throw new BusinessRuleError(
+        ErrorCodes.JOURNAL_INVALID_STATE,
+        `Only posted entries can be reversed (current status: ${entry.status}).`,
+        { status: entry.status },
+      );
+    }
+    if (input.reversalDate < entry.entryDate) {
+      throw new BusinessRuleError(
+        ErrorCodes.VALIDATION_FAILED,
+        'The reversal date cannot be before the original entry date.',
+      );
+    }
+    const lines = await tx
+      .select()
+      .from(journalLines)
+      .where(eq(journalLines.journalEntryId, entry.id))
+      .orderBy(asc(journalLines.lineNumber));
+    const reversal = await this.postEvent(
+      tx,
+      {
+        companyId: entry.companyId,
+        entryDate: input.reversalDate,
+        description:
+          input.description ?? `Reversal of ${entry.documentNumber}: ${entry.description}`,
+        reference: entry.documentNumber,
+        journalType: 'REVERSAL',
+        branchId: entry.branchId,
+        transactionCurrency: entry.transactionCurrency,
+        exchangeRate: entry.exchangeRate,
+        lines: lines.map((l) => ({
+          accountId: l.accountId,
+          description: l.description,
+          debit: l.credit,
+          credit: l.debit,
+          branchId: l.branchId,
+          departmentId: l.departmentId,
+          costCenterId: l.costCenterId,
+          projectId: l.projectId,
+          foreignDebit: l.foreignCredit,
+          foreignCredit: l.foreignDebit,
+          exchangeRate: l.exchangeRate,
+        })),
+        sourceType: 'JOURNAL_REVERSAL',
+        sourceId: entry.id,
+        reversalOfId: entry.id,
+        actor: input.actor,
+      },
+      { permission: input.permission ?? P['journal.reverse'] },
+    );
+    await tx
+      .update(journalEntries)
+      .set({ status: 'REVERSED', reversedById: reversal.id })
+      .where(eq(journalEntries.id, entry.id));
+    await this.audit.record(
+      {
+        action: 'REVERSE',
+        module: MODULE,
+        entityType: 'JournalEntry',
+        entityId: entry.id,
+        previousValue: { status: entry.status },
+        newValue: { status: 'REVERSED', reversedById: reversal.id },
+        metadata: {
+          documentNumber: entry.documentNumber,
+          reversalDocumentNumber: reversal.documentNumber,
+          automatic: entry.autoReverseDate === input.reversalDate,
+        },
+        companyId: entry.companyId,
+        userId: input.actor.id,
+      },
+      tx,
+    );
+    return reversal;
   }
 
   private async findExisting(

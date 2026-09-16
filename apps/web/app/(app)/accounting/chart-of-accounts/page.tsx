@@ -65,6 +65,8 @@ const TYPE_VARIANT: Record<
   REVENUE: 'success',
   COST_OF_SALES: 'destructive',
   EXPENSE: 'destructive',
+  OTHER_INCOME: 'success',
+  OTHER_EXPENSE: 'destructive',
 };
 
 export default function ChartOfAccountsPage() {
