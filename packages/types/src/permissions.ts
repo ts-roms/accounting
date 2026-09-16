@@ -266,6 +266,8 @@ export const PERMISSION_DEFINITIONS = [
   define('opening-balance.view', 'ACCOUNTING', 'View opening balances and their reconciliation'),
   define('opening-balance.manage', 'ACCOUNTING', 'Load opening balances into the ledger and subledgers'),
   define('audit.view', 'AUDIT', 'View the audit trail'),
+  define('operations.view', 'ADMINISTRATION', 'View platform operations: jobs, queues, integrity runs and runtime status'),
+  define('operations.manage', 'ADMINISTRATION', 'Run jobs, retry or discard failed queue jobs and trigger integrity checks'),
 
   // AI assistance (advisory only - nothing here posts)
   define('ai.view', 'AI', 'View AI intake, anomaly flags, forecasts and conversations'),

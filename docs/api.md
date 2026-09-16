@@ -411,6 +411,20 @@ New error codes: `IMPORT_FILE_INVALID`, `IMPORT_INVALID_ROWS`, `OPENING_BALANCE_
 | GET          | `/journal-entries` new filters `branchId`, `sourceType` (`MANUAL`), `createdBy`, `approvedBy`, `postedBy`, `minAmount`, `maxAmount`; `/journal-entries/summary` (counts / totals per status and source, review indicators) | `journal.view`             |
 | GET          | `/trace/journal/:id` (journal → source document → party → related journals → approvals → audit trail), `/trace/document/:sourceId`                                                                                         | `trace.view`               |
 
+### Operations (see `docs/operations.md`)
+
+| Method        | Path                                                                                                                                           | Permission          |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| GET           | `/operations/status` (version, instance, draining, database + pool, migrations known / applied / pending, Redis + key prefix, storage, queues) | `operations.view`   |
+| GET           | `/operations/jobs` (registered jobs: schedule, enabled, last run, failing streak), `/operations/job-runs?jobName&status` (paginated)           | `operations.view`   |
+| POST          | `/operations/jobs/:name/run` - advisory-locked manual run; 422 `JOB_ALREADY_RUNNING` while another instance holds it; audited `JOB_RUN`        | `operations.manage` |
+| GET           | `/operations/queues` (counts + schedulers per queue, `null` without Redis), `/operations/queues/:queue/failed?limit` (dead letter)             | `operations.view`   |
+| POST / DELETE | `/operations/queues/:queue/failed/retry`, `/operations/queues/:queue/failed/:id/retry`, `/operations/queues/:queue/failed/:id` (audited)       | `operations.manage` |
+| GET / POST    | `/operations/integrity-runs?companyId`, `/operations/integrity-runs { companyId }` (run now, stores the outcome)                               | view / manage       |
+| GET           | `/health/ready` - 200 when schema current and not draining, else 503 with `reasons`; `/metrics` - Prometheus text (bearer `METRICS_TOKEN`)     | public              |
+
+New error codes: `JOB_ALREADY_RUNNING` (422), `QUEUE_UNAVAILABLE`. New audit actions: `JOB_RUN`, `QUEUE_RETRY`, `QUEUE_DISCARD`.
+
 ### Audit & health
 
 | Method | Path                                                                                                                 | Notes                         |

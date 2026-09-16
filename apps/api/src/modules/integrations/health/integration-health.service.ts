@@ -43,7 +43,13 @@ export class IntegrationHealthService implements OnModuleInit {
 
   onModuleInit(): void {
     this.jobs.register(QUEUES.INTEGRATION_MAINTENANCE, JOB_CHECK, () => this.checkAll());
-    void this.jobs.schedule(QUEUES.INTEGRATION_MAINTENANCE, JOB_CHECK, { every: 10 * 60_000 });
+    void this.jobs.schedule(
+      QUEUES.INTEGRATION_MAINTENANCE,
+      JOB_CHECK,
+      { every: 10 * 60_000 },
+      {},
+      'Recompute integration health scores and raise failing-connector notifications',
+    );
   }
 
   async evaluate(integration: Integration, persist = true): Promise<IntegrationHealthView> {

@@ -350,9 +350,26 @@ A second programme strengthens the delivered system along the lines of
   to accounting roles and auditors
 - Tests: API integration 199 (+10), API unit +6, Playwright +3
 
-### H8-H9 (planned)
+### H8 - Operations & reliability (COMPLETE)
 
-Reliability, consolidation readiness.
+- Job registry: every scheduled job runs through `JobRegistryService.execute`
+  - PostgreSQL advisory lock per job name (multi-instance safe), persisted
+    `job_runs` (trigger, instance, duration, result / error), failure
+    notifications to operators, manual trigger; one dispatching worker per
+    queue (fixes occurrences swallowed by name-filtering workers)
+- Queue isolation (`QUEUE_PREFIX`), dead-letter listing / retry / discard,
+  self-healing sweep for stale queued syncs and orphaned RUNNING runs
+- Nightly integrity checks per company stored as `integrity_runs` with
+  `INTEGRITY_ALERT` notifications; run-now from the console
+- Readiness (`/health/ready`: schema current + not draining), graceful
+  drain on SIGTERM, runtime status (pool, migrations, Redis, storage)
+- Prometheus `/metrics` (requests per route template, latency histogram,
+  job runs, queue depths); Administration → Operations console
+- Tests: API integration +9, API unit +2, Playwright +3
+
+### H9 (planned)
+
+Consolidation readiness.
 
 ## Beyond the roadmap
 

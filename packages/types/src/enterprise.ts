@@ -216,3 +216,14 @@ export type ReportCategory = (typeof REPORT_CATEGORIES)[number];
 /** Presentation sign of a row: the account's natural side, or forced debit / credit positive. */
 export const REPORT_SIGNS = ['NATURAL', 'DEBIT', 'CREDIT'] as const;
 export type ReportSign = (typeof REPORT_SIGNS)[number];
+
+// ------------------------------------------------------- operations (H8)
+
+export const JOB_RUN_STATUSES = ['RUNNING', 'SUCCEEDED', 'FAILED', 'SKIPPED_LOCKED'] as const;
+export type JobRunStatus = (typeof JOB_RUN_STATUSES)[number];
+
+export const JOB_TRIGGERS = ['SCHEDULED', 'MANUAL', 'STARTUP'] as const;
+export type JobTrigger = (typeof JOB_TRIGGERS)[number];
+
+export const INTEGRITY_RUN_STATUSES = ['OK', 'WARNING', 'CRITICAL', 'FAILED'] as const;
+export type IntegrityRunStatus = (typeof INTEGRITY_RUN_STATUSES)[number];

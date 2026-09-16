@@ -49,7 +49,13 @@ export class PayablesSweepJob implements OnModuleInit {
 
   onModuleInit(): void {
     this.jobs.register(QUEUES.MAINTENANCE, JOB_NAME, () => this.run());
-    void this.jobs.schedule(QUEUES.MAINTENANCE, JOB_NAME, { every: 24 * 60 * 60_000 });
+    void this.jobs.schedule(
+      QUEUES.MAINTENANCE,
+      JOB_NAME,
+      { every: 24 * 60 * 60_000 },
+      {},
+      'Daily payables sweep: bills due soon, lapsing early-payment discounts, overdue bills and aged GRNI lines',
+    );
   }
 
   async run(): Promise<{ companies: number }> {

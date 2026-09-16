@@ -95,6 +95,7 @@ describe('navigation', () => {
       '/reports/consolidation',
       '/admin/workflows',
       '/admin/approvals',
+      '/admin/operations',
       ...[
         'delegations',
         'integrations',

@@ -62,7 +62,13 @@ export class OAuthService implements OnModuleInit {
 
   onModuleInit(): void {
     this.jobs.register(QUEUES.INTEGRATION_MAINTENANCE, JOB_REFRESH, () => this.refreshExpiring());
-    void this.jobs.schedule(QUEUES.INTEGRATION_MAINTENANCE, JOB_REFRESH, { every: 5 * 60_000 });
+    void this.jobs.schedule(
+      QUEUES.INTEGRATION_MAINTENANCE,
+      JOB_REFRESH,
+      { every: 5 * 60_000 },
+      {},
+      'Refresh OAuth tokens that expire soon',
+    );
   }
 
   redirectUri(): string {

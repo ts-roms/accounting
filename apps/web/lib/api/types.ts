@@ -2728,3 +2728,93 @@ export interface JournalTrace {
     metadata: unknown;
   }>;
 }
+
+// ------------------------------------------------------------- operations (H8)
+
+export interface JobRunView {
+  id: string;
+  jobName: string;
+  trigger: 'SCHEDULED' | 'MANUAL' | 'STARTUP';
+  status: 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'SKIPPED_LOCKED';
+  instanceId: string;
+  startedAt: string;
+  finishedAt: string | null;
+  durationMs: number | null;
+  result: unknown;
+  error: string | null;
+  triggeredBy: string | null;
+}
+
+export interface JobView {
+  name: string;
+  description: string;
+  queue: string;
+  schedule: string | null;
+  enabled: boolean;
+  lastRun: JobRunView | null;
+  failingStreak: number;
+}
+
+export interface QueueStatsView {
+  name: string;
+  waiting: number;
+  active: number;
+  delayed: number;
+  failed: number;
+  completed: number;
+  paused: boolean;
+  schedulers: Array<{
+    key: string;
+    name: string | null;
+    pattern: string | null;
+    every: string | null;
+    next: string | null;
+  }>;
+}
+
+export interface FailedJobView {
+  id: string;
+  name: string;
+  data: unknown;
+  attemptsMade: number;
+  failedReason: string | null;
+  stacktrace: string[];
+  timestamp: string;
+  finishedOn: string | null;
+}
+
+export interface RuntimeStatusView {
+  version: string;
+  instanceId: string;
+  environment: string;
+  startedAt: string;
+  uptimeSeconds: number;
+  draining: boolean;
+  node: string;
+  database: {
+    ok: boolean;
+    latencyMs: number | null;
+    pool: { total: number; idle: number; waiting: number };
+  };
+  migrations: { known: number; applied: number; pending: string[] } | { error: string };
+  redis: { ok: boolean; latencyMs: number | null; keyPrefix: string };
+  storage: { dir: string; writable: boolean };
+  queues: QueueStatsView[] | null;
+  inlineJobs: boolean;
+}
+
+export interface IntegrityRunView {
+  id: string;
+  companyId: string;
+  companyCode: string;
+  asOf: string;
+  status: 'OK' | 'WARNING' | 'CRITICAL' | 'FAILED';
+  criticalCount: number;
+  warningCount: number;
+  findings: Array<{ name: string; severity: string; count: number }>;
+  error: string | null;
+  notified: boolean;
+  jobRunId: string | null;
+  triggeredBy: string | null;
+  ranAt: string;
+}

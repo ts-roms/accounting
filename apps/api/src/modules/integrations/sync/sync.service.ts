@@ -124,7 +124,13 @@ export class SyncService implements OnModuleInit {
       2,
     );
     this.jobs.register(QUEUES.INTEGRATION_MAINTENANCE, JOB_DUE, () => this.runDue());
-    void this.jobs.schedule(QUEUES.INTEGRATION_MAINTENANCE, JOB_DUE, { every: 60_000 });
+    void this.jobs.schedule(
+      QUEUES.INTEGRATION_MAINTENANCE,
+      JOB_DUE,
+      { every: 60_000 },
+      {},
+      'Queue integration syncs whose schedule is due',
+    );
   }
 
   // ----------------------------------------------------------------- queries

@@ -28,7 +28,13 @@ export class ReceivablesSweepJob implements OnModuleInit {
 
   onModuleInit(): void {
     this.jobs.register(QUEUES.MAINTENANCE, JOB_NAME, () => this.run());
-    void this.jobs.schedule(QUEUES.MAINTENANCE, JOB_NAME, { every: 24 * 60 * 60_000 });
+    void this.jobs.schedule(
+      QUEUES.MAINTENANCE,
+      JOB_NAME,
+      { every: 24 * 60 * 60_000 },
+      {},
+      'Daily collections sweep: overdue detection, collection cases, dunning steps and promise evaluation',
+    );
   }
 
   async run(): Promise<{ companies: number }> {

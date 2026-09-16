@@ -4,7 +4,8 @@ import { PinoLogger } from 'nestjs-pino';
 import { AppConfigService } from '@/config/app-config.service';
 import { DRIZZLE, type Database } from '@/database/database.types';
 import { companies } from '@/database/schema';
-import { QUEUES, QueueService } from '@/modules/jobs/queue.service';
+import { JobRegistryService } from '@/modules/jobs/job-registry.service';
+import { QUEUES } from '@/modules/jobs/queue.service';
 import { AiAnomalyService } from './ai-anomaly.service';
 
 const JOB_NAME = 'ai-anomaly-scan';
@@ -17,7 +18,7 @@ const JOB_NAME = 'ai-anomaly-scan';
 @Injectable()
 export class AiAnomalyJob implements OnModuleInit {
   constructor(
-    private readonly queues: QueueService,
+    private readonly registry: JobRegistryService,
     private readonly config: AppConfigService,
     private readonly logger: PinoLogger,
     private readonly anomalies: AiAnomalyService,
@@ -27,17 +28,13 @@ export class AiAnomalyJob implements OnModuleInit {
   }
 
   async onModuleInit(): Promise<void> {
-    if (this.config.isTest || this.config.env.AI_ANOMALY_SCAN_DAYS === 0) return;
-    try {
-      this.queues.registerWorker(QUEUES.MAINTENANCE, async (job) => {
-        if (job.name === JOB_NAME) await this.run();
-      });
-      await this.queues
-        .queue(QUEUES.MAINTENANCE)
-        .upsertJobScheduler(JOB_NAME, { pattern: '30 3 * * *' }, { name: JOB_NAME });
-    } catch (err) {
-      this.logger.warn({ err }, 'Could not schedule the anomaly scan job (is Redis running?)');
-    }
+    await this.registry.scheduleRepeatable({
+      name: JOB_NAME,
+      description: 'Advisory anomaly scan of recent postings for every active company',
+      queue: QUEUES.MAINTENANCE,
+      repeat: this.config.env.AI_ANOMALY_SCAN_DAYS === 0 ? null : { pattern: '30 3 * * *' },
+      run: () => this.run(),
+    });
   }
 
   async run(): Promise<void> {

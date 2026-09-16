@@ -169,6 +169,13 @@
       "when": 1789543564433,
       "tag": "0023_reporting_engine",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1789544629904,
+      "tag": "0024_operations",
+      "breakpoints": true
     }
   ]
 }

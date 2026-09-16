@@ -24,7 +24,13 @@ export class DelegationExpiryJob implements OnModuleInit {
 
   onModuleInit(): void {
     this.jobs.register(QUEUES.INTEGRATION_MAINTENANCE, JOB_NAME, () => this.run());
-    void this.jobs.schedule(QUEUES.INTEGRATION_MAINTENANCE, JOB_NAME, { every: 5 * 60_000 });
+    void this.jobs.schedule(
+      QUEUES.INTEGRATION_MAINTENANCE,
+      JOB_NAME,
+      { every: 5 * 60_000 },
+      {},
+      'Expire delegations past their end date and warn about ones expiring soon',
+    );
   }
 
   async run(): Promise<{ expired: number; warned: number }> {

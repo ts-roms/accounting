@@ -36,6 +36,7 @@ import { JwtAuthGuard } from './modules/auth/jwt-auth.guard';
 import { HealthModule } from './modules/health/health.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { JobsModule } from './modules/jobs/jobs.module';
+import { OperationsModule } from './modules/operations/operations.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { PayablesModule } from './modules/payables/payables.module';
 import { PurchasingModule } from './modules/purchasing/purchasing.module';
@@ -109,6 +110,7 @@ import { UsersModule } from './modules/users/users.module';
     AiModule,
     ReconciliationModule,
     IntegrityModule,
+    OperationsModule,
     FinancialCloseModule,
     ControlsModule,
     DataInfrastructureModule,
