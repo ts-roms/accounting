@@ -38,6 +38,8 @@ export const AUDIT_ACTIONS = [
   'CANCEL',
   'OPENING_BALANCE',
   'RECURRING_RUN',
+  'IMPORT',
+  'EXPORT',
   'RECOGNIZE',
   'PAUSE',
   'RESUME',

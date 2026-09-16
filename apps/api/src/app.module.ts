@@ -15,6 +15,7 @@ import { AiModule } from './modules/ai/ai.module';
 import { IntegrityModule } from './modules/accounting/integrity/integrity.module';
 import { ReconciliationModule } from './modules/reconciliation/reconciliation.module';
 import { ControlsModule } from './modules/controls/controls.module';
+import { DataInfrastructureModule } from './modules/data-infrastructure/data-infrastructure.module';
 import { FinancialCloseModule } from './modules/financial-close/financial-close.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { DelegationsModule } from './modules/delegations/delegations.module';
@@ -110,6 +111,7 @@ import { UsersModule } from './modules/users/users.module';
     IntegrityModule,
     FinancialCloseModule,
     ControlsModule,
+    DataInfrastructureModule,
     WorkflowsModule,
     AttachmentsModule,
     BudgetingModule,

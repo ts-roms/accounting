@@ -49,6 +49,8 @@ export const ADJUSTMENT_REASONS = [
   'CORRECTION',
   'FOUND',
   'OTHER',
+  /** Opening stock at cut-over: the value offsets to OPENING_BALANCE_EQUITY, not to the adjustment account. */
+  'OPENING',
 ] as const;
 export type AdjustmentReason = (typeof ADJUSTMENT_REASONS)[number];
 

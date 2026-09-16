@@ -310,10 +310,30 @@ A second programme strengthens the delivered system along the lines of
   Suspense Accounts screen, SoD conflicts tab, workflow deadline fields
 - Tests: API integration 124 (+5), Playwright +3
 
-### H6-H9 (planned)
+### H6 - Data infrastructure (COMPLETE)
 
-Data infrastructure (imports, opening balances, numbering), reporting
-engine, reliability, consolidation readiness.
+- Document numbering engine: rules per company / document type / branch
+  (prefix, format tokens, padding, yearly reset), branch-aware counters,
+  atomic in-transaction allocation, preview without consuming;
+  Administration → Document Numbering
+- CSV import engine: parse → validate (cell, referential, file-level) →
+  stored preview → commit; atomic for journals / opening balances, row by row
+  with per-row outcomes for master data; templates; Administration → Data
+  Imports
+- CSV exports (trial balance, general ledger, journals, chart of accounts,
+  parties, aging, audit logs) gated by `reports.export` + the dataset
+  permission and audited; export buttons on the report screens
+- Opening balances: AR / AP open items, opening stock (reason OPENING) and
+  migrated assets with accumulated depreciation, all offset to opening
+  equity; reconciliation report (control vs subledger, opening journals,
+  equity residual); Accounting → Opening Balances
+- Fixes: fixed-asset subledger as-of uses the capitalisation posting date;
+  database pool errors no longer crash the API
+- Tests: API integration 174 (+5), API unit 146 (+8), Playwright +4
+
+### H7-H9 (planned)
+
+Reporting engine, reliability, consolidation readiness.
 
 ## Beyond the roadmap
 

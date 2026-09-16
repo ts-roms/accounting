@@ -1,6 +1,8 @@
 import type { LucideIcon } from 'lucide-react';
 import {
   BadgePercent,
+  FileUp,
+  Hash,
   Banknote,
   BarChart3,
   Bell,
@@ -97,6 +99,7 @@ export const NAVIGATION: NavSection[] = [
       item('Trial Balance', '/accounting/trial-balance', Scale, [P['reports.view']]),
       item('Period Closing', '/accounting/period-closing', Landmark, [P['period.view']]),
       item('Financial Close', '/accounting/financial-close', ClipboardCheck, [P['close.view']]),
+      item('Opening Balances', '/accounting/opening-balances', Scale, [P['opening-balance.view']]),
       item('Reconciliation Center', '/accounting/reconciliation', Scale, [
         P['reconciliation.view'],
       ]),
@@ -327,6 +330,8 @@ export const NAVIGATION: NavSection[] = [
       item('Webhooks', '/admin/webhooks', Webhook, [P['webhook.view']]),
       item('Integration Logs', '/admin/integration-logs', ScrollText, [P['integration.view']]),
       item('Notifications', '/admin/notifications', Bell, [P['notification.view']]),
+      item('Document Numbering', '/admin/numbering', Hash, [P['numbering.view']]),
+      item('Data Imports', '/admin/imports', FileUp, [P['import.view']]),
       item('Audit Logs', '/admin/audit-logs', ClipboardList, [P['audit.view']]),
     ],
   },

@@ -400,10 +400,15 @@ export class StockDocumentsService {
         .from(stockDocumentLines)
         .where(eq(stockDocumentLines.documentId, id))
         .orderBy(asc(stockDocumentLines.lineNumber));
+      // Opening stock is equity at cut-over, not an adjustment gain / loss.
       const adjustmentAccount =
         type === 'TRANSFER'
           ? null
-          : await this.accounts.resolveMapped(companyId, 'INVENTORY_ADJUSTMENT', tx);
+          : await this.accounts.resolveMapped(
+              companyId,
+              existing.reason === 'OPENING' ? 'OPENING_BALANCE_EQUITY' : 'INVENTORY_ADJUSTMENT',
+              tx,
+            );
       // Signed value per inventory account: positive = stock value increased.
       const byInventoryAccount = new Map<string, Money>();
       const movementIds: string[] = [];

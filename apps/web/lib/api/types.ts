@@ -2455,3 +2455,111 @@ export interface SodUserConflict {
   companyId: string | null;
   companyName: string | null;
 }
+
+// ---------------------------------------------------------------- Hardening H6: data infrastructure
+
+export interface NumberingRuleView {
+  documentType: string;
+  branchId: string | null;
+  branchCode: string | null;
+  branchName: string | null;
+  prefix: string;
+  format: string;
+  padding: number;
+  resetYearly: boolean;
+  isActive: boolean;
+  /** Configured rule id, or null for the built-in default. */
+  ruleId: string | null;
+  nextNumber: string;
+}
+
+export type ImportType =
+  | 'CHART_OF_ACCOUNTS'
+  | 'CUSTOMERS'
+  | 'VENDORS'
+  | 'PRODUCTS'
+  | 'OPENING_BALANCES'
+  | 'JOURNAL_ENTRIES'
+  | 'BANK_TRANSACTIONS';
+export type ImportStatus = 'VALIDATED' | 'COMMITTED' | 'FAILED' | 'CANCELLED';
+
+export interface ImportColumn {
+  key: string;
+  required: boolean;
+  description: string;
+  example: string;
+}
+
+export interface ImportSpec {
+  type: ImportType;
+  title: string;
+  atomic: boolean;
+  columns: ImportColumn[];
+}
+
+export interface ImportRow {
+  line: number;
+  values: Record<string, string>;
+  errors: string[];
+  result?: string | null;
+}
+
+export interface ImportJob {
+  id: string;
+  type: ImportType;
+  status: ImportStatus;
+  fileName: string;
+  options: { asOfDate?: string | null; branchId?: string | null };
+  rowCount: number;
+  validCount: number;
+  errorCount: number;
+  result: { created?: number; failed?: number; documents?: string[]; error?: string };
+  spec: Pick<ImportSpec, 'title' | 'atomic' | 'columns'>;
+  createdBy: string | null;
+  createdByEmail: string | null;
+  committedBy: string | null;
+  committedAt: string | null;
+  createdAt: string;
+}
+
+export interface ImportJobDetail extends ImportJob {
+  rows: ImportRow[];
+}
+
+export type ExportDataset =
+  | 'TRIAL_BALANCE'
+  | 'GENERAL_LEDGER'
+  | 'JOURNAL_ENTRIES'
+  | 'CHART_OF_ACCOUNTS'
+  | 'CUSTOMERS'
+  | 'VENDORS'
+  | 'AR_AGING'
+  | 'AP_AGING'
+  | 'AUDIT_LOGS';
+
+export type OpeningBalanceArea = 'AR' | 'AP' | 'INVENTORY' | 'FIXED_ASSETS';
+
+export interface OpeningLoadResult {
+  area: OpeningBalanceArea;
+  asOfDate: string;
+  created: number;
+  total: string;
+  documents: string[];
+}
+
+export interface OpeningBalanceReport {
+  asOf: string;
+  currency: string;
+  areas: Array<{
+    area: OpeningBalanceArea;
+    controlAccountId: string;
+    subledger: string;
+    ledger: string;
+    variance: string;
+    reconciled: boolean;
+  }>;
+  openingJournals: { count: number; posted: number; drafts: number; totalDebit: string };
+  openingEquity: { accountId: string; code: string; balance: string };
+  trialBalanceBalanced: boolean;
+  reconciled: boolean;
+}

@@ -146,3 +146,42 @@ export type CloseAutoCheck = (typeof CLOSE_AUTO_CHECKS)[number];
 /** Suspense / clearing account monitor status, decided by company policy. */
 export const SUSPENSE_STATUSES = ['CLEAR', 'WITHIN_POLICY', 'REQUIRES_INVESTIGATION'] as const;
 export type SuspenseStatus = (typeof SUSPENSE_STATUSES)[number];
+
+// ------------------------------------------------------------------ data infrastructure (H6)
+
+/** Datasets a CSV import can load. */
+export const IMPORT_TYPES = [
+  'CHART_OF_ACCOUNTS',
+  'CUSTOMERS',
+  'VENDORS',
+  'PRODUCTS',
+  'OPENING_BALANCES',
+  'JOURNAL_ENTRIES',
+  'BANK_TRANSACTIONS',
+] as const;
+export type ImportType = (typeof IMPORT_TYPES)[number];
+
+export const IMPORT_STATUSES = ['VALIDATED', 'COMMITTED', 'FAILED', 'CANCELLED'] as const;
+export type ImportStatus = (typeof IMPORT_STATUSES)[number];
+
+/** Datasets that can be exported as CSV. */
+export const EXPORT_DATASETS = [
+  'TRIAL_BALANCE',
+  'GENERAL_LEDGER',
+  'JOURNAL_ENTRIES',
+  'CHART_OF_ACCOUNTS',
+  'CUSTOMERS',
+  'VENDORS',
+  'AR_AGING',
+  'AP_AGING',
+  'AUDIT_LOGS',
+] as const;
+export type ExportDataset = (typeof EXPORT_DATASETS)[number];
+
+/** Tokens a numbering format may contain. */
+export const NUMBERING_TOKENS = ['{PREFIX}', '{BRANCH}', '{YEAR}', '{YY}', '{SEQ}'] as const;
+export const DEFAULT_NUMBERING_FORMAT = '{PREFIX}-{YEAR}-{SEQ}';
+
+/** Subledger areas an opening balance can be loaded into. */
+export const OPENING_BALANCE_AREAS = ['AR', 'AP', 'INVENTORY', 'FIXED_ASSETS'] as const;
+export type OpeningBalanceArea = (typeof OPENING_BALANCE_AREAS)[number];

@@ -65,6 +65,9 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
       P['role.assign'],
       P['sod.manage'],
       P['policy.manage'],
+      P['numbering.manage'],
+      P['import.run'],
+      P['opening-balance.manage'],
       P['account.manage'],
       P['journal.create'],
       P['journal.submit'],
@@ -115,6 +118,8 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
     permissions: [
       ...VIEW_ALL,
       P['account.manage'],
+      P['import.run'],
+      P['opening-balance.manage'],
       P['journal.create'],
       P['reconciliation.prepare'],
       P['close.manage'],

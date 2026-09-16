@@ -418,11 +418,13 @@ export function NewStockDocumentScreen({ cfg }: { cfg: StockDocumentConfig }) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {ADJUSTMENT_REASONS.filter((r) => r !== 'COUNT_VARIANCE').map((r) => (
-                    <SelectItem key={r} value={r}>
-                      {titleCase(r)}
-                    </SelectItem>
-                  ))}
+                  {ADJUSTMENT_REASONS.filter((r) => r !== 'COUNT_VARIANCE' && r !== 'OPENING').map(
+                    (r) => (
+                      <SelectItem key={r} value={r}>
+                        {titleCase(r)}
+                      </SelectItem>
+                    ),
+                  )}
                 </SelectContent>
               </Select>
             </div>

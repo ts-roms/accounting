@@ -87,9 +87,11 @@ test.describe('fixed assets & banking', () => {
     await page.getByPlaceholder('Search by code or name...').fill('4900');
     await page.locator('[cmdk-item]').first().click();
     await page.getByTestId('tx-save').click();
-    await expect(page.getByRole('dialog')).toContainText(/BTX-2026-\d{6}/);
+    // The account popover may still be animating out (it also has role=dialog): scope to the form dialog.
+    const txDialog = page.getByRole('dialog', { name: /bank transaction|BTX-2026-/i });
+    await expect(txDialog).toContainText(/BTX-2026-\d{6}/);
     await page.getByTestId('tx-post').click();
-    await expect(page.getByRole('dialog')).toContainText('Posted');
+    await expect(txDialog).toContainText('Posted');
     await page.keyboard.press('Escape');
 
     // Import a one-line statement for it. Opening = ledger balance before, closing = + 777.

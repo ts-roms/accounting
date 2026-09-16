@@ -17,6 +17,7 @@ import { DimensionRulesService } from './dimensions/dimension-rules.service';
 import { DimensionsController } from './dimensions/dimensions.controller';
 import { DimensionsService } from './dimensions/dimensions.service';
 import { FiscalPeriodsController } from './fiscal/fiscal-periods.controller';
+import { NumberingController } from './numbering/numbering.controller';
 import { FiscalPeriodsService } from './fiscal/fiscal-periods.service';
 import { JournalEntriesController } from './journals/journal-entries.controller';
 import { JournalEntriesService } from './journals/journal-entries.service';
@@ -41,6 +42,7 @@ import { SuspenseService } from './suspense/suspense.service';
   controllers: [
     AccountsController,
     FiscalPeriodsController,
+    NumberingController,
     JournalEntriesController,
     GeneralLedgerController,
     DimensionsController,
@@ -67,6 +69,7 @@ import { SuspenseService } from './suspense/suspense.service';
   ],
   exports: [
     AccountsService,
+    JournalEntriesService,
     FiscalPeriodsService,
     AccountingPostingService,
     GeneralLedgerService,
