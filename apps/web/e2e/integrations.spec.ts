@@ -178,4 +178,47 @@ test.describe('integration platform', () => {
     // Cleanup so the seeded stack does not accumulate authorities.
     await apiCall(page, 'delete', `/integrations/${authority.id}`);
   });
+
+  test('the Operations tab lists dead letters with replay and discard, and the retention policy', async ({
+    page,
+  }) => {
+    await login(page);
+    // An unreachable receiver with a single attempt: the test delivery goes straight to EXHAUSTED.
+    const name = `Playwright dead letter ${Date.now()}`;
+    const hook = await (
+      await apiCall(page, 'post', '/webhooks', {
+        name,
+        url: 'http://127.0.0.1:9/unreachable',
+        events: ['webhook.test'],
+        maxAttempts: 1,
+      })
+    ).json();
+    const delivery = await (await apiCall(page, 'post', `/webhooks/${hook.id}/test`)).json();
+    expect(delivery.status).toBe('EXHAUSTED');
+
+    await page.goto('/admin/integrations');
+    await page.getByTestId('integrations-operations-tab').click();
+    await expect(page.getByTestId('dead-letters')).toBeVisible();
+    await expect(page.getByTestId('retention-policy')).toContainText('90 days');
+    const row = page.getByTestId('dead-letter-row').filter({ hasText: name });
+    await expect(row).toBeVisible();
+    await expect(row).toContainText('Webhook delivery');
+    await expect(row).toContainText('webhook.test');
+    // Replay re-queues a fresh delivery to the same dead receiver: it exhausts again and comes back.
+    await row.getByTestId('dead-letter-replay').click();
+    await expect(page.getByText(/Replayed:/)).toBeVisible();
+    await expect(page.getByTestId('dead-letter-row').filter({ hasText: name }).first()).toBeVisible(
+      { timeout: 15_000 },
+    );
+    // Discard acknowledges them (the original and the exhausted replay): the rows leave the queue.
+    for (let round = 0; round < 4; round += 1) {
+      const rows = page.getByTestId('dead-letter-row').filter({ hasText: name });
+      if ((await rows.count()) === 0) break;
+      await rows.first().getByTestId('dead-letter-discard').click();
+      await expect(page.getByText(/Discarded/).first()).toBeVisible();
+      await page.waitForTimeout(500);
+    }
+    await expect(page.getByTestId('dead-letter-row').filter({ hasText: name })).toHaveCount(0);
+    await apiCall(page, 'delete', `/webhooks/${hook.id}`);
+  });
 });

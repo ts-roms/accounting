@@ -86,6 +86,36 @@ inbound events by provider event id.
 | `delegation-expiration`    | integration-maintenance | every 5 min      |
 | `integration-cleanup`      | integration-maintenance | 03:30 daily      |
 
+Every scheduled job above goes through the H8 job registry
+(`JobRunnerService.schedule` registers it): one advisory lock per name, a
+`job_runs` row per occurrence, visible and triggerable from the operations
+console.
+
+### Operations (`ops/`)
+
+- **Dead letters** - `GET /integrations/ops/dead-letters` is one queue for
+  everything the platform gave up on: EXHAUSTED outbound deliveries that no
+  replay picked up, FAILED inbound events, FAILED outbox rows and FAILED sync /
+  push jobs nobody resumed. `replay` hands each kind to its own idempotent
+  path (delivery replay row, inbound re-processing, outbox re-dispatch, sync
+  resume from the checkpoint), `replay-all` does it per kind, `discard` marks
+  the row acknowledged (delivery DISABLED, event REJECTED, job CANCELLED) so it
+  leaves the queue but stays as history. Every action is audited
+  (`DeadLetter`). Administration -> Integrations -> Operations shows the queue
+  and the retention policy; each integration's Health tab counts its own dead
+  letters.
+- **Retention** - the nightly cleanup applies
+  `INTEGRATION_LOG_RETENTION_DAYS` (90), `INTEGRATION_EVENT_RETENTION_DAYS`
+  (30), `WEBHOOK_DELIVERY_RETENTION_DAYS` (30) and `SYNC_JOB_RETENTION_DAYS`
+  (180) in bounded batches of 5 000 rows: terminal rows go after their window,
+  dead letters after twice the window, and an outbox row is never removed while
+  a delivery still references it (deliveries are compacted first).
+  `GET /integrations/ops/retention` returns the effective policy.
+- **Metrics** - `GET /integrations/:id/health` carries a `metrics` block for
+  the last 24 h next to the score: provider calls, failures and error rate,
+  average and p95 latency, sync / push jobs and records, webhook deliveries,
+  dead letters.
+
 ## Tenancy
 
 Every table carries `organization_id` (and `company_id` where the data is

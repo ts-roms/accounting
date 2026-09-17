@@ -117,12 +117,20 @@ export class IntegrationLogsService {
   async stats(
     integrationId: string,
     since: Date,
-  ): Promise<{ failures: number; successes: number; avgLatencyMs: number | null }> {
+  ): Promise<{
+    failures: number;
+    successes: number;
+    avgLatencyMs: number | null;
+    p95LatencyMs: number | null;
+  }> {
     const [row] = await this.db
       .select({
         failures: sql<number>`count(*) filter (where ${integrationLogs.status} = 'FAILURE')::int`,
         successes: sql<number>`count(*) filter (where ${integrationLogs.status} = 'SUCCESS')::int`,
         avgLatencyMs: sql<number | null>`avg(${integrationLogs.durationMs})::int`,
+        p95LatencyMs: sql<
+          number | null
+        >`(percentile_cont(0.95) within group (order by ${integrationLogs.durationMs}))::int`,
       })
       .from(integrationLogs)
       .where(
@@ -138,6 +146,10 @@ export class IntegrationLogsService {
         row?.avgLatencyMs === null || row?.avgLatencyMs === undefined
           ? null
           : Number(row.avgLatencyMs),
+      p95LatencyMs:
+        row?.p95LatencyMs === null || row?.p95LatencyMs === undefined
+          ? null
+          : Number(row.p95LatencyMs),
     };
   }
 }

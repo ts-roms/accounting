@@ -18,6 +18,9 @@ import { IntegrationHealthService } from './health/integration-health.service';
 import { IdempotencyInterceptor } from './idempotency/idempotency.interceptor';
 import { IdempotencyService } from './idempotency/idempotency.service';
 import { IntegrationCleanupJob } from './jobs/integration-cleanup.job';
+import { DeadLettersService } from './ops/dead-letters.service';
+import { IntegrationOpsController } from './ops/integration-ops.controller';
+import { IntegrationRetentionService } from './ops/integration-retention.service';
 import { IntegrationLogsController } from './logs/integration-logs.controller';
 import { IntegrationLogsService } from './logs/integration-logs.service';
 import { ExternalReferencesService } from './mapping/external-references.service';
@@ -69,7 +72,12 @@ import { WebhooksController } from './webhooks/webhooks.controller';
     PayablesModule,
     InventoryModule,
   ],
-  controllers: [IntegrationsController, IntegrationLogsController, WebhooksController],
+  controllers: [
+    IntegrationsController,
+    IntegrationLogsController,
+    WebhooksController,
+    IntegrationOpsController,
+  ],
   providers: [
     ...CONNECTOR_CLASSES,
     ConnectorRegistry,
@@ -102,6 +110,8 @@ import { WebhooksController } from './webhooks/webhooks.controller';
     IntegrationHealthService,
     IdempotencyService,
     IntegrationCleanupJob,
+    IntegrationRetentionService,
+    DeadLettersService,
     { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },
   ],
   exports: [IntegrationsService, SyncService, OutboundWebhooksService, InboundWebhooksService],

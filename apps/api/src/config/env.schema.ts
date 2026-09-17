@@ -63,7 +63,11 @@ export const envSchema = z.object({
    * bearer token protecting GET /metrics.
    */
   INTEGRITY_CHECK_CRON: z.string().trim().default('45 3 * * *'),
-  QUEUE_PREFIX: z.string().trim().regex(/^[A-Za-z0-9_:-]{1,40}$/).default('accounting'),
+  QUEUE_PREFIX: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z0-9_:-]{1,40}$/)
+    .default('accounting'),
   METRICS_TOKEN: z.string().trim().min(16).optional(),
 
   /**
@@ -78,6 +82,11 @@ export const envSchema = z.object({
     .default('false')
     .transform((v) => v === 'true'),
   WEBHOOK_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60000).default(10000),
+  /** Retention (days) applied by the nightly integration-cleanup job; dead letters are kept twice as long. */
+  INTEGRATION_LOG_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(90),
+  INTEGRATION_EVENT_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(30),
+  WEBHOOK_DELIVERY_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(30),
+  SYNC_JOB_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(180),
   /** Public base URL of the API for OAuth redirect URIs (e.g. https://api.example.com). */
   OAUTH_REDIRECT_BASE_URL: z.string().trim().url().optional(),
   /** Where OAuth callbacks send the browser back to (the web app). */

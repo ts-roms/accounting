@@ -1,8 +1,14 @@
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, gte, isNull, sql } from 'drizzle-orm';
 import { PinoLogger } from 'nestjs-pino';
 import { DRIZZLE, type Database } from '@/database/database.types';
-import { integrations, oauthConnections, type Integration } from '@/database/schema';
+import {
+  integrationEvents,
+  integrationSyncJobs,
+  integrations,
+  oauthConnections,
+  type Integration,
+} from '@/database/schema';
 import { QUEUES } from '@/modules/jobs/queue.service';
 import { CredentialsService } from '../core/credentials.service';
 import { IntegrationsService } from '../core/integrations.service';
@@ -14,8 +20,30 @@ import { computeHealth, type HealthReport } from './health.logic';
 
 const JOB_CHECK = 'integration-health-check';
 
+/** Measured throughput over the last 24 hours, next to the score: what the operator looks at when the score drops. */
+export interface IntegrationMetrics {
+  windowHours: number;
+  calls: number;
+  failures: number;
+  /** failures / calls, 0..1; null when there were no calls. */
+  errorRate: number | null;
+  avgLatencyMs: number | null;
+  p95LatencyMs: number | null;
+  syncJobs: number;
+  syncJobsFailed: number;
+  recordsProcessed: number;
+  recordsCreated: number;
+  recordsUpdated: number;
+  recordsFailed: number;
+  webhooksDelivered: number;
+  webhooksExhausted: number;
+  /** FAILED inbound / outbox events and FAILED, un-resumed sync jobs waiting in the dead-letter queue. */
+  deadLetters: number;
+}
+
 export interface IntegrationHealthView extends HealthReport {
   integrationId: string;
+  metrics: IntegrationMetrics;
   checkedAt: Date;
   lastSuccessAt: Date | null;
   lastFailureAt: Date | null;
@@ -65,6 +93,10 @@ export class IntegrationHealthService implements OnModuleInit {
         .where(eq(oauthConnections.integrationId, integration.id)),
     ]);
     const wh = await this.webhooks.healthFor(webhookIds);
+    const [syncStats, deadLetters] = await Promise.all([
+      this.syncStats(integration.id, since),
+      this.deadLetterCount(integration.id),
+    ]);
     const connector = this.integrations.connector(integration.provider);
     const report = computeHealth({
       status: integration.status,
@@ -111,9 +143,22 @@ export class IntegrationHealthService implements OnModuleInit {
         dedupeKey: `credentials-expiring:${integration.id}`,
       });
     }
+    const calls = stats.failures + stats.successes;
     return {
       ...report,
       integrationId: integration.id,
+      metrics: {
+        windowHours: 24,
+        calls,
+        failures: stats.failures,
+        errorRate: calls ? Number((stats.failures / calls).toFixed(4)) : null,
+        avgLatencyMs: stats.avgLatencyMs,
+        p95LatencyMs: stats.p95LatencyMs,
+        ...syncStats,
+        webhooksDelivered: wh.delivered24h,
+        webhooksExhausted: wh.exhausted24h,
+        deadLetters,
+      },
       checkedAt: now,
       lastSuccessAt: integration.lastSuccessAt,
       lastFailureAt: integration.lastFailureAt,
@@ -137,5 +182,55 @@ export class IntegrationHealthService implements OnModuleInit {
       }
     }
     return rows.length;
+  }
+
+  private async syncStats(integrationId: string, since: Date) {
+    const [row] = await this.db
+      .select({
+        syncJobs: sql<number>`count(*)::int`,
+        syncJobsFailed: sql<number>`count(*) filter (where ${integrationSyncJobs.status} = 'FAILED')::int`,
+        recordsProcessed: sql<number>`coalesce(sum(${integrationSyncJobs.recordsProcessed}), 0)::int`,
+        recordsCreated: sql<number>`coalesce(sum(${integrationSyncJobs.recordsCreated}), 0)::int`,
+        recordsUpdated: sql<number>`coalesce(sum(${integrationSyncJobs.recordsUpdated}), 0)::int`,
+        recordsFailed: sql<number>`coalesce(sum(${integrationSyncJobs.recordsFailed}), 0)::int`,
+      })
+      .from(integrationSyncJobs)
+      .where(
+        and(
+          eq(integrationSyncJobs.integrationId, integrationId),
+          gte(integrationSyncJobs.createdAt, since),
+        ),
+      );
+    return {
+      syncJobs: Number(row?.syncJobs ?? 0),
+      syncJobsFailed: Number(row?.syncJobsFailed ?? 0),
+      recordsProcessed: Number(row?.recordsProcessed ?? 0),
+      recordsCreated: Number(row?.recordsCreated ?? 0),
+      recordsUpdated: Number(row?.recordsUpdated ?? 0),
+      recordsFailed: Number(row?.recordsFailed ?? 0),
+    };
+  }
+
+  private async deadLetterCount(integrationId: string): Promise<number> {
+    const [events] = await this.db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(integrationEvents)
+      .where(
+        and(
+          eq(integrationEvents.integrationId, integrationId),
+          eq(integrationEvents.status, 'FAILED'),
+        ),
+      );
+    const [jobs] = await this.db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(integrationSyncJobs)
+      .where(
+        and(
+          eq(integrationSyncJobs.integrationId, integrationId),
+          eq(integrationSyncJobs.status, 'FAILED'),
+          sql`not exists (select 1 from integration_sync_jobs r where r.resumed_from_job_id = ${integrationSyncJobs.id})`,
+        ),
+      );
+    return Number(events?.n ?? 0) + Number(jobs?.n ?? 0);
   }
 }

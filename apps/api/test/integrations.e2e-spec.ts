@@ -10,6 +10,7 @@ import { configureApp } from '@/app.setup';
 import { runMigrations } from '@/database/migrate';
 import { runSeed } from '@/database/seed/seed';
 import { JobRunnerService } from '@/modules/jobs/job-runner.service';
+import { IntegrationRetentionService } from '@/modules/integrations/ops/integration-retention.service';
 import { OutboundWebhooksService } from '@/modules/integrations/webhooks/outbound-webhooks.service';
 import { verifySignature } from '@/modules/integrations/webhooks/webhook-signature';
 
@@ -1392,6 +1393,157 @@ describe('Integration platform (e2e)', () => {
       .send({ name: 'x', url: receiverUrl, events: ['webhook.test'] })
       .expect(403);
     await new Promise<void>((r) => receiver.close(() => r()));
+  });
+
+  // ------------------------------------------------------------- operations
+
+  it('runs the dead-letter queue (replay / discard) and the retention policy, and reports throughput per integration', async () => {
+    await as(server().get('/api/v1/integrations/ops/dead-letters'), viewer).expect(403);
+    const before = await as(server().get('/api/v1/integrations/ops/dead-letters')).expect(200);
+    // The push refused for a missing scope earlier failed and was never resumed: it waits here. The
+    // exhausted test delivery was replayed successfully, so it does not.
+    const failedSync = before.body.items.find(
+      (i: { kind: string; ownerName: string }) =>
+        i.kind === 'SYNC_JOB' && i.ownerName === 'E2E e-invoicing (no read scope)',
+    );
+    expect(failedSync).toMatchObject({ replayable: true, subject: 'push:all' });
+    expect(failedSync.error).toMatch(/AUTHORIZATION_ERROR/);
+    expect(before.body.summary.WEBHOOK_DELIVERY).toBe(0);
+
+    // Seed the other kinds the way production produces them: rows the dispatcher / receiver gave up on.
+    const [org] = await sql<{ organization_id: string }>(
+      'select organization_id from integrations where id = $1',
+      [shopId],
+    );
+    const [webhook] = await sql<{ id: string }>(
+      "select id from integration_webhooks where name = 'E2E receiver' limit 1",
+    );
+    // A delivery is unique per (webhook, event): give each seeded delivery its own processed outbox row.
+    const deadEvent = async () =>
+      (
+        await sql<{ id: string }>(
+          "insert into integration_events (organization_id, company_id, direction, event_type, status, payload, processed_at) values ($1, $2, 'OUTBOUND', 'webhook.test', 'PROCESSED', '{}', now()) returning id",
+          [org!.organization_id, companyId],
+        )
+      )[0]!.id;
+    const [exhausted] = await sql<{ id: string }>(
+      "insert into integration_webhook_deliveries (webhook_id, event_id, event_type, status, attempts, max_attempts, last_error) values ($1, $2, 'webhook.test', 'EXHAUSTED', 3, 3, 'connect ECONNREFUSED') returning id",
+      [webhook!.id, await deadEvent()],
+    );
+    const outboxIds = await sql<{ id: string }>(
+      "insert into integration_events (organization_id, company_id, direction, event_type, status, attempts, last_error, payload) values ($1, $2, 'OUTBOUND', 'webhook.test', 'FAILED', 1, 'dispatch failed', '{}'), ($1, $2, 'OUTBOUND', 'webhook.test', 'FAILED', 1, 'dispatch failed', '{}') returning id",
+      [org!.organization_id, companyId],
+    );
+    const [inboundDead] = await sql<{ id: string }>(
+      "insert into integration_events (organization_id, company_id, integration_id, direction, event_type, external_event_id, status, attempts, last_error, payload) values ($1, $2, $3, 'INBOUND', 'payment.received', 'evt_dead_1', 'FAILED', 2, 'MAPPING_ERROR: customer missing', '{\"id\":\"pay_dead\"}') returning id",
+      [org!.organization_id, companyId, gatewayId],
+    );
+    const queue = await as(server().get('/api/v1/integrations/ops/dead-letters')).expect(200);
+    expect(queue.body.summary).toMatchObject({
+      WEBHOOK_DELIVERY: 1,
+      INBOUND_EVENT: 1,
+      OUTBOX_EVENT: 2,
+    });
+    expect(queue.body.items.find((i: { id: string }) => i.id === exhausted!.id)).toMatchObject({
+      kind: 'WEBHOOK_DELIVERY',
+      ownerName: 'E2E receiver',
+      subject: 'webhook.test',
+      attempts: 3,
+    });
+
+    // Replay every failed outbox row: the dispatcher processes them again (no subscribers -> processed).
+    const replayed = await as(server().post('/api/v1/integrations/ops/dead-letters/replay-all'))
+      .send({ kind: 'OUTBOX_EVENT' })
+      .expect(200);
+    expect(replayed.body.OUTBOX_EVENT).toBe(2);
+    await new Promise((r) => setTimeout(r, 50));
+    await outbound.dispatchPending();
+    await drain();
+    const [outboxStatus] = await sql<{ statuses: string[] }>(
+      'select array_agg(distinct status::text) as statuses from integration_events where id = any($1::uuid[])',
+      [outboxIds.map((r) => r.id)],
+    );
+    expect(outboxStatus!.statuses).toEqual(['PROCESSED']);
+    // Discard the rest: acknowledged rows leave the queue but stay as history.
+    await as(server().post('/api/v1/integrations/ops/dead-letters/discard'), viewer)
+      .send({ kind: 'INBOUND_EVENT', id: inboundDead!.id })
+      .expect(403);
+    await as(server().post('/api/v1/integrations/ops/dead-letters/discard'))
+      .send({ kind: 'INBOUND_EVENT', id: inboundDead!.id })
+      .expect(200);
+    await as(server().post('/api/v1/integrations/ops/dead-letters/discard'))
+      .send({ kind: 'WEBHOOK_DELIVERY', id: exhausted!.id })
+      .expect(200);
+    const discardedSync = await as(server().post('/api/v1/integrations/ops/dead-letters/discard'))
+      .send({ kind: 'SYNC_JOB', id: failedSync.id })
+      .expect(200);
+    expect(discardedSync.body.status).toBe('CANCELLED');
+    const after = await as(server().get('/api/v1/integrations/ops/dead-letters')).expect(200);
+    expect(after.body.summary).toMatchObject({
+      WEBHOOK_DELIVERY: 0,
+      INBOUND_EVENT: 0,
+      OUTBOX_EVENT: 0,
+    });
+    expect(after.body.items.some((i: { id: string }) => i.id === failedSync.id)).toBe(false);
+    expect(
+      (
+        await sql<{ status: string; last_error: string }>(
+          'select status, last_error from integration_events where id = $1',
+          [inboundDead!.id],
+        )
+      )[0],
+    ).toMatchObject({ status: 'REJECTED', last_error: expect.stringContaining(ADMIN.email) });
+    // Every replay / discard is audited.
+    const audit = await as(server().get('/api/v1/audit-logs?entityType=DeadLetter')).expect(200);
+    expect(audit.body.total).toBeGreaterThanOrEqual(5);
+
+    // Retention: the nightly cleanup applies the env policy in bounded batches; dead letters live twice as long.
+    const policy = await as(server().get('/api/v1/integrations/ops/retention')).expect(200);
+    expect(policy.body).toMatchObject({
+      logDays: 90,
+      eventDays: 30,
+      deliveryDays: 30,
+      syncJobDays: 180,
+      deadLetterMultiplier: 2,
+    });
+    const [deliveredOld] = await sql<{ id: string }>(
+      "update integration_webhook_deliveries set created_at = now() - interval '40 days' where status = 'DELIVERED' and webhook_id = $1 returning id",
+      [webhook!.id],
+    );
+    await sql(
+      "update integration_webhook_deliveries set created_at = now() - interval '40 days' where id = $1",
+      [exhausted!.id],
+    );
+    const [stillDead] = await sql<{ id: string }>(
+      "insert into integration_webhook_deliveries (webhook_id, event_id, event_type, status, attempts, max_attempts, created_at) values ($1, $2, 'webhook.test', 'EXHAUSTED', 3, 3, now() - interval '40 days') returning id",
+      [webhook!.id, await deadEvent()],
+    );
+    const [oldLog] = await sql<{ id: string }>(
+      "update integration_logs set occurred_at = now() - interval '100 days' where integration_id = $1 returning id",
+      [shopId],
+    );
+    const compacted = await app.get(IntegrationRetentionService).compact();
+    expect(compacted.deliveries).toBeGreaterThanOrEqual(2); // the delivered one and the discarded (DISABLED) one
+    expect(compacted.logs).toBeGreaterThanOrEqual(1);
+    expect(
+      (await sql('select 1 from integration_webhook_deliveries where id = $1', [deliveredOld!.id]))
+        .length,
+    ).toBe(0);
+    expect((await sql('select 1 from integration_logs where id = $1', [oldLog!.id])).length).toBe(
+      0,
+    );
+    // The 40-day-old exhausted delivery is still a dead letter: kept until 60 days.
+    expect(
+      (await sql('select 1 from integration_webhook_deliveries where id = $1', [stillDead!.id]))
+        .length,
+    ).toBe(1);
+
+    // Throughput next to the health score.
+    const health = await as(server().get(`/api/v1/integrations/${shopId}/health`)).expect(200);
+    expect(health.body.metrics).toMatchObject({ windowHours: 24 });
+    expect(health.body.metrics.syncJobs).toBeGreaterThanOrEqual(2);
+    expect(health.body.metrics.recordsProcessed).toBeGreaterThanOrEqual(7);
+    expect(typeof health.body.metrics.deadLetters).toBe('number');
   });
 
   // ------------------------------------------------------------------ OAuth

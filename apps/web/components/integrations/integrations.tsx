@@ -41,10 +41,11 @@ import { formatDateTime, titleCase } from '@/lib/format';
 import { useSession } from '@/lib/auth/session';
 import { DataTable, useTableState } from '@/components/ui-ext/data-table';
 import { Can, EmptyState, PageHeader } from '@/components/ui-ext/page';
+import { DeadLettersPanel } from './dead-letters';
 import { Stat } from '@/components/fixed-assets/shared';
 import { HealthBadge, IntegrationStatusBadge } from './shared';
 
-type Filter = 'ALL' | 'CONNECTED' | 'ATTENTION' | 'DISABLED' | 'AVAILABLE';
+type Filter = 'ALL' | 'CONNECTED' | 'ATTENTION' | 'DISABLED' | 'AVAILABLE' | 'OPERATIONS';
 
 /** Integrations catalogue: connected / needs attention / disabled, plus the provider catalogue to connect from. */
 export function IntegrationsPage() {
@@ -250,9 +251,14 @@ export function IntegrationsPage() {
           <TabsTrigger value="ATTENTION">Needs attention</TabsTrigger>
           <TabsTrigger value="DISABLED">Disabled</TabsTrigger>
           <TabsTrigger value="AVAILABLE">Available</TabsTrigger>
+          <TabsTrigger value="OPERATIONS" data-testid="integrations-operations-tab">
+            Operations
+          </TabsTrigger>
         </TabsList>
       </Tabs>
-      {filter === 'AVAILABLE' ? (
+      {filter === 'OPERATIONS' ? (
+        <DeadLettersPanel />
+      ) : filter === 'AVAILABLE' ? (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {(providers.data ?? []).map((p) => (
             <div

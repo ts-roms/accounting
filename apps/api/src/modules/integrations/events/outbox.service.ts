@@ -85,6 +85,24 @@ export class OutboxService {
       .where(eq(integrationEvents.id, id));
   }
 
+  /** Puts a FAILED outbox row back in front of the dispatcher (dead-letter replay). */
+  async requeue(id: string, executor: DbExecutor = this.db): Promise<boolean> {
+    const [row] = await executor
+      .update(integrationEvents)
+      .set({ status: 'PENDING', processedAt: null })
+      .where(
+        and(
+          eq(integrationEvents.id, id),
+          eq(integrationEvents.direction, 'OUTBOUND'),
+          eq(integrationEvents.status, 'FAILED'),
+        ),
+      )
+      .returning({ id: integrationEvents.id });
+    if (row)
+      setTimeout(() => this.emitter.emit(OUTBOX_ENQUEUED_EVENT, { eventId: row.id }), 0).unref();
+    return Boolean(row);
+  }
+
   async markFailed(id: string, error: string, executor: DbExecutor = this.db): Promise<void> {
     await executor
       .update(integrationEvents)

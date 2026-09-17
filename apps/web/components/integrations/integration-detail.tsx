@@ -1107,6 +1107,28 @@ function HealthTab({ i }: { i: IntegrationView }) {
               ['API latency', h.apiLatencyMs !== null ? `${h.apiLatencyMs} ms avg (24h)` : 'n/a'],
               ['Rate limit', h.rateLimitState],
               [
+                `Provider calls (${h.metrics.windowHours}h)`,
+                `${h.metrics.calls} calls, ${h.metrics.failures} failed${h.metrics.errorRate !== null ? ` (${(h.metrics.errorRate * 100).toFixed(1)}% error rate)` : ''}${h.metrics.p95LatencyMs !== null ? `, p95 ${h.metrics.p95LatencyMs} ms` : ''}`,
+              ],
+              [
+                `Sync / push (${h.metrics.windowHours}h)`,
+                `${h.metrics.syncJobs} jobs (${h.metrics.syncJobsFailed} failed) - ${h.metrics.recordsProcessed} records: ${h.metrics.recordsCreated} created, ${h.metrics.recordsUpdated} updated, ${h.metrics.recordsFailed} failed`,
+              ],
+              [
+                `Webhooks (${h.metrics.windowHours}h)`,
+                `${h.metrics.webhooksDelivered} delivered, ${h.metrics.webhooksExhausted} exhausted`,
+              ],
+              [
+                'Dead letters',
+                h.metrics.deadLetters ? (
+                  <span className="text-critical" data-testid="health-dead-letters">
+                    {h.metrics.deadLetters} waiting - see Integrations - Operations
+                  </span>
+                ) : (
+                  'none'
+                ),
+              ],
+              [
                 'Credential expiry',
                 h.credentialExpiry.state === 'NONE'
                   ? 'not tracked'
