@@ -30,7 +30,10 @@ import type {
   MappingPreview,
   MappingsResponse,
   NotificationView,
+  DeadLetterKind,
+  DeadLettersView,
   ProviderDescriptor,
+  RetentionPolicyView,
   PushRecordResult,
   RecordLinksView,
   ScopeCatalogEntry,
@@ -129,6 +132,48 @@ export const usePushRecord = () => {
     mutationFn: ({ id, ...input }: { id: string; entity: SyncEntity; internalId: string }) =>
       api.post<PushRecordResult>(`/integrations/${id}/push-record`, input),
     onSuccess: () => invalidate(qc),
+  });
+};
+
+// ------------------------------------------------------------- operations
+
+export const useDeadLetters = () =>
+  useQuery({
+    queryKey: [ROOT, 'dead-letters'],
+    queryFn: () => api.get<DeadLettersView>('/integrations/ops/dead-letters'),
+    refetchInterval: 30_000,
+  });
+
+export const useRetentionPolicy = () =>
+  useQuery({
+    queryKey: [ROOT, 'retention'],
+    queryFn: () => api.get<RetentionPolicyView>('/integrations/ops/retention'),
+    staleTime: 5 * 60_000,
+  });
+
+export const useDeadLetterAction = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { action: 'replay' | 'discard'; kind: DeadLetterKind; id: string }) =>
+      api.post<{ result?: string; status?: string }>(
+        `/integrations/ops/dead-letters/${input.action}`,
+        {
+          kind: input.kind,
+          id: input.id,
+        },
+      ),
+    onSuccess: () => invalidate(qc, 'webhooks'),
+  });
+};
+
+export const useReplayAllDeadLetters = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (kind?: DeadLetterKind) =>
+      api.post<Record<DeadLetterKind, number>>('/integrations/ops/dead-letters/replay-all', {
+        kind,
+      }),
+    onSuccess: () => invalidate(qc, 'webhooks'),
   });
 };
 

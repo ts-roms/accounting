@@ -109,8 +109,54 @@ export interface IntegrationLogView {
   occurredAt: string;
 }
 
+export interface IntegrationMetrics {
+  windowHours: number;
+  calls: number;
+  failures: number;
+  errorRate: number | null;
+  avgLatencyMs: number | null;
+  p95LatencyMs: number | null;
+  syncJobs: number;
+  syncJobsFailed: number;
+  recordsProcessed: number;
+  recordsCreated: number;
+  recordsUpdated: number;
+  recordsFailed: number;
+  webhooksDelivered: number;
+  webhooksExhausted: number;
+  deadLetters: number;
+}
+
+export type DeadLetterKind = 'WEBHOOK_DELIVERY' | 'INBOUND_EVENT' | 'OUTBOX_EVENT' | 'SYNC_JOB';
+
+export interface DeadLetterView {
+  kind: DeadLetterKind;
+  id: string;
+  ownerId: string | null;
+  ownerName: string;
+  subject: string;
+  error: string | null;
+  attempts: number;
+  occurredAt: string;
+  replayable: boolean;
+}
+
+export interface DeadLettersView {
+  summary: Record<DeadLetterKind, number>;
+  items: DeadLetterView[];
+}
+
+export interface RetentionPolicyView {
+  logDays: number;
+  eventDays: number;
+  deliveryDays: number;
+  syncJobDays: number;
+  deadLetterMultiplier: number;
+}
+
 export interface IntegrationHealthView {
   integrationId: string;
+  metrics: IntegrationMetrics;
   score: number;
   status: IntegrationHealthStatus;
   deductions: Array<{ code: string; points: number; detail: string }>;
