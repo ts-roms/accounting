@@ -43,8 +43,10 @@ export interface ExportPage {
  */
 export interface Exporter {
   readonly entity: SyncEntity;
-  /** Which scope the integration must hold to export this entity. */
+  /** A page in (updatedAt, id) order; asserts the entity's read scope. */
   select(ctx: ExportContext, query: ExportQuery): Promise<ExportPage>;
+  /** One record for a targeted (re-)push; null when it does not exist or is not exportable (e.g. a draft). */
+  byId(ctx: ExportContext, internalId: string): Promise<ExportRecord | null>;
 }
 
 export const EXPORT_BATCH_SIZE = 50;

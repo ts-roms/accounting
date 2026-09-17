@@ -15,6 +15,7 @@ import type {
   UpdateWebhookInput,
   UpsertMappingInput,
 } from '@accounting/validation';
+import type { SyncEntity } from '@accounting/types';
 import { api, getActiveCompanyId } from './client';
 import type {
   ApiKeyView,
@@ -30,6 +31,8 @@ import type {
   MappingsResponse,
   NotificationView,
   ProviderDescriptor,
+  PushRecordResult,
+  RecordLinksView,
   ScopeCatalogEntry,
   SyncJobView,
   WebhookDeliveryView,
@@ -108,6 +111,26 @@ export const useIntegrationMappings = (id: string | null) =>
     queryFn: () => api.get<MappingsResponse>(`/integrations/${id}/mappings`),
     enabled: Boolean(id),
   });
+
+/** Record-centric view: which providers know this invoice / bill / party / product. */
+export const useRecordLinks = (entityType: SyncEntity, internalId: string | null) =>
+  useQuery({
+    queryKey: key('record-links', entityType, internalId),
+    queryFn: () =>
+      api.get<RecordLinksView>('/integrations/record-links', {
+        query: { entityType, internalId },
+      }),
+    enabled: Boolean(internalId),
+  });
+
+export const usePushRecord = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...input }: { id: string; entity: SyncEntity; internalId: string }) =>
+      api.post<PushRecordResult>(`/integrations/${id}/push-record`, input),
+    onSuccess: () => invalidate(qc),
+  });
+};
 
 export const useExternalReferences = (id: string | null, entityType?: string) =>
   useQuery({

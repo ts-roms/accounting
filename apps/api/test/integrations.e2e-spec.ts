@@ -1057,6 +1057,106 @@ describe('Integration platform (e2e)', () => {
     expect(pending).toBe(0);
   });
 
+  it('shows a record its integration trail (with the record permission only) and re-pushes one record on demand', async () => {
+    const authority = (
+      await as(server().get('/api/v1/integrations?pageSize=50')).expect(200)
+    ).body.items.find((i: { name: string }) => i.name === 'E2E e-invoicing (events)') as {
+      id: string;
+    };
+    const invoice = (await as(server().get('/api/v1/invoices?search=EVT-1')).expect(200)).body
+      .items[0] as { id: string; documentNumber: string };
+    // A viewer can see the invoice, so they can see who received it - integration.view is not required.
+    const links = await as(
+      server().get(
+        `/api/v1/integrations/record-links?entityType=invoices&internalId=${invoice.id}`,
+      ),
+      viewer,
+    ).expect(200);
+    const sent = links.body.references.find(
+      (r: { integrationId: string }) => r.integrationId === authority.id,
+    );
+    expect(sent).toMatchObject({
+      integrationName: 'E2E e-invoicing (events)',
+      providerName: 'Demo Tax Authority (e-invoicing)',
+      direction: 'OUTBOUND',
+      canPush: true,
+    });
+    expect(sent.externalId).toMatch(/^ACK-/);
+    expect(sent.metadata.documentNumber).toBe(invoice.documentNumber);
+    // Other push-capable integrations that never received it are offered as targets, never the linked one.
+    expect(
+      links.body.pushTargets.some(
+        (t: { integrationId: string }) => t.integrationId === authority.id,
+      ),
+    ).toBe(false);
+    expect(links.body.pushTargets.length).toBeGreaterThan(0);
+    // An imported record shows the provider it came from.
+    const northwind = (await as(server().get('/api/v1/customers?search=EC-C_1')).expect(200)).body
+      .items[0] as { id: string };
+    const imported = await as(
+      server().get(
+        `/api/v1/integrations/record-links?entityType=customers&internalId=${northwind.id}`,
+      ),
+    ).expect(200);
+    expect(imported.body.references).toEqual([
+      expect.objectContaining({
+        provider: 'DEMO_ECOMMERCE',
+        direction: 'INBOUND',
+        externalId: 'c_1',
+      }),
+    ]);
+    // Wrong entity for the record -> nothing, not an error; missing permission -> 403.
+    expect(
+      (
+        await as(
+          server().get(
+            `/api/v1/integrations/record-links?entityType=products&internalId=${invoice.id}`,
+          ),
+        ).expect(200)
+      ).body.references,
+    ).toEqual([]);
+
+    // Re-push: manager only, same exporter -> mapping -> push path, reference updated with the actor.
+    await as(server().post(`/api/v1/integrations/${authority.id}/push-record`), viewer)
+      .send({ entity: 'invoices', internalId: invoice.id })
+      .expect(403);
+    const repush = await as(server().post(`/api/v1/integrations/${authority.id}/push-record`))
+      .send({ entity: 'invoices', internalId: invoice.id })
+      .expect(201);
+    expect(repush.body).toMatchObject({ outcome: 'UPDATED', externalId: sent.externalId });
+    const after = await as(
+      server().get(
+        `/api/v1/integrations/record-links?entityType=invoices&internalId=${invoice.id}`,
+      ),
+    ).expect(200);
+    const updated = after.body.references.find(
+      (r: { integrationId: string }) => r.integrationId === authority.id,
+    );
+    expect(updated.metadata).toMatchObject({ pushedBy: ADMIN.email, version: 'resubmission' });
+    // A draft is never pushable; an entity the provider does not handle is refused; no job row was created.
+    const draft = (await as(server().get('/api/v1/invoices?search=EVT-DRAFT')).expect(200)).body
+      .items[0] as { id: string };
+    await as(server().post(`/api/v1/integrations/${authority.id}/push-record`))
+      .send({ entity: 'invoices', internalId: draft.id })
+      .expect(404);
+    await as(server().post(`/api/v1/integrations/${authority.id}/push-record`))
+      .send({ entity: 'customers', internalId: northwind.id })
+      .expect(422);
+    expect(
+      (await as(server().get(`/api/v1/integrations/${authority.id}/sync-jobs`)).expect(200)).body
+        .total,
+    ).toBe(1);
+    const logs = await as(
+      server().get(`/api/v1/integration-logs?integrationId=${authority.id}&direction=OUTBOUND`),
+    ).expect(200);
+    expect(
+      logs.body.items.some(
+        (l: { operation: string; status: string }) =>
+          l.operation === 'push-record:invoices' && l.status === 'SUCCESS',
+      ),
+    ).toBe(true);
+  });
+
   // ------------------------------------------------------- inbound webhooks
 
   let gatewayId: string;

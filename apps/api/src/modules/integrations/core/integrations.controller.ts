@@ -37,6 +37,7 @@ import { IntegrationLogsService } from '../logs/integration-logs.service';
 import { ExternalReferencesService } from '../mapping/external-references.service';
 import { MappingsService } from '../mapping/mappings.service';
 import { OAuthService } from '../oauth/oauth.service';
+import { RecordLinksService } from '../sync/record-links.service';
 import { SyncService } from '../sync/sync.service';
 import { InboundWebhooksService } from '../webhooks/inbound-webhooks.service';
 import { IntegrationsService } from './integrations.service';
@@ -55,6 +56,12 @@ class DisconnectDto extends createZodDto(
   z.object({ reason: z.string().trim().max(500).optional() }),
 ) {}
 class RefsDto extends createZodDto(z.object({ entityType: z.enum(SYNC_ENTITIES).optional() })) {}
+class RecordLinksDto extends createZodDto(
+  z.object({ entityType: z.enum(SYNC_ENTITIES), internalId: z.string().uuid() }),
+) {}
+class PushRecordDto extends createZodDto(
+  z.object({ entity: z.enum(SYNC_ENTITIES), internalId: z.string().uuid() }),
+) {}
 
 /** Integration registry plus the per-integration sub-resources (sync, mappings, logs, health, OAuth). */
 @ApiTags('Integrations')
@@ -69,7 +76,22 @@ export class IntegrationsController {
     private readonly health: IntegrationHealthService,
     private readonly oauth: OAuthService,
     private readonly inbound: InboundWebhooksService,
+    private readonly links: RecordLinksService,
   ) {}
+
+  // ---------------------------------------------------------- record links
+
+  /** Which providers know one internal record; gated by the record's own view permission, not integration.view. */
+  @Get('record-links')
+  @ApiOperation({ summary: 'External references and push targets of one internal record' })
+  recordLinks(@CurrentUser() user: AuthenticatedUser, @Query() query: RecordLinksDto) {
+    return this.links.forRecord(
+      user,
+      user.companyId ?? '',
+      query.entityType,
+      query.internalId,
+    );
+  }
 
   // -------------------------------------------------------------- catalogue
 
@@ -160,6 +182,17 @@ export class IntegrationsController {
     @Body() body: SyncDto,
   ) {
     return this.sync.trigger(user, user.organizationId, id, body);
+  }
+
+  @Post(':id/push-record')
+  @RequirePermissions(P['integration.manage'])
+  @ApiOperation({ summary: 'Push one record to the provider now (re-push); returns the outcome' })
+  pushRecord(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: PushRecordDto,
+  ) {
+    return this.links.pushRecord(user, user.organizationId, id, body.entity, body.internalId);
   }
 
   @Post(':id/push')
