@@ -45,6 +45,7 @@ Enterprise accounting platform (modular monolith). Read `docs/architecture.md`,
 - New permission: add to `packages/types/src/permissions.ts` (+ system roles) -> build -> `pnpm db:seed`.
 - e2e suites DROP the schema: they only run against a database whose name contains `test` (see `apps/api/test/setup-env.ts`); unit Jest is scoped to `src/`. Each git worktree gets its own test database automatically (`accounting_test_<worktree>`, created by `test/global-setup.ts`); set `TEST_DATABASE_SUFFIX` to isolate another checkout or session - never run two e2e suites against one database.
 - Tests: `pnpm test` (unit), `pnpm --filter @accounting/api test:e2e` (needs Docker infra), `pnpm --filter @accounting/web test:e2e` (needs running stack).
+- Playwright specs import `test` / `expect` from `e2e/fixtures.ts` (never from `@playwright/test` directly) and start sessions with `login(page)` from `e2e/helpers.ts`: the fixture writes the context's cookies back to `e2e/.auth/admin.json` after every admin test so the API's refresh-token rotation never trips its reuse detector, and `login()` waits for the shell or the login form (`settle`) and re-logs in when the stored session is gone. Never sign the shared admin session out through the UI; switch users only via `login(page, FINANCE)`.
 - Lint/typecheck before finishing: `pnpm lint && pnpm typecheck`.
 
 ## Conventions

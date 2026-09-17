@@ -19,7 +19,8 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   projects: [
-    { name: 'setup', testMatch: /auth.setup.ts/ },
+    // The first hit compiles the whole shell on the dev server: give the login setup room.
+    { name: 'setup', testMatch: /auth.setup.ts/, timeout: 90_000 },
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'], storageState: 'e2e/.auth/admin.json' },

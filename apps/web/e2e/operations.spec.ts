@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 import { login } from './helpers';
 
 /** Hardening H8: the operations console - runtime status, jobs, run history, queues, integrity runs. */

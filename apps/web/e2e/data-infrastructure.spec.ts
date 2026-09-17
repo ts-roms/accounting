@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 import { login } from './helpers';
 
 /** Hardening H6: document numbering rules, the CSV import engine, exports and opening balances. */
