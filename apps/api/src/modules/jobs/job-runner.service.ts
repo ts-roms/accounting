@@ -21,6 +21,8 @@ export class JobRunnerService implements OnModuleInit {
   private redisAvailable = true;
   /** Inline executions still in flight (tests await this to observe results). */
   private pending: Promise<unknown>[] = [];
+  /** Inline stand-in for BullMQ's job-id dedupe: a waiting or running id is not added twice. */
+  private readonly inlineIds = new Set<string>();
 
   constructor(
     private readonly queues: QueueService,
@@ -70,13 +72,19 @@ export class JobRunnerService implements OnModuleInit {
     if (this.inline) {
       const h = this.handlers.get(`${queue}:${name}`);
       if (!h) throw new Error(`No inline handler for ${queue}:${name}`);
+      const id = options.jobId ? `${queue}:${options.jobId}` : null;
+      if (id) {
+        if (this.inlineIds.has(id)) return null;
+        this.inlineIds.add(id);
+      }
       const run = (async () => {
         if (options.delay) await new Promise((r) => setTimeout(r, Math.min(options.delay!, 50)));
-        await h(data, { jobId: `inline-${Date.now()}`, attempt: 1 });
+        await h(data, { jobId: options.jobId ?? `inline-${Date.now()}`, attempt: 1 });
       })().catch((err: unknown) => this.logger.error({ err, queue, name }, 'Inline job failed'));
       this.pending.push(run);
       void run.finally(() => {
         this.pending = this.pending.filter((p) => p !== run);
+        if (id) this.inlineIds.delete(id);
       });
       return null;
     }

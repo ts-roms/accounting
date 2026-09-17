@@ -790,7 +790,7 @@ describe('Integration platform (e2e)', () => {
         name: 'E2E e-invoicing',
         scopes: ['invoices:read'],
         credentials: { apiKey: 'demo-tax-e2e-key' },
-        config: { taxpayerId: '000-111-222-333', environment: 'SANDBOX' },
+        config: { taxpayerId: '000-111-222-333', environment: 'SANDBOX', pushOnEvents: false },
       })
       .expect(201);
     const authorityId = created.body.id as string;
@@ -930,7 +930,7 @@ describe('Integration platform (e2e)', () => {
         name: 'E2E e-invoicing (no read scope)',
         scopes: ['companies:read'],
         credentials: { apiKey: 'demo-tax-e2e-key-2' },
-        config: { taxpayerId: '000-111-222-444' },
+        config: { taxpayerId: '000-111-222-444', pushOnEvents: false },
       })
       .expect(201);
     const denied = await as(server().post(`/api/v1/integrations/${unscoped.body.id}/push`))
@@ -947,6 +947,114 @@ describe('Integration platform (e2e)', () => {
     expect(
       logs.body.items.some((l: { operation: string }) => l.operation === 'push:invoices'),
     ).toBe(true);
+  });
+
+  it('pushes automatically when a domain event lands in the outbox (debounced, opt-out per integration)', async () => {
+    // Let earlier events settle so the assertions below only see this test's activity.
+    await new Promise((r) => setTimeout(r, 400));
+    await outbound.dispatchPending();
+    await drain();
+    const created = await as(server().post('/api/v1/integrations'))
+      .send({
+        provider: 'DEMO_TAX_AUTHORITY',
+        name: 'E2E e-invoicing (events)',
+        scopes: ['invoices:read'],
+        credentials: { apiKey: 'demo-tax-e2e-key-3' },
+        config: { taxpayerId: '000-111-222-555' },
+      })
+      .expect(201);
+    const eventsId = created.body.id as string;
+    expect(created.body.config.pushOnEvents).toBe(true);
+    const customer = await as(server().get('/api/v1/customers?search=EC-C_1')).expect(200);
+    const postInvoice = async (reference: string) => {
+      const inv = await as(server().post('/api/v1/invoices'))
+        .send({
+          customerId: customer.body.items[0].id,
+          documentDate: '2026-03-13',
+          reference,
+          lines: [{ description: 'Event push', unitPrice: '75', accountId: acc['4100'] }],
+        })
+        .expect(201);
+      await as(server().post(`/api/v1/invoices/${inv.body.id}/approve`)).expect(201);
+      await as(server().post(`/api/v1/invoices/${inv.body.id}/post`)).expect(201);
+      return inv.body as { id: string; documentNumber: string };
+    };
+    const settle = async () => {
+      // The outbox nudges the dispatcher ~250 ms after commit; force the same path synchronously.
+      await new Promise((r) => setTimeout(r, 400));
+      await outbound.dispatchPending();
+      await drain();
+      await drain();
+    };
+
+    // Nothing has been pushed yet: no job, no reference.
+    expect(
+      (await as(server().get(`/api/v1/integrations/${eventsId}/sync-jobs`)).expect(200)).body.total,
+    ).toBe(0);
+    const first = await postInvoice('EVT-1');
+    await settle();
+    const jobs = await as(server().get(`/api/v1/integrations/${eventsId}/sync-jobs`)).expect(200);
+    // invoice.posted + journal.posted (AR_DOCUMENT) for the same document collapse into one push.
+    expect(jobs.body.total).toBe(1);
+    expect(jobs.body.items[0]).toMatchObject({
+      trigger: 'EVENT',
+      direction: 'OUTBOUND',
+      entity: 'invoices',
+      status: 'COMPLETED',
+      recordsFailed: 0,
+    });
+    expect(jobs.body.items[0].recordsCreated).toBeGreaterThanOrEqual(1);
+    const refs = await as(
+      server().get(`/api/v1/integrations/${eventsId}/external-references?entityType=invoices`),
+    ).expect(200);
+    const pushed = refs.body.find((r: { internalId: string }) => r.internalId === first.id);
+    expect(pushed).toBeDefined();
+    expect(pushed.externalId).toMatch(/^ACK-/);
+    expect(pushed.metadata.documentNumber).toBe(first.documentNumber);
+    // A draft never triggers anything: the exporters only send what left UNPOSTED.
+    const draft = await as(server().post('/api/v1/invoices'))
+      .send({
+        customerId: customer.body.items[0].id,
+        documentDate: '2026-03-13',
+        reference: 'EVT-DRAFT',
+        lines: [{ description: 'Draft', unitPrice: '1', accountId: acc['4100'] }],
+      })
+      .expect(201);
+    await settle();
+    expect(
+      (await as(server().get(`/api/v1/integrations/${eventsId}/sync-jobs`)).expect(200)).body.total,
+    ).toBe(1);
+    expect(
+      (
+        await as(
+          server().get(`/api/v1/integrations/${eventsId}/external-references?entityType=invoices`),
+        ).expect(200)
+      ).body.some((r: { internalId: string }) => r.internalId === draft.body.id),
+    ).toBe(false);
+
+    // Opt out: the same event no longer schedules a push for this integration.
+    await as(server().patch(`/api/v1/integrations/${eventsId}`))
+      .send({ config: { taxpayerId: '000-111-222-555', pushOnEvents: false } })
+      .expect(200);
+    const second = await postInvoice('EVT-2');
+    await settle();
+    expect(
+      (await as(server().get(`/api/v1/integrations/${eventsId}/sync-jobs`)).expect(200)).body.total,
+    ).toBe(1);
+    expect(
+      (
+        await as(
+          server().get(`/api/v1/integrations/${eventsId}/external-references?entityType=invoices`),
+        ).expect(200)
+      ).body.some((r: { internalId: string }) => r.internalId === second.id),
+    ).toBe(false);
+    // The outbox itself is untouched by the second consumer: events are processed exactly once.
+    const pending = (
+      await sql<{ n: number }>(
+        "select count(*)::int as n from integration_events where direction = 'OUTBOUND' and status = 'PENDING'",
+      )
+    )[0]!.n;
+    expect(pending).toBe(0);
   });
 
   // ------------------------------------------------------- inbound webhooks

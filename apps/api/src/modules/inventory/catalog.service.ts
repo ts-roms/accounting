@@ -30,6 +30,7 @@ import {
 } from '@/database/schema';
 import { AccountsService } from '@/modules/accounting/accounts/accounts.service';
 import { AuditService } from '@/modules/audit/audit.service';
+import { OutboxService } from '@/modules/integrations/events/outbox.service';
 
 const MODULE = 'INVENTORY';
 
@@ -46,6 +47,7 @@ export class CatalogService {
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly audit: AuditService,
     private readonly accounts: AccountsService,
+    private readonly outbox: OutboxService,
   ) {}
 
   // ---------------------------------------------------------------- products
@@ -147,6 +149,18 @@ export class CatalogService {
         },
         tx,
       );
+      await this.outbox.enqueue(tx, {
+        eventType: 'product.created',
+        companyId,
+        dedupeKey: 'product.created:' + created!.id,
+        payload: {
+          productId: created!.id,
+          sku: created!.sku,
+          name: created!.name,
+          productType: created!.productType,
+          status: created!.status,
+        },
+      });
       return created!.id;
     });
     return this.getProduct(companyId, id);
@@ -203,6 +217,17 @@ export class CatalogService {
         },
         tx,
       );
+      await this.outbox.enqueue(tx, {
+        eventType: 'product.updated',
+        companyId,
+        payload: {
+          productId: id,
+          sku: sku ? sku.toUpperCase() : existing.sku,
+          name: input.name ?? existing.name,
+          status: input.status ?? existing.status,
+          changed: Object.keys(rest),
+        },
+      });
     });
     return this.getProduct(companyId, id);
   }

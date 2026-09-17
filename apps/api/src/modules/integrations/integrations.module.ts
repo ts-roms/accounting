@@ -40,6 +40,7 @@ import { PaymentsImporter } from './sync/importers/payments.importer';
 import { SalesOrdersImporter } from './sync/importers/sales-orders.importer';
 import { PurchaseOrdersImporter } from './sync/importers/purchase-orders.importer';
 import { OrdersModule } from '@/modules/orders/orders.module';
+import { PushTriggerService } from './sync/push-trigger.service';
 import { SyncService } from './sync/sync.service';
 import { InboundWebhooksService } from './webhooks/inbound-webhooks.service';
 import { OutboundWebhooksService } from './webhooks/outbound-webhooks.service';
@@ -92,6 +93,7 @@ import { WebhooksController } from './webhooks/webhooks.controller';
     BillsExporter,
     PurchaseOrdersImporter,
     SyncService,
+    PushTriggerService,
     InboundWebhooksService,
     OutboundWebhooksService,
     OAuthService,

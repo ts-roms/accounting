@@ -8,6 +8,7 @@ import {
   type ConnectResult,
   type PushRequest,
   type PushResult,
+  pushConfigSchema,
 } from '../core/connector';
 import { IntegrationError } from '../core/integration-error';
 import { looksLikeDemoSecret } from './demo-fixtures';
@@ -34,6 +35,8 @@ export class DemoTaxAuthorityConnector extends BaseConnector {
     configSchema: z.object({
       taxpayerId: z.string().min(3).max(40),
       environment: z.enum(['SANDBOX', 'PRODUCTION']).default('SANDBOX'),
+      /** Submit automatically when an invoice is posted / voided (event-driven push). */
+      ...pushConfigSchema,
     }),
     credentialFields: [{ key: 'apiKey', label: 'Submission key (demo-tax-...)', required: true }],
     /** Internal invoice detail -> e-invoice submission. */
