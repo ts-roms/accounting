@@ -21,7 +21,18 @@ const SHELL_OR_LOGIN = 'nav[aria-label="Main navigation"], form input[type="pass
  * proceed on a page that was about to be swapped for the login form.
  */
 export async function settle(page: Page): Promise<'shell' | 'login'> {
-  await page.locator(SHELL_OR_LOGIN).first().waitFor({ state: 'visible', timeout: 60_000 });
+  const target = page.locator(SHELL_OR_LOGIN).first();
+  // The dev server occasionally stalls the page's first API call while it compiles; a reload
+  // after 20 s clears that far more reliably than waiting out the whole budget.
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await target.waitFor({ state: 'visible', timeout: attempt < 2 ? 20_000 : 60_000 });
+      break;
+    } catch (err) {
+      if (attempt >= 2) throw err;
+      await page.reload({ waitUntil: 'commit' });
+    }
+  }
   return /\/login/.test(page.url()) ? 'login' : 'shell';
 }
 
