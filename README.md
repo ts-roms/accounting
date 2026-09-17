@@ -33,7 +33,7 @@ pnpm infra:up              # PostgreSQL on localhost:5433, Redis on 6379
 pnpm build:packages
 pnpm db:migrate
 pnpm db:seed
-pnpm dev                   # web http://localhost:3000  |  api http://localhost:3001/api/v1  |  docs /api/docs
+pnpm dev                   # web http://localhost:3006  |  api http://localhost:3001/api/v1  |  docs /api/docs
 ```
 
 Sign in with `admin@acme.local` / `P@ssw0rd123` (other demo users in
