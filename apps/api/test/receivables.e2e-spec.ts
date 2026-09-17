@@ -104,7 +104,7 @@ describe('Receivables platform (e2e)', () => {
     expect(rec.breakdown.writeOffs).toBe('0.0000');
     const dash = await as(admin, http().get(`/api/v1/ar-dashboard?asOf=${TODAY}`)).expect(200);
     expect(dash.body.totals.totalReceivables).toBe(
-      rec.subledgerBalance === '1950240.0000' ? '1965440.0000' : dash.body.totals.totalReceivables,
+      rec.subledgerBalance === '2185440.0000' ? '2200640.0000' : dash.body.totals.totalReceivables,
     );
     expect(dash.body.aging).toHaveLength(6);
     expect(dash.body.totals.openCases).toBeGreaterThanOrEqual(4);

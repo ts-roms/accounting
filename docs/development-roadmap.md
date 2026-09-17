@@ -376,6 +376,15 @@ interest, consolidated statements, intercompany settlement and
 reconciliation, group-close readiness and integrity checks. See
 `docs/consolidation/`.
 
+### Prompt #10 - Revenue recognition & deferred revenue (COMPLETE)
+
+Recognition policies (point in time / ratable by day / milestone), deferred
+revenue schedules created by invoice posting, month-end recognition runs
+(one adjusting journal, reversible latest first), milestone completion,
+rollforward / waterfall / backlog reports proven against the ledger, a
+financial-close check, a scheduled job and integrity checks. See
+`docs/revenue-recognition/`.
+
 ## Beyond the roadmap
 
 All nine phases of the specification are delivered. Candidates for follow-up

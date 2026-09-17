@@ -138,6 +138,8 @@ export class ReconciliationsService {
             input.closeRequireDepreciation ?? before.closeRequireDepreciation,
           closeRequireFxRevaluation:
             input.closeRequireFxRevaluation ?? before.closeRequireFxRevaluation,
+          closeRequireRevenueRecognition:
+            input.closeRequireRevenueRecognition ?? before.closeRequireRevenueRecognition,
           closeBlockOnUnapprovedJournals:
             input.closeBlockOnUnapprovedJournals ?? before.closeBlockOnUnapprovedJournals,
           closeBlockOnOpenExceptions:

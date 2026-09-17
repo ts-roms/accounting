@@ -170,6 +170,8 @@ export const ACCOUNT_MAPPING_KEYS = [
   'INTERCOMPANY_DIFFERENCE',
   /** Equity-method share of associate results. */
   'SHARE_OF_ASSOCIATE_PROFIT',
+  /** Unearned revenue on invoices recognized over time (Prompt #10). */
+  'DEFERRED_REVENUE',
 ] as const;
 export type AccountMappingKey = (typeof ACCOUNT_MAPPING_KEYS)[number];
 
@@ -220,6 +222,8 @@ export const DOCUMENT_TYPES = [
   'PMF',
   /** Consolidation run (Prompt #9). */
   'CON',
+  /** Revenue recognition run (Prompt #10). */
+  'RRN',
 ] as const;
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
 

@@ -233,6 +233,8 @@ export const OUTBOUND_EVENT_TYPES = [
   'consolidation.finalized',
   'consolidation.reopened',
   'intercompany.settled',
+  'revenue.recognized',
+  'revenue.run_reversed',
   'period.closed',
   'webhook.test',
 ] as const;
@@ -328,6 +330,11 @@ export const API_SCOPE_DEFINITIONS = [
     'consolidation:read',
     'Read consolidation groups, runs and consolidated statements',
     ['consolidation.view', 'intercompany.view'],
+  ],
+  [
+    'revenue:read',
+    'Read revenue policies, schedules, recognition runs and deferred revenue reports',
+    ['revenue.view'],
   ],
   [
     'treasury:read',
@@ -447,5 +454,7 @@ export const NOTIFICATION_EVENT_TYPES = [
   'CONSOLIDATION_FINALIZED',
   'CONSOLIDATION_REOPENED',
   'INTERCOMPANY_MISMATCH',
+  'REVENUE_RECOGNITION_DUE',
+  'REVENUE_RUN_POSTED',
 ] as const;
 export type NotificationEventType = (typeof NOTIFICATION_EVENT_TYPES)[number];

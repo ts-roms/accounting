@@ -77,6 +77,14 @@ export const PERMISSION_DEFINITIONS = [
   define('prepayment.view', 'ACCOUNTING', 'View prepayment schedules'),
   define('prepayment.manage', 'ACCOUNTING', 'Create, update and cancel prepayment schedules'),
   define('prepayment.post', 'ACCOUNTING', 'Activate prepayments and post scheduled recognitions'),
+  // Revenue recognition (Prompt #10)
+  define(
+    'revenue.view',
+    'ACCOUNTING',
+    'View revenue policies, schedules and deferred revenue reports',
+  ),
+  define('revenue.manage', 'ACCOUNTING', 'Maintain revenue policies, settings and milestones'),
+  define('revenue.recognize', 'ACCOUNTING', 'Post and reverse revenue recognition runs'),
   define('posting-rule.view', 'ACCOUNTING', 'View posting rules'),
   define(
     'posting-rule.manage',

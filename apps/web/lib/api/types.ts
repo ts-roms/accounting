@@ -435,6 +435,7 @@ import type {
   PaymentMethod,
   PaymentStatus,
   PaymentType,
+  RevenueMilestone,
   SubledgerDocumentStatus,
   SubledgerDocumentType,
 } from '@accounting/types';
@@ -541,6 +542,11 @@ export interface DocumentLine {
   withholdingTaxCodeId: string | null;
   withholdingRate: string;
   withholdingAmount: string;
+  /** Revenue recognition (Prompt #10) - invoice lines only. */
+  revenuePolicyId?: string | null;
+  serviceStartDate?: string | null;
+  serviceEndDate?: string | null;
+  milestones?: RevenueMilestone[];
 }
 
 export interface AllocationView {
@@ -2028,6 +2034,7 @@ export interface AccountingPolicy {
   closeRequireReconciliations: boolean;
   closeRequireBankReconciliation: boolean;
   closeRequireDepreciation: boolean;
+  closeRequireRevenueRecognition: boolean;
   closeRequireFxRevaluation: boolean;
   closeBlockOnUnapprovedJournals: boolean;
   closeBlockOnOpenExceptions: boolean;

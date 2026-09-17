@@ -51,6 +51,10 @@ export const accountingPolicies = pgTable('accounting_policies', {
     .default(true),
   closeRequireDepreciation: boolean('close_require_depreciation').notNull().default(true),
   closeRequireFxRevaluation: boolean('close_require_fx_revaluation').notNull().default(false),
+  /** Due deferred revenue must be recognized before the period closes (Prompt #10). */
+  closeRequireRevenueRecognition: boolean('close_require_revenue_recognition')
+    .notNull()
+    .default(true),
   closeBlockOnUnapprovedJournals: boolean('close_block_on_unapproved_journals')
     .notNull()
     .default(true),

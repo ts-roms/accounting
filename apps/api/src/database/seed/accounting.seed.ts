@@ -15,6 +15,7 @@ import { seedBudgetingTax } from './budgeting-tax.seed';
 import { seedInventory } from './inventory.seed';
 import { seedOrders } from './orders.seed';
 import { seedReceivables } from './receivables.seed';
+import { seedRevenue } from './revenue.seed';
 import { seedPayables } from './payables.seed';
 import { seedTreasury } from './treasury.seed';
 import { seedConsolidation } from './consolidation.seed';
@@ -175,6 +176,13 @@ const CHART: CoaRow[] = [
     type: 'LIABILITY',
     parent: '2100',
     subtype: 'ACCRUED_LIABILITY',
+  },
+  {
+    code: '2190',
+    name: 'Deferred Revenue',
+    type: 'LIABILITY',
+    parent: '2100',
+    subtype: 'OTHER_LIABILITY',
   },
   {
     code: '2200',
@@ -478,6 +486,7 @@ const MAPPINGS: Array<[AccountMappingKey, string]> = [
   ['BAD_DEBT_RECOVERY', '4940'],
   ['PURCHASE_DISCOUNT', '5400'],
   ['ACCRUED_EXPENSE', '2120'],
+  ['DEFERRED_REVENUE', '2190'],
 ];
 
 interface SampleLine {
@@ -604,6 +613,7 @@ export async function seedAccounting(
     // Orders before the AR / AP demo sets: seedOrders skips itself once any order exists.
     await seedOrders(tx, company, codeToId, adminUserId, log);
     await seedReceivables(tx, company, codeToId, adminUserId, log);
+    await seedRevenue(tx, company, codeToId, adminUserId, log);
     await seedPayables(tx, company, codeToId, adminUserId, log);
     await seedInventory(tx, company, adminUserId, log);
     await seedAssetsBanking(tx, company, codeToId, adminUserId, log);

@@ -8,6 +8,7 @@ import { InventoryCoreModule } from '@/modules/inventory/inventory-core.module';
 import { OrdersCoreModule } from '@/modules/orders/orders-core.module';
 import { WorkflowsModule } from '@/modules/workflows/workflows.module';
 import { JobsModule } from '@/modules/jobs/jobs.module';
+import { RevenueModule } from '@/modules/revenue/revenue.module';
 import { ArConfigService } from './ar-config.service';
 import { ArDashboardService } from './ar-dashboard.service';
 import { ArIntegrityService } from './ar-integrity.service';
@@ -64,6 +65,7 @@ import {
     RbacModule,
     WorkflowsModule,
     JobsModule,
+    RevenueModule,
   ],
   controllers: [
     CustomersController,

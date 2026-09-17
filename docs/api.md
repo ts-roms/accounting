@@ -188,6 +188,23 @@ Non-blocking warnings returned as `warnings[{ code, message, details }]`:
 AP error codes (422): `VENDOR_ON_HOLD`, `VENDOR_NOT_APPROVED`, `BILL_ON_HOLD`, `PAYMENT_RUN_INVALID`, `ACCRUAL_INVALID`;
 held bills fail settlement with `MATCH_EXCEPTION_UNREVIEWED` like an unreviewed three-way match.
 
+### Revenue recognition & deferred revenue (Prompt #10; all require `X-Company-Id`; see `docs/revenue-recognition/`)
+
+| Method             | Path                                                                                                                                                                          | Permission                        |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| GET / PUT          | `/revenue/settings` `{ autoRecognize?, overdueGraceDays?, defaultPolicyId? }`                                                                                                 | `revenue.view` / `revenue.manage` |
+| GET / POST / PATCH | `/revenue/policies[/:id]` `{ code, name, method POINT_IN_TIME/RATABLE/MILESTONE, defaultTermMonths?, autoRecognize?, description? }` (PATCH also `status`)                    | `revenue.view` / `revenue.manage` |
+| GET                | `/revenue/schedules?status&method&customerId&invoiceId&policyId`, `/revenue/schedules/:id` (lines with run / journal)                                                         | `revenue.view`                    |
+| POST               | `/revenue/schedules/:id/lines/:lineId/complete { completedOn?, note? }` (milestone becomes due)                                                                               | `revenue.manage`                  |
+| GET                | `/revenue/runs?status`, `/revenue/runs/:id`, `/revenue/runs/preview?periodEnd`                                                                                                | `revenue.view`                    |
+| POST               | `/revenue/runs { periodEnd, description?, scheduleIds? }` (one adjusting journal; `{ run: null }` when nothing is due), `/revenue/runs/:id/reverse { reason }` (latest first) | `revenue.recognize`               |
+| POST               | `/revenue/recognize-now?asOf` (scheduled job on demand)                                                                                                                       | `revenue.recognize`               |
+| GET                | `/revenue/reports/rollforward?from&to`, `/revenue/reports/waterfall?from&months`, `/revenue/reports/backlog?asOf`, `/revenue/integrity?asOf`                                  | `revenue.view`                    |
+
+Invoice lines accept `revenuePolicyId`, `serviceStartDate`, `serviceEndDate` and `milestones[{ name, percent, expectedDate? }]` (AR only).
+Revenue error codes (422): `REVENUE_SCHEDULE_INVALID` (bad window / milestones, inactive policy, policy on a note), `REVENUE_RECOGNIZED` (void refused),
+`REVENUE_RUN_INVALID_STATE` (already reversed, or a later run exists).
+
 ### Group consolidation & intercompany (Prompt #9; organization-level, no `X-Company-Id`; see `docs/consolidation/`)
 
 | Method                | Path                                                                                                                                                                                                    | Permission                                    |

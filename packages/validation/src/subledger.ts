@@ -118,21 +118,41 @@ export const percentSchema = z
  * Quantity and unit price are decimals; the line amount is
  * quantity * unitPrice * (1 - discount%) rounded half-even to 4 places.
  */
-export const documentLineSchema = dimensionRefsSchema.merge(lineTaxSchema).extend({
-  description: z.string().trim().min(1, 'Description is required').max(300),
-  quantity: quantitySchema.default('1'),
-  unitPrice: amountSchema,
-  discountPercent: percentSchema.default('0'),
-  accountId: uuidSchema,
-  branchId: uuidSchema.nullable().optional(),
-  /** Set when the line fulfils a sales / purchase order line. */
-  orderLineId: uuidSchema.optional(),
-  /** Stocked product moved by this line (Phase 5); requires a warehouse for GOODS. */
-  productId: uuidSchema.nullable().optional(),
-  warehouseId: uuidSchema.nullable().optional(),
-  lotNumber: optionalText(60),
-  serialNumbers: z.array(z.string().trim().min(1).max(80)).max(1000).optional(),
+/** A milestone on an invoice line recognized under the MILESTONE revenue method (Prompt #10). */
+export const revenueMilestoneSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  percent: percentSchema,
+  expectedDate: isoDateSchema.nullable().optional(),
 });
+export type RevenueMilestoneInput = z.infer<typeof revenueMilestoneSchema>;
+
+/** Revenue recognition fields an invoice line may carry (ignored on the AP side). */
+export const revenueLineFieldsSchema = z.object({
+  /** Explicit policy; null = the product's policy, else the company default, else point in time. */
+  revenuePolicyId: uuidSchema.nullable().optional(),
+  serviceStartDate: isoDateSchema.nullable().optional(),
+  serviceEndDate: isoDateSchema.nullable().optional(),
+  milestones: z.array(revenueMilestoneSchema).max(20).optional(),
+});
+
+export const documentLineSchema = dimensionRefsSchema
+  .merge(lineTaxSchema)
+  .merge(revenueLineFieldsSchema)
+  .extend({
+    description: z.string().trim().min(1, 'Description is required').max(300),
+    quantity: quantitySchema.default('1'),
+    unitPrice: amountSchema,
+    discountPercent: percentSchema.default('0'),
+    accountId: uuidSchema,
+    branchId: uuidSchema.nullable().optional(),
+    /** Set when the line fulfils a sales / purchase order line. */
+    orderLineId: uuidSchema.optional(),
+    /** Stocked product moved by this line (Phase 5); requires a warehouse for GOODS. */
+    productId: uuidSchema.nullable().optional(),
+    warehouseId: uuidSchema.nullable().optional(),
+    lotNumber: optionalText(60),
+    serialNumbers: z.array(z.string().trim().min(1).max(80)).max(1000).optional(),
+  });
 export type DocumentLineInput = z.infer<typeof documentLineSchema>;
 
 const documentBase = z.object({

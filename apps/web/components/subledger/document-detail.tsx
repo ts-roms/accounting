@@ -66,6 +66,7 @@ import { MatchCard } from '@/components/orders/match-card';
 import { DocumentStatusBadge } from './badges';
 import { partyOf } from './documents';
 import { InvoiceArActions, InvoiceArBadges } from '@/components/receivables/ar-panels';
+import { InvoiceRevenueCard } from '@/components/receivables/revenue-line';
 import { BillApActions, BillApBadges } from '@/components/payables/ap-panels';
 
 export function DocumentDetailPage({ cfg, id }: { cfg: SubledgerConfig; id: string }) {
@@ -505,6 +506,9 @@ export function DocumentDetailPage({ cfg, id }: { cfg: SubledgerConfig; id: stri
           {cfg.side === 'AP' ? <MatchCard cfg={cfg} bill={d} /> : null}
           {!isCreditNote && d.status !== 'VOID' && d.status !== 'DRAFT' ? (
             <FollowUpCard cfg={cfg} document={d} />
+          ) : null}
+          {cfg.side === 'AR' && d.accountingStatus !== 'UNPOSTED' ? (
+            <InvoiceRevenueCard invoiceId={d.id} />
           ) : null}
           <DocumentJournalsPanel sourceId={d.id} />
           <RecordLinksPanel
