@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import { AlertTriangle, ArrowLeft, Ban, Check, Pencil, RotateCcw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Money } from '@accounting/money';
@@ -70,7 +70,7 @@ import { InvoiceRevenueCard } from '@/components/receivables/revenue-line';
 import { BillApActions, BillApBadges } from '@/components/payables/ap-panels';
 
 export function DocumentDetailPage({ cfg, id }: { cfg: SubledgerConfig; id: string }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const { hasPermission, hasAuthority } = useSession();
   const document = useDocument(cfg, id);
   const action = useDocumentAction(cfg);

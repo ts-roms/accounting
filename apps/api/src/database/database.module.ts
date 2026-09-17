@@ -17,6 +17,11 @@ import { DRIZZLE, PG_POOL, type Database } from './database.types';
         const pool = new Pool({
           connectionString: config.env.DATABASE_URL,
           max: config.env.DATABASE_POOL_MAX,
+          // Idle sockets through a Docker / NAT port proxy get silently dropped; keepalives keep
+          // the mapping alive and a short idle timeout retires clients before that happens.
+          keepAlive: true,
+          keepAliveInitialDelayMillis: 10_000,
+          idleTimeoutMillis: 30_000,
           // Always work with timezone-aware timestamps; pg returns them as Date.
           application_name: 'accounting-api',
         });

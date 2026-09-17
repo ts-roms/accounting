@@ -1,7 +1,8 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import type { ColumnDef } from '@tanstack/react-table';
 import { ArrowLeft, Upload } from 'lucide-react';
 import { toast } from 'sonner';
@@ -41,7 +42,7 @@ import { Amount, today } from '@/components/accounting/primitives';
 import { BankAccountSelect, RECONCILIATION_PATH, StatementStatusBadge } from './shared';
 
 export function BankStatementsPage() {
-  const router = useRouter();
+  const router = useAppRouter();
   const params = useSearchParams();
   const table = useTableState({ sortBy: 'statementDate', sortDir: 'desc' });
   const [bankAccountId, setBankAccountId] = React.useState<string | null>(
@@ -246,7 +247,7 @@ export function parseStatementText(text: string): {
 }
 
 export function ImportStatementPage() {
-  const router = useRouter();
+  const router = useAppRouter();
   const params = useSearchParams();
   const accounts = useBankAccounts();
   const importStatement = useImportStatement();

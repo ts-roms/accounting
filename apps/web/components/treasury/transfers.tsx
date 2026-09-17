@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import type { ColumnDef } from '@tanstack/react-table';
 import { ArrowLeft, ArrowLeftRight, Plus } from 'lucide-react';
 import { toast } from 'sonner';
@@ -56,7 +56,7 @@ import { DescriptionList, Field, ReasonDialog, StatusBadge } from '@/components/
 // ------------------------------------------------------------------- list
 
 export function BankTransfersPage() {
-  const router = useRouter();
+  const router = useAppRouter();
   const table = useTableState({ sortDir: 'desc' });
   const [status, setStatus] = React.useState('ALL');
   const [create, setCreate] = React.useState(false);

@@ -1,10 +1,11 @@
 import { type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
-import { APP_FILTER, APP_GUARD, APP_PIPE } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { ZodValidationPipe } from 'nestjs-zod';
 import { RequestContextMiddleware } from './common/context/request-context.middleware';
+import { TransientDbErrorInterceptor } from './common/interceptors/transient-db-error.interceptor';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { CsrfGuard } from './common/guards/csrf.guard';
 import { AppConfigModule } from './config/app-config.module';
@@ -136,6 +137,8 @@ import { UsersModule } from './modules/users/users.module';
   providers: [
     { provide: APP_PIPE, useClass: ZodValidationPipe },
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },
+    // A read that hits a dropped pooled connection is repeated once on a fresh one.
+    { provide: APP_INTERCEPTOR, useClass: TransientDbErrorInterceptor },
     // Guard order matters: rate limit -> CSRF -> authentication -> authorization.
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: CsrfGuard },

@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Plus, Search } from 'lucide-react';
 import {
@@ -36,7 +36,7 @@ import {
 } from '@/components/accounting/primitives';
 
 export default function JournalEntriesPage() {
-  const router = useRouter();
+  const router = useAppRouter();
   const table = useTableState({ sortBy: 'entryDate', sortDir: 'desc' });
   const [status, setStatus] = React.useState('ALL');
   const [journalType, setJournalType] = React.useState('ALL');

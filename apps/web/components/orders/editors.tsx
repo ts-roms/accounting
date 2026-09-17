@@ -1,7 +1,8 @@
 'use client';
 /* New / edit screens for orders. Route files under /sales and /purchasing wrap these. */
 import * as React from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import { Skeleton } from '@accounting/ui';
 import { toast } from 'sonner';
 import { describeError } from '@/lib/api/client';
@@ -17,7 +18,7 @@ function useCurrency() {
 }
 
 export function NewOrderScreen({ cfg }: { cfg: OrderConfig }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const params = useSearchParams();
   const currency = useCurrency();
   const create = useCreateOrder(cfg);
@@ -53,7 +54,7 @@ export function NewOrderScreen({ cfg }: { cfg: OrderConfig }) {
 }
 
 export function EditOrderScreen({ cfg, id }: { cfg: OrderConfig; id: string }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const currency = useCurrency();
   const order = useOrder(cfg, id);
   const update = useUpdateOrder(cfg);

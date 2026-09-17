@@ -1,7 +1,8 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -89,7 +90,7 @@ const NEXT_ACTION: Partial<Record<JournalStatus, JournalAction>> = {
 
 export default function JournalEntryDetailPage() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
+  const router = useAppRouter();
   const { hasPermission, me } = useSession();
   const entry = useJournalEntry(params.id);
   const action = useJournalAction();

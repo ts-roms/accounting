@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import type { ColumnDef } from '@tanstack/react-table';
 import { ArrowLeft, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -94,7 +94,7 @@ export function ClaimStatusBadge({ status }: { status: ExpenseClaimStatus }) {
 }
 
 export function ExpenseClaimsPage() {
-  const router = useRouter();
+  const router = useAppRouter();
   const table = useTableState({ sortBy: 'claimDate', sortDir: 'desc' });
   const [status, setStatus] = React.useState('ALL');
   const claims = useExpenseClaims({
@@ -227,7 +227,7 @@ function trim(v: string): string {
 }
 
 export function ExpenseClaimForm({ claim }: { claim?: ExpenseClaimDetail }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const create = useCreateExpenseClaim();
   const update = useUpdateExpenseClaim();
   const taxCodes = useTaxCodes('PURCHASES');
@@ -583,7 +583,7 @@ export function NewExpenseClaimPage() {
 }
 
 export function ExpenseClaimDetailPage({ id }: { id: string }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const { hasPermission, me } = useSession();
   const claim = useExpenseClaim(id);
   const act = useExpenseClaimAction();

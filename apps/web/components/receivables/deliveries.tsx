@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import type { ColumnDef } from '@tanstack/react-table';
 import { ArrowLeft, Plus, Search, Truck } from 'lucide-react';
 import { toast } from 'sonner';
@@ -50,7 +50,7 @@ import { Amount, today } from '@/components/accounting/primitives';
 import { DescriptionList, Field, ReasonDialog, StatusBadge } from './shared';
 
 export function DeliveriesPage() {
-  const router = useRouter();
+  const router = useAppRouter();
   const table = useTableState({ sortBy: 'deliveryDate', sortDir: 'desc' });
   const [status, setStatus] = React.useState('ALL');
   const [create, setCreate] = React.useState(false);
@@ -266,7 +266,7 @@ function NewDeliveryDialog({
 export { NewDeliveryDialog };
 
 export function DeliveryDetailPage({ id }: { id: string }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const { hasPermission } = useSession();
   const delivery = useDelivery(id);
   const action = useDeliveryAction();

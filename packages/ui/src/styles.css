@@ -255,6 +255,21 @@
     opacity: 0.55;
   }
 }
+/* Route progress bar: indeterminate sweep while the next page loads. */
+@keyframes route-progress {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(-30%);
+  }
+  100% {
+    transform: translateX(-8%);
+  }
+}
+.route-progress-bar[data-active='true'] {
+  animation: route-progress calc(var(--motion-data) * 2.3) ease-out forwards;
+}
 @keyframes check-draw {
   from {
     stroke-dashoffset: 24;
@@ -467,6 +482,10 @@
     scroll-behavior: auto !important;
   }
   /* Activity indicators are essential feedback: keep them moving, slowly. */
+  .route-progress-bar {
+    animation: none !important;
+    transform: translateX(-10%) !important;
+  }
   .animate-spin {
     animation-duration: 1.5s !important;
     animation-iteration-count: infinite !important;

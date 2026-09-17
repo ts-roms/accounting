@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import type { ColumnDef } from '@tanstack/react-table';
 import { FileText, Plus, Sparkles, Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
@@ -57,7 +57,7 @@ import { AdvisoryNote, ConfidenceMeter, DocStatusBadge } from './shared';
 const ALL = 'ALL';
 
 export function AiIntakePage() {
-  const router = useRouter();
+  const router = useAppRouter();
   const table = useTableState({ pageSize: 25 });
   const [status, setStatus] = React.useState<string>(ALL);
   const [kind, setKind] = React.useState<string>(ALL);
@@ -230,7 +230,7 @@ function UploadDialog({
   open: boolean;
   onOpenChange: (o: boolean) => void;
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const upload = useAiIntakeUpload();
   const [file, setFile] = React.useState<File | null>(null);
   const [kind, setKind] = React.useState<string>('AUTO');

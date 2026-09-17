@@ -1,6 +1,7 @@
 'use client';
 import * as React from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Cable, Plug, RefreshCw, Unplug, Zap } from 'lucide-react';
 import { toast } from 'sonner';
@@ -49,7 +50,7 @@ type Filter = 'ALL' | 'CONNECTED' | 'ATTENTION' | 'DISABLED' | 'AVAILABLE' | 'OP
 
 /** Integrations catalogue: connected / needs attention / disabled, plus the provider catalogue to connect from. */
 export function IntegrationsPage() {
-  const router = useRouter();
+  const router = useAppRouter();
   const params = useSearchParams();
   const table = useTableState({ pageSize: 25 });
   const [filter, setFilter] = React.useState<Filter>(
@@ -321,7 +322,7 @@ function ConnectDialog({
   provider: ProviderDescriptor | null;
   onClose: () => void;
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const { activeCompany } = useSession();
   const create = useCreateIntegration();
   const oauth = useOAuthStart();

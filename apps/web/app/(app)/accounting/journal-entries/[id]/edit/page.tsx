@@ -1,5 +1,6 @@
 'use client';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import { toast } from 'sonner';
 import { Skeleton } from '@accounting/ui';
 import { describeError } from '@/lib/api/client';
@@ -9,7 +10,7 @@ import { JournalEntryForm } from '@/components/accounting/journal-entry-form';
 
 export default function EditJournalEntryPage() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
+  const router = useAppRouter();
   const entry = useJournalEntry(params.id);
   const update = useUpdateJournalEntry();
 

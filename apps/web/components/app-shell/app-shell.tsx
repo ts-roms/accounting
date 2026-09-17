@@ -1,7 +1,9 @@
 'use client';
 import * as React from 'react';
 import { usePathname } from 'next/navigation';
-import { PageTransition } from '@accounting/ui';
+import { PageTransition, cn } from '@accounting/ui';
+import { useNavigationPending } from '@/lib/navigation/progress';
+import { NavigationProgress } from './navigation-progress';
 import { Sidebar, SidebarProvider } from './sidebar';
 import { Header } from './header';
 
@@ -12,6 +14,8 @@ import { Header } from './header';
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  // A route that takes longer than a beat to load dims the current page so the wait is visible.
+  const pending = useNavigationPending();
   return (
     <SidebarProvider>
       <div className="flex h-screen overflow-hidden bg-background">
@@ -24,7 +28,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Sidebar className="hidden lg:flex" />
         <div className="flex min-w-0 flex-1 flex-col">
           <Header />
-          <main id="main-content" className="flex-1 overflow-y-auto" tabIndex={-1}>
+          <React.Suspense fallback={null}>
+            <NavigationProgress />
+          </React.Suspense>
+          <main
+            id="main-content"
+            className={cn(
+              'flex-1 overflow-y-auto transition-opacity duration-normal',
+              pending && 'pointer-events-none opacity-60',
+            )}
+            aria-busy={pending || undefined}
+            tabIndex={-1}
+          >
             <PageTransition
               routeKey={pathname}
               className="mx-auto w-full max-w-[1440px] space-y-5 p-4 md:p-6"

@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Plus, Search } from 'lucide-react';
 import { ORDER_STATUSES, type OrderStatus } from '@accounting/types';
@@ -35,7 +35,7 @@ const DESCRIPTION: Record<OrderConfig['type'], string> = {
 };
 
 export function OrdersPage({ cfg }: { cfg: OrderConfig }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const table = useTableState({ sortBy: 'orderDate', sortDir: 'desc' });
   const [status, setStatus] = React.useState('ALL');
   const orders = useOrders(cfg, {

@@ -11,7 +11,7 @@
 import * as React from 'react';
 import { Check } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { MOTION_MS, readMotionMs, type MotionToken } from '../theme/motion';
+import { readMotionMs, type MotionToken } from '../theme/motion';
 
 // ---------------------------------------------------------- reduced motion
 const QUERY = '(prefers-reduced-motion: reduce)';

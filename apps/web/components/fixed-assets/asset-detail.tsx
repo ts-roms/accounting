@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import { ArrowLeft, Pencil, Plus, Scissors, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Money } from '@accounting/money';
@@ -58,7 +58,7 @@ const ACTION_LABEL: Record<AssetAction, string> = {
 };
 
 export function FixedAssetDetailPage({ id }: { id: string }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const { hasPermission } = useSession();
   const asset = useFixedAsset(id);
   const remove = useDeleteFixedAsset();
@@ -502,7 +502,7 @@ function SplitDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const split = useSplitAsset();
   const [eventDate, setEventDate] = React.useState(today());
   const [parts, setParts] = React.useState([{ name: '', percent: '50', location: '' }]);

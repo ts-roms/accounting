@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import type { ColumnDef } from '@tanstack/react-table';
 import { AlertTriangle, ArrowLeft, Plus, Search, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -109,7 +109,7 @@ const STATUS_VARIANT: Record<StockDocumentStatus, 'secondary' | 'success' | 'des
 const qty = (v: string | null) => (v === null ? '-' : trimAmount(v));
 
 export function StockDocumentsPage({ cfg }: { cfg: StockDocumentConfig }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const table = useTableState({ sortBy: 'documentDate', sortDir: 'desc' });
   const [status, setStatus] = React.useState('ALL');
   const docs = useStockDocuments(cfg.type, {
@@ -285,7 +285,7 @@ const newLine = (): LineDraft => ({
 });
 
 export function NewStockDocumentScreen({ cfg }: { cfg: StockDocumentConfig }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const create = useCreateStockDocument(cfg.type);
   const [warehouseId, setWarehouseId] = React.useState<string | null>(null);
   const [toWarehouseId, setToWarehouseId] = React.useState<string | null>(null);
@@ -614,7 +614,7 @@ export function NewStockDocumentScreen({ cfg }: { cfg: StockDocumentConfig }) {
 // ------------------------------------------------------------------ detail
 
 export function StockDocumentDetailPage({ cfg, id }: { cfg: StockDocumentConfig; id: string }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const { hasPermission } = useSession();
   const doc = useStockDocument(cfg.type, id);
   const action = useStockDocumentAction(cfg.type);

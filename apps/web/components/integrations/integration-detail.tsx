@@ -1,7 +1,8 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import { ArrowLeft, Plug, RefreshCw, Trash2, Unplug, Upload, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { P } from '@accounting/types';
@@ -67,7 +68,7 @@ import { useWebhookDeliveries } from '@/lib/api/integrations-hooks';
 
 /** Enterprise-style detail: one tab per concern instead of one overwhelming page. */
 export function IntegrationDetailPage({ id }: { id: string }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const params = useSearchParams();
   const detail = useIntegration(id);
   const action = useIntegrationAction();

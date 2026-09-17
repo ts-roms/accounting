@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import type { ColumnDef } from '@tanstack/react-table';
 import {
   ArrowLeft,
@@ -85,7 +85,7 @@ function endOfMonth(iso: string): string {
 }
 
 export function PayRunsPage() {
-  const router = useRouter();
+  const router = useAppRouter();
   const table = useTableState();
   const [status, setStatus] = React.useState('ALL');
   const [creating, setCreating] = React.useState(false);
@@ -208,7 +208,7 @@ export function PayRunsPage() {
 }
 
 function NewRunDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const settings = usePayrollSettings();
   const create = useCreatePayRun();
   const [form, setForm] = React.useState({
@@ -371,7 +371,7 @@ function timeline(r: PayRun): TimelineStep[] {
 }
 
 export function PayRunDetailPage({ id }: { id: string }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const run = usePayRun(id);
   const action = usePayRunAction();
   const reopen = useReopenPayRun();

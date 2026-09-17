@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import type { ColumnDef } from '@tanstack/react-table';
 import { ArrowLeft, Phone, Play, Plus, Search, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
@@ -62,7 +62,7 @@ import { Amount, today } from '@/components/accounting/primitives';
 import { DescriptionList, Field, ReasonDialog, StatusBadge } from './shared';
 
 export function CollectionsPage() {
-  const router = useRouter();
+  const router = useAppRouter();
   const table = useTableState({ sortDir: 'desc' });
   const [status, setStatus] = React.useState('OPEN');
   const [create, setCreate] = React.useState(false);

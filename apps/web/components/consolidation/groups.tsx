@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import { ArrowLeft, Building2, Plus, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatMoney } from '@accounting/money';
@@ -83,7 +83,7 @@ const RULE_LABEL: Record<EliminationRuleType, string> = {
 // ------------------------------------------------------------------- list
 
 export function ConsolidationGroupsPage() {
-  const router = useRouter();
+  const router = useAppRouter();
   const groups = useConsolidationGroups();
   const [create, setCreate] = React.useState(false);
   return (
@@ -283,7 +283,7 @@ function NewGroupDialog({
 // ----------------------------------------------------------------- detail
 
 export function ConsolidationGroupDetailPage({ id }: { id: string }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const group = useConsolidationGroup(id);
   const runs = useConsolidationRuns({ groupId: id, pageSize: 25 });
   const update = useUpdateConsolidationGroup();

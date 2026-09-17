@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import { ArrowLeft, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { P } from '@accounting/types';
@@ -63,7 +63,7 @@ const ACTION_LABEL: Record<LeaseAction, string> = {
 };
 
 export function LeaseDetailPage({ id }: { id: string }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const { hasPermission } = useSession();
   const lease = useLease(id);
   const remove = useDeleteLease();

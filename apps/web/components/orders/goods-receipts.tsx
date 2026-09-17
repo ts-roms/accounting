@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import type { ColumnDef } from '@tanstack/react-table';
 import { AlertTriangle, ArrowLeft, Check, Search, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -54,7 +54,7 @@ import { trimAmount } from '@/components/subledger/document-detail';
 import { ReceiptStatusBadge } from './badges';
 
 export function GoodsReceiptsPage() {
-  const router = useRouter();
+  const router = useAppRouter();
   const table = useTableState({ sortBy: 'receiptDate', sortDir: 'desc' });
   const [status, setStatus] = React.useState('ALL');
   const receipts = useGoodsReceipts({
@@ -186,7 +186,7 @@ export function GoodsReceiptsPage() {
 }
 
 export function GoodsReceiptDetailPage({ id }: { id: string }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const { hasPermission } = useSession();
   const receipt = useGoodsReceipt(id);
   const action = useGoodsReceiptAction();

@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import type { ColumnDef } from '@tanstack/react-table';
 import { ArrowLeft, CalendarCheck, PlayCircle, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -51,7 +51,7 @@ function endOfMonth(iso: string): string {
 }
 
 export function RevenueRunsPage() {
-  const router = useRouter();
+  const router = useAppRouter();
   const table = useTableState();
   const [status, setStatus] = React.useState('ALL');
   const [periodEnd, setPeriodEnd] = React.useState(endOfMonth(today()));

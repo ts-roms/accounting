@@ -1,6 +1,6 @@
 'use client';
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import {
   BookOpenText,
   Building2,
@@ -55,7 +55,7 @@ export function CommandMenu({
   onOpenChange: (open: boolean) => void;
   mode?: 'commands' | 'search';
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const { hasAnyPermission, hasPermission, logout, me, setActiveCompany } = useSession();
   const { setTheme, resolved } = useTheme();
   const sidebar = useSidebar();

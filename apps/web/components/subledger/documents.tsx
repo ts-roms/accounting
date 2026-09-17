@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Plus, Search } from 'lucide-react';
 import {
@@ -55,7 +55,7 @@ export function DocumentsPage({
   initialStatus?: string;
   initialType?: SubledgerDocumentType;
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const table = useTableState({ sortBy: 'documentDate', sortDir: 'desc' });
   const [status, setStatus] = React.useState(initialStatus ?? 'ALL');
   const [type, setType] = React.useState<string>(initialType ?? 'ALL');

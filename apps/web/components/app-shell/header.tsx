@@ -1,7 +1,8 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import {
   Building2,
   Check,
@@ -201,7 +202,7 @@ function CompanySwitcher() {
 
 function UserMenu({ onShortcuts }: { onShortcuts: () => void }) {
   const { me, logout } = useSession();
-  const router = useRouter();
+  const router = useAppRouter();
   const [changePassword, setChangePassword] = React.useState(false);
   const { user } = me;
   return (

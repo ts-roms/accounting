@@ -1,6 +1,7 @@
 'use client';
 import * as React from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AlertCircle } from 'lucide-react';
@@ -21,7 +22,7 @@ import { api, ApiError } from '@/lib/api/client';
 import type { UserView } from '@/lib/api/types';
 
 export function LoginForm() {
-  const router = useRouter();
+  const router = useAppRouter();
   const search = useSearchParams();
   const [error, setError] = React.useState<string | null>(null);
 
