@@ -96,7 +96,7 @@ describe('Financial close (e2e)', () => {
     closeId = res.body.id;
     expect(res.body.status).toBe('IN_PROGRESS');
     expect(res.body.periodName).toBe('January 2026');
-    expect(res.body.tasks.length).toBe(19);
+    expect(res.body.tasks.length).toBe(20);
     expect(task(res.body, 'AR_RECONCILIATION').status).toBe('BLOCKED');
     expect(task(res.body, 'TRIAL_BALANCE').status).toBe('DONE');
     expect(task(res.body, 'INTEGRITY').status).toBe('DONE');

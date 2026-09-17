@@ -7,7 +7,9 @@ import {
   Hash,
   Banknote,
   BarChart3,
+  BadgeDollarSign,
   CalendarCheck,
+  Contact,
   Bell,
   BookOpenText,
   Boxes,
@@ -206,6 +208,16 @@ export const NAVIGATION: NavSection[] = [
       item('AP Accruals', '/payables/accruals', Layers, [P['ap-accrual.view']], 'Control'),
       item('AP Reconciliation', '/payables/reconciliation', Scale, [P['reports.view']], 'Control'),
       item('Payables Settings', '/payables/settings', Settings2, [P['vendor.view']], 'Control'),
+    ],
+  },
+  {
+    title: 'Payroll',
+    icon: BadgeDollarSign,
+    items: [
+      item('Pay Runs', '/payroll/runs', Wallet, [P['payroll.view']]),
+      item('Employees', '/payroll/employees', Contact, [P['employee.view']]),
+      item('Pay Items', '/payroll/pay-items', Settings2, [P['payroll.view']]),
+      item('Payroll Reports', '/payroll/reports', ClipboardList, [P['payroll.view']]),
     ],
   },
   {

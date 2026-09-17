@@ -235,6 +235,10 @@ export const OUTBOUND_EVENT_TYPES = [
   'intercompany.settled',
   'revenue.recognized',
   'revenue.run_reversed',
+  'pay_run.approved',
+  'pay_run.posted',
+  'pay_run.paid',
+  'pay_run.reversed',
   'period.closed',
   'webhook.test',
 ] as const;
@@ -330,6 +334,11 @@ export const API_SCOPE_DEFINITIONS = [
     'consolidation:read',
     'Read consolidation groups, runs and consolidated statements',
     ['consolidation.view', 'intercompany.view'],
+  ],
+  [
+    'payroll:read',
+    'Read employees, pay runs, payslips and payroll reports',
+    ['employee.view', 'payroll.view'],
   ],
   [
     'revenue:read',
@@ -456,5 +465,7 @@ export const NOTIFICATION_EVENT_TYPES = [
   'INTERCOMPANY_MISMATCH',
   'REVENUE_RECOGNITION_DUE',
   'REVENUE_RUN_POSTED',
+  'PAY_RUN_APPROVAL_REQUIRED',
+  'PAY_RUN_DUE',
 ] as const;
 export type NotificationEventType = (typeof NOTIFICATION_EVENT_TYPES)[number];

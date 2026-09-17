@@ -188,6 +188,25 @@ Non-blocking warnings returned as `warnings[{ code, message, details }]`:
 AP error codes (422): `VENDOR_ON_HOLD`, `VENDOR_NOT_APPROVED`, `BILL_ON_HOLD`, `PAYMENT_RUN_INVALID`, `ACCRUAL_INVALID`;
 held bills fail settlement with `MATCH_EXCEPTION_UNREVIEWED` like an unreviewed three-way match.
 
+### Payroll & employee expenses (Prompt #11; all require `X-Company-Id`; see `docs/payroll/`)
+
+| Method              | Path                                                                                                                                                                             | Permission                          |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| GET / POST / PATCH  | `/employees[/:id]?status&payFrequency&departmentId&search` (`employeeNumber?`, names, `userId?`, employment type, `payFrequency`, `baseSalary`, dates, dimensions, bank details) | `employee.view` / `employee.manage` |
+| POST / DELETE       | `/employees/:id/pay-items[/:assignmentId]` `{ payItemId, amount?, rate?, effectiveFrom, effectiveTo?, notes? }`                                                                  | `employee.manage`                   |
+| GET                 | `/employees/:id/ytd?year`                                                                                                                                                        | `payroll.view`                      |
+| GET / PUT           | `/payroll/settings` `{ defaultPayFrequency?, payrollBankAccountId?, reimburseExpenseClaims?, payDateReminderDays? }`                                                             | `payroll.view` / `payroll.manage`   |
+| GET / POST / PATCH  | `/payroll/pay-items[/:id]` `{ code, name, type, calculation, amount?, rate?, maxBase?, brackets?, taxable?, appliesToAll?, expenseAccountId?, liabilityAccountId?, sortOrder? }` | `payroll.view` / `payroll.manage`   |
+| GET                 | `/payroll/runs?status&payFrequency`, `/payroll/runs/:id` (payslips with lines, inputs), `/payroll/payslips/:id`                                                                  | `payroll.view`                      |
+| POST / PUT / DELETE | `/payroll/runs { payFrequency, periodStart, periodEnd, payDate, description?, bankAccountId? }`, `/payroll/runs/:id/inputs { inputs[] }`, `/payroll/runs/:id`                    | `payroll.manage`                    |
+| POST                | `/payroll/runs/:id/calculate`, `/payroll/runs/:id/submit`                                                                                                                        | `payroll.manage`                    |
+| POST                | `/payroll/runs/:id/approve`, `/payroll/runs/:id/reopen { reason }`                                                                                                               | `payroll.approve` (delegable)       |
+| POST                | `/payroll/runs/:id/post`, `/payroll/runs/:id/pay { bankAccountId?, paymentDate?, reference? }`, `/payroll/runs/:id/reverse { reason, reversalDate? }`                            | `payroll.post`                      |
+| GET                 | `/payroll/reports/summary?from&to`, `/payroll/reports/withholding?from&to`, `/payroll/integrity?asOf`                                                                            | `payroll.view`                      |
+| POST                | `/payroll/reminders/run?asOf` (pay-date reminder job on demand)                                                                                                                  | `payroll.manage`                    |
+
+Payroll error codes (422): `PAY_RUN_INVALID_STATE` (wrong status, overlapping period, paid run reversal, negative net), `PAY_ITEM_INVALID` (second base salary item, inactive / base item assigned, bad accounts), `EMPLOYEE_INACTIVE` (nobody to pay), `DOCUMENT_INVALID_STATE` (a reimbursed claim was paid elsewhere - recalculate). Employee and payroll views are restricted (not in the viewer bundle).
+
 ### Revenue recognition & deferred revenue (Prompt #10; all require `X-Company-Id`; see `docs/revenue-recognition/`)
 
 | Method             | Path                                                                                                                                                                          | Permission                        |

@@ -30,6 +30,7 @@ import {
   invoices,
   journalEntries,
   journalLines,
+  payRuns,
   revenueRecognitionRuns,
   stockDocuments,
   vendorBills,
@@ -177,6 +178,8 @@ const SOURCE_TABLES = {
   FX_REVALUATION_REVERSAL: fxRevaluations,
   JOURNAL_REVERSAL: journalEntries,
   REVENUE_RECOGNITION_RUN: revenueRecognitionRuns,
+  PAY_RUN: payRuns,
+  PAY_RUN_PAYMENT: payRuns,
 } as const satisfies Record<string, SourceTable>;
 
 /** Shape every verifiable source table shares. */

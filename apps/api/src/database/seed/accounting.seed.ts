@@ -15,6 +15,7 @@ import { seedBudgetingTax } from './budgeting-tax.seed';
 import { seedInventory } from './inventory.seed';
 import { seedOrders } from './orders.seed';
 import { seedReceivables } from './receivables.seed';
+import { seedPayroll } from './payroll.seed';
 import { seedRevenue } from './revenue.seed';
 import { seedPayables } from './payables.seed';
 import { seedTreasury } from './treasury.seed';
@@ -185,6 +186,13 @@ const CHART: CoaRow[] = [
     subtype: 'OTHER_LIABILITY',
   },
   {
+    code: '2175',
+    name: 'Statutory Contributions Payable',
+    type: 'LIABILITY',
+    parent: '2100',
+    subtype: 'ACCRUED_LIABILITY',
+  },
+  {
     code: '2200',
     name: 'Non-current Liabilities',
     type: 'LIABILITY',
@@ -312,6 +320,13 @@ const CHART: CoaRow[] = [
   {
     code: '6100',
     name: 'Salaries and Wages',
+    type: 'EXPENSE',
+    parent: '6000',
+    subtype: 'OPERATING_EXPENSE',
+  },
+  {
+    code: '6110',
+    name: 'Employer Contributions',
     type: 'EXPENSE',
     parent: '6000',
     subtype: 'OPERATING_EXPENSE',
@@ -487,6 +502,9 @@ const MAPPINGS: Array<[AccountMappingKey, string]> = [
   ['PURCHASE_DISCOUNT', '5400'],
   ['ACCRUED_EXPENSE', '2120'],
   ['DEFERRED_REVENUE', '2190'],
+  ['SALARY_EXPENSE', '6100'],
+  ['EMPLOYER_CONTRIBUTION_EXPENSE', '6110'],
+  ['STATUTORY_CONTRIBUTIONS_PAYABLE', '2175'],
 ];
 
 interface SampleLine {
@@ -619,6 +637,7 @@ export async function seedAccounting(
     await seedAssetsBanking(tx, company, codeToId, adminUserId, log);
     await seedTreasury(tx, company, codeToId, adminUserId, log);
     await seedBudgetingTax(tx, company, codeToId, adminUserId, log);
+    await seedPayroll(tx, company, codeToId, adminUserId, log);
     await seedAccountingCore(tx, company, codeToId, adminUserId, log);
   }
   await seedExchangeRates(tx, organizationId, adminUserId, log);

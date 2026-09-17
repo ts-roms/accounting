@@ -55,6 +55,8 @@ export const accountingPolicies = pgTable('accounting_policies', {
   closeRequireRevenueRecognition: boolean('close_require_revenue_recognition')
     .notNull()
     .default(true),
+  /** Every pay run of the period must be posted before it closes (Prompt #11). */
+  closeRequirePayrollPosted: boolean('close_require_payroll_posted').notNull().default(true),
   closeBlockOnUnapprovedJournals: boolean('close_block_on_unapproved_journals')
     .notNull()
     .default(true),

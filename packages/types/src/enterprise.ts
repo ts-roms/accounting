@@ -36,6 +36,7 @@ export const WORKFLOW_DOCUMENT_TYPES = [
   'BANK_TRANSFER',
   'PETTY_CASH_VOUCHER',
   'CONSOLIDATION_RUN',
+  'PAY_RUN',
 ] as const;
 export type WorkflowDocumentType = (typeof WORKFLOW_DOCUMENT_TYPES)[number];
 
@@ -143,6 +144,8 @@ export const CLOSE_AUTO_CHECKS = [
   'TRIAL_BALANCE',
   'INTEGRITY',
   'SUSPENSE_BALANCES',
+  /** Every pay run whose period ends in the fiscal period is posted (Prompt #11). */
+  'PAYROLL_POSTED',
   /** No deferred revenue due in the period is still waiting for a recognition run (Prompt #10). */
   'REVENUE_RECOGNITION',
 ] as const;

@@ -21,7 +21,9 @@ import {
   cashForecastItems,
   cashForecastSnapshots,
   invoices,
+  payRuns,
   paymentRuns,
+  payrollSettings,
   promisesToPay,
   recurringJournals,
   vendorBills,
@@ -118,6 +120,7 @@ export class CashForecastService {
       ...(await this.promiseFlows(companyId, asOf, horizonEnd, currency, scenario)),
       ...(await this.apFlows(companyId, asOf, horizonEnd, currency)),
       ...(await this.runFlows(companyId, asOf, horizonEnd, currency)),
+      ...(await this.payrollFlows(companyId, asOf, horizonEnd, currency)),
       ...(await this.transferFlows(companyId, asOf, horizonEnd, currency)),
       ...(await this.recurringFlows(companyId, asOf, horizonEnd, currency)),
       ...(await this.plannedFlows(companyId, asOf, horizonEnd, currency)),
@@ -507,6 +510,38 @@ export class CashForecastService {
     }));
   }
 
+  /** Calculated, approved and posted-unpaid pay runs on their pay date (Prompt #11); the payroll bank account when known. */
+  private async payrollFlows(
+    companyId: string,
+    asOf: string,
+    horizonEnd: string,
+    currency: string,
+  ): Promise<ForecastFlow[]> {
+    const [settings] = await this.db
+      .select({ bankAccountId: payrollSettings.payrollBankAccountId })
+      .from(payrollSettings)
+      .where(eq(payrollSettings.companyId, companyId));
+    const rows = await this.db
+      .select()
+      .from(payRuns)
+      .where(
+        and(
+          eq(payRuns.companyId, companyId),
+          inArray(payRuns.status, ['CALCULATED', 'APPROVED', 'POSTED']),
+          lte(payRuns.payDate, horizonEnd),
+        ),
+      );
+    return rows.map((r) => ({
+      date: r.payDate < asOf ? asOf : r.payDate,
+      source: 'PAYROLL' as const,
+      direction: 'OUTFLOW' as const,
+      amount: Money.of(r.netTotal, currency).toString(),
+      bankAccountId: r.bankAccountId ?? settings?.bankAccountId ?? null,
+      reference: r.documentNumber,
+      label: `Payroll ${r.documentNumber} (${r.status.toLowerCase()})`,
+    }));
+  }
+
   /** Approved transfers still to be sent and sent transfers still to land: the receiving side is an inflow to that account, the sending side an outflow. */
   private async transferFlows(
     companyId: string,
@@ -641,6 +676,8 @@ export class CashForecastService {
         select base_amount as amount from vendor_payments where company_id = ${companyId} and status = 'POSTED' and payment_type = 'PAYMENT' and payment_date > ${from} and payment_date <= ${asOf}
         union all
         select amount from bank_transactions where company_id = ${companyId} and status = 'POSTED' and transaction_type in ('WITHDRAWAL', 'BANK_FEE') and transaction_date > ${from} and transaction_date <= ${asOf}
+        union all
+        select net_total as amount from pay_runs where company_id = ${companyId} and status = 'PAID' and payment_date > ${from} and payment_date <= ${asOf}
       ) x`);
     const row =
       (result as unknown as { rows?: Array<{ total: string }> }).rows?.[0] ??

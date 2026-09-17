@@ -33,6 +33,7 @@ import {
   fxRevaluations,
   journalEntries,
   reconciliationExceptions,
+  payRuns,
   reconciliations,
   revenueScheduleLines,
   revenueSchedules,
@@ -125,6 +126,7 @@ const TEMPLATE: Array<{
     kind: 'AUTO',
     required: true,
   },
+  { key: 'PAYROLL_POSTED', title: 'Payroll posted', kind: 'AUTO', required: true },
   { key: 'TAX_RECONCILIATION', title: 'Tax reconciliation approved', kind: 'AUTO', required: true },
   {
     key: 'MANUAL_INTERCOMPANY',
@@ -746,6 +748,27 @@ export class FinancialCloseService {
       { pendingLines: dueRevenue?.n ?? 0, pendingAmount: dueRevenue?.amount ?? '0' },
     );
 
+    // Pay runs whose period ends in this fiscal period but are not yet posted (Prompt #11).
+    const openRuns = await this.db
+      .select({ documentNumber: payRuns.documentNumber, status: payRuns.status })
+      .from(payRuns)
+      .where(
+        and(
+          eq(payRuns.companyId, companyId),
+          inArray(payRuns.status, ['DRAFT', 'CALCULATED', 'APPROVED']),
+          gte(payRuns.periodEnd, period.startDate),
+          lte(payRuns.periodEnd, end),
+        ),
+      );
+    push(
+      'PAYROLL_POSTED',
+      openRuns.length === 0,
+      openRuns.length
+        ? `Pay run(s) not yet posted: ${openRuns.map((r) => `${r.documentNumber} (${r.status.toLowerCase()})`).join(', ')}`
+        : 'Every pay run of the period is posted',
+      { openRuns: openRuns.map((r) => r.documentNumber) },
+    );
+
     // Journals still in draft / submitted / approved inside the period.
     const unposted = await this.db
       .select({ documentNumber: journalEntries.documentNumber, status: journalEntries.status })
@@ -908,6 +931,7 @@ function blockersFrom(checks: CheckResult[], policy: AccountingPolicy): CloseBlo
     DEPRECIATION: policy.closeRequireDepreciation,
     FX_REVALUATION: policy.closeRequireFxRevaluation,
     REVENUE_RECOGNITION: policy.closeRequireRevenueRecognition,
+    PAYROLL_POSTED: policy.closeRequirePayrollPosted,
     UNAPPROVED_JOURNALS: policy.closeBlockOnUnapprovedJournals,
     OPEN_RECONCILIATION_EXCEPTIONS: policy.closeBlockOnOpenExceptions,
     TRIAL_BALANCE: true,

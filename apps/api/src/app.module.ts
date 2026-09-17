@@ -40,6 +40,7 @@ import { OperationsModule } from './modules/operations/operations.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { PayablesModule } from './modules/payables/payables.module';
 import { PurchasingModule } from './modules/purchasing/purchasing.module';
+import { PayrollModule } from './modules/payroll/payroll.module';
 import { RevenueModule } from './modules/revenue/revenue.module';
 import { TreasuryModule } from './modules/treasury/treasury.module';
 import { ReceivablesModule } from './modules/receivables/receivables.module';
@@ -103,6 +104,7 @@ import { UsersModule } from './modules/users/users.module';
     PayablesModule,
     TreasuryModule,
     RevenueModule,
+    PayrollModule,
     SalesModule,
     PurchasingModule,
     InventoryModule,

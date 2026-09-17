@@ -52,6 +52,7 @@ export const DELEGABLE_PERMISSION_DEFINITIONS = [
   ['bank-transfer.approve', 'Approve bank transfers', 'Treasury'],
   ['petty-cash.approve', 'Approve petty cash vouchers', 'Treasury'],
   ['consolidation.approve', 'Finalize consolidation runs', 'Group'],
+  ['payroll.approve', 'Approve pay runs', 'Payroll'],
   ['journal.approve', 'Approve journal entries', 'General Ledger'],
   ['budget.approve', 'Approve budget versions', 'Budgeting'],
   ['approval.decide', 'Decide workflow approval requests', 'Workflows'],
@@ -87,6 +88,7 @@ export const DELEGATION_DOCUMENT_TYPES = [
   'BANK_TRANSFER',
   'PETTY_CASH_VOUCHER',
   'CONSOLIDATION_RUN',
+  'PAY_RUN',
 ] as const;
 export type DelegationDocumentType = (typeof DELEGATION_DOCUMENT_TYPES)[number];
 

@@ -50,6 +50,8 @@ const DEFAULT_PREFIX: Record<DocumentType, string> = {
   PMF: 'PMF',
   CON: 'CON',
   RRN: 'RRN',
+  EMP: 'EMP',
+  PYR: 'PYR',
 };
 
 /** The rule that governs a document number, whether configured or the built-in default. */
