@@ -292,5 +292,3 @@ export function AnimatedStatus({
     </ScaleIn>
   );
 }
-
-export { MOTION_MS };

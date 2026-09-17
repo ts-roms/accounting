@@ -26,7 +26,16 @@
     {
       "name": "web-verify",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@accounting/web", "exec", "next", "dev", "-p", "3010"],
+      "runtimeArgs": [
+        "--filter",
+        "@accounting/web",
+        "exec",
+        "next",
+        "dev",
+        "--turbopack",
+        "-p",
+        "3010"
+      ],
       "port": 3010,
       "env": {
         "API_INTERNAL_URL": "http://localhost:3011",
@@ -36,7 +45,16 @@
     {
       "name": "web-ar",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@accounting/web", "exec", "next", "dev", "-p", "3021"],
+      "runtimeArgs": [
+        "--filter",
+        "@accounting/web",
+        "exec",
+        "next",
+        "dev",
+        "--turbopack",
+        "-p",
+        "3021"
+      ],
       "port": 3021,
       "env": {
         "API_INTERNAL_URL": "http://localhost:3012"
