@@ -15,6 +15,7 @@ import { seedBudgetingTax } from './budgeting-tax.seed';
 import { seedInventory } from './inventory.seed';
 import { seedOrders } from './orders.seed';
 import { seedReceivables } from './receivables.seed';
+import { seedBankFeed } from './bank-feed.seed';
 import { seedPayroll } from './payroll.seed';
 import { seedRevenue } from './revenue.seed';
 import { seedPayables } from './payables.seed';
@@ -638,6 +639,7 @@ export async function seedAccounting(
     await seedTreasury(tx, company, codeToId, adminUserId, log);
     await seedBudgetingTax(tx, company, codeToId, adminUserId, log);
     await seedPayroll(tx, company, codeToId, adminUserId, log);
+    await seedBankFeed(tx, company, codeToId, adminUserId, log);
     await seedAccountingCore(tx, company, codeToId, adminUserId, log);
   }
   await seedExchangeRates(tx, organizationId, adminUserId, log);

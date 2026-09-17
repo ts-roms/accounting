@@ -141,6 +141,9 @@ describe('navigation', () => {
       ...['groups', 'runs', 'intercompany-reconciliation'].map((p) => `/consolidation/${p}`),
       ...['schedules', 'runs', 'reports', 'policies'].map((p) => `/revenue/${p}`),
       ...['runs', 'employees', 'pay-items', 'reports'].map((p) => `/payroll/${p}`),
+      '/banking/feed',
+      '/banking/feed/rules',
+      '/banking/feed/dashboard',
     ]);
     for (const section of NAVIGATION) {
       for (const item of section.items) {

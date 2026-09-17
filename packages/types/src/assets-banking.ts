@@ -56,7 +56,8 @@ export const STATEMENT_LINE_STATUSES = [
 ] as const;
 export type StatementLineStatus = (typeof STATEMENT_LINE_STATUSES)[number];
 
-export const MATCH_KINDS = ['AUTO', 'MANUAL'] as const;
+/** AUTO: the statement matcher; MANUAL: a person; RULE: a bank feed rule / suggestion applied (Prompt #12). */
+export const MATCH_KINDS = ['AUTO', 'MANUAL', 'RULE'] as const;
 
 /** How sure the matching engine is about an automatic match. */
 export const MATCH_CONFIDENCES = ['HIGH', 'MEDIUM'] as const;

@@ -6,6 +6,7 @@ import {
   statementLineInputSchema,
 } from '@accounting/validation';
 import { DRIZZLE, type Database } from '@/database/database.types';
+import { BankFeedService } from '@/modules/bank-feed/bank-feed.service';
 import { StatementsService } from '@/modules/banking/statements.service';
 import type { ExternalRecord } from '../../core/connector';
 import { IntegrationError } from '../../core/integration-error';
@@ -43,6 +44,7 @@ export class BankTransactionsImporter implements Importer {
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly statements: StatementsService,
     private readonly refs: ExternalReferencesService,
+    private readonly feed: BankFeedService,
   ) {}
 
   async import(
@@ -74,6 +76,10 @@ export class BankTransactionsImporter implements Importer {
     });
     if (!input.success) throw mappingError(input.error.issues);
     const view = await this.statements.import(ctx.companyId, ctx.principal, input.data);
+    // Feed lines the matcher could not pair get rule / document / history suggestions (Prompt #12).
+    const suggested = await this.feed.suggest(ctx.companyId, ctx.principal, {
+      statementId: view.id,
+    });
     await this.db.transaction((tx) =>
       this.refs.link(tx, {
         integrationId: ctx.integration.id,
@@ -87,7 +93,7 @@ export class BankTransactionsImporter implements Importer {
     return {
       action: 'CREATED',
       internalId: view.id,
-      message: `${view.lineCount} lines, ${view.matchedCount} auto-matched`,
+      message: `${view.lineCount} lines, ${view.matchedCount} auto-matched, ${suggested.autoApplied} explained by rules, ${suggested.suggested - suggested.autoApplied} suggested`,
     };
   }
 }
