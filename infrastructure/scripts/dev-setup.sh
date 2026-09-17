@@ -11,4 +11,4 @@ echo "Waiting for PostgreSQL..."
 until docker exec accounting-postgres pg_isready -U accounting -d accounting >/dev/null 2>&1; do sleep 1; done
 pnpm db:migrate
 pnpm db:seed
-echo "Done. Run 'pnpm dev' and open http://localhost:3000"
+echo "Done. Run 'pnpm dev' and open http://localhost:3006"
