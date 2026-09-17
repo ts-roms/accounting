@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 const ADMIN = { email: 'admin@acme.local', password: 'Admin!Passw0rd' };
 
