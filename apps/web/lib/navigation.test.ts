@@ -77,7 +77,10 @@ describe('navigation', () => {
         'settings',
       ].map((p) => `/inventory/${p}`),
       ...['accounts', 'transactions', 'reconciliation'].map((p) => `/banking/${p}`),
-      ...['assets', 'depreciation', 'categories'].map((p) => `/fixed-assets/${p}`),
+      ...['assets', 'depreciation', 'categories', 'rollforward'].map((p) => `/fixed-assets/${p}`),
+      '/leases',
+      '/leases/runs',
+      '/leases/reports',
       ...['budgets', 'variance', 'dimensions', 'expense-claims'].map((p) => `/budgeting/${p}`),
       ...['codes', 'transactions', 'reports'].map((p) => `/tax/${p}`),
       ...[

@@ -31,6 +31,10 @@ import {
   journalEntries,
   journalLines,
   payRuns,
+  leases,
+  leaseRuns,
+  leaseScheduleLines,
+  leaseEvents,
   revenueRecognitionRuns,
   stockDocuments,
   vendorBills,
@@ -180,6 +184,11 @@ const SOURCE_TABLES = {
   REVENUE_RECOGNITION_RUN: revenueRecognitionRuns,
   PAY_RUN: payRuns,
   PAY_RUN_PAYMENT: payRuns,
+  LEASE_COMMENCEMENT: leases,
+  LEASE_TERMINATION: leases,
+  LEASE_RUN: leaseRuns,
+  LEASE_PAYMENT: leaseScheduleLines,
+  LEASE_REMEASUREMENT: leaseEvents,
 } as const satisfies Record<string, SourceTable>;
 
 /** Shape every verifiable source table shares. */

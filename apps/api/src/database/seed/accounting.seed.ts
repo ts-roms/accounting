@@ -16,6 +16,7 @@ import { seedInventory } from './inventory.seed';
 import { seedOrders } from './orders.seed';
 import { seedReceivables } from './receivables.seed';
 import { seedBankFeed } from './bank-feed.seed';
+import { seedLeases } from './leases.seed';
 import { seedPayroll } from './payroll.seed';
 import { seedRevenue } from './revenue.seed';
 import { seedPayables } from './payables.seed';
@@ -126,6 +127,21 @@ const CHART: CoaRow[] = [
     subtype: 'ACCUMULATED_DEPRECIATION',
     normalBalance: 'CREDIT',
   },
+  {
+    code: '1530',
+    name: 'Right-of-use Assets',
+    type: 'ASSET',
+    parent: '1500',
+    subtype: 'FIXED_ASSET',
+  },
+  {
+    code: '1540',
+    name: 'Accumulated Depreciation - Right-of-use',
+    type: 'ASSET',
+    parent: '1500',
+    subtype: 'ACCUMULATED_DEPRECIATION',
+    normalBalance: 'CREDIT',
+  },
   { code: '2000', name: 'Liabilities', type: 'LIABILITY', header: true },
   { code: '2100', name: 'Current Liabilities', type: 'LIABILITY', parent: '2000', header: true },
   {
@@ -201,6 +217,7 @@ const CHART: CoaRow[] = [
     header: true,
   },
   { code: '2210', name: 'Loans Payable', type: 'LIABILITY', parent: '2200', subtype: 'LOAN' },
+  { code: '2220', name: 'Lease Liabilities', type: 'LIABILITY', parent: '2200', subtype: 'LOAN' },
   { code: '3000', name: 'Equity', type: 'EQUITY', header: true },
   { code: '3100', name: 'Share Capital', type: 'EQUITY', parent: '3000', subtype: 'SHARE_CAPITAL' },
   {
@@ -340,6 +357,13 @@ const CHART: CoaRow[] = [
     subtype: 'OPERATING_EXPENSE',
   },
   {
+    code: '6210',
+    name: 'Short-term Lease Expense',
+    type: 'EXPENSE',
+    parent: '6000',
+    subtype: 'OPERATING_EXPENSE',
+  },
+  {
     code: '6300',
     name: 'Utilities Expense',
     type: 'EXPENSE',
@@ -440,6 +464,13 @@ const CHART: CoaRow[] = [
     parent: '8000',
     subtype: 'OTHER_EXPENSE',
   },
+  {
+    code: '8110',
+    name: 'Lease Interest Expense',
+    type: 'OTHER_EXPENSE',
+    parent: '8000',
+    subtype: 'OTHER_EXPENSE',
+  },
   { code: '6150', name: 'Project Consulting Fees', type: 'EXPENSE', parent: '6000' },
   // Accounts receivable controls (Prompt #6)
   {
@@ -506,6 +537,11 @@ const MAPPINGS: Array<[AccountMappingKey, string]> = [
   ['SALARY_EXPENSE', '6100'],
   ['EMPLOYER_CONTRIBUTION_EXPENSE', '6110'],
   ['STATUTORY_CONTRIBUTIONS_PAYABLE', '2175'],
+  ['RIGHT_OF_USE_ASSET', '1530'],
+  ['ROU_ACCUMULATED_DEPRECIATION', '1540'],
+  ['LEASE_LIABILITY', '2220'],
+  ['LEASE_INTEREST_EXPENSE', '8110'],
+  ['LEASE_EXPENSE', '6210'],
 ];
 
 interface SampleLine {
@@ -639,6 +675,7 @@ export async function seedAccounting(
     await seedTreasury(tx, company, codeToId, adminUserId, log);
     await seedBudgetingTax(tx, company, codeToId, adminUserId, log);
     await seedPayroll(tx, company, codeToId, adminUserId, log);
+    await seedLeases(tx, company, codeToId, adminUserId, log);
     await seedBankFeed(tx, company, codeToId, adminUserId, log);
     await seedAccountingCore(tx, company, codeToId, adminUserId, log);
   }

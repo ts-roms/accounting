@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AccountingModule } from '@/modules/accounting/accounting.module';
 import { JobsModule } from '@/modules/jobs/jobs.module';
+import { AssetReportsService } from './asset-reports.service';
 import { DepreciationRunsService } from './depreciation-runs.service';
 import { DepreciationJob } from './depreciation.job';
 import {
@@ -14,7 +15,7 @@ import { FixedAssetsService } from './fixed-assets.service';
 @Module({
   imports: [AccountingModule, JobsModule],
   controllers: [FixedAssetsController, AssetCategoriesController, DepreciationRunsController],
-  providers: [FixedAssetsService, DepreciationRunsService, DepreciationJob],
-  exports: [FixedAssetsService, DepreciationRunsService],
+  providers: [FixedAssetsService, DepreciationRunsService, AssetReportsService, DepreciationJob],
+  exports: [FixedAssetsService, DepreciationRunsService, AssetReportsService],
 })
 export class FixedAssetsModule {}

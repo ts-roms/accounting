@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, inArray, lte, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, lte, ne, sql, type SQL } from 'drizzle-orm';
 import { Money } from '@accounting/money';
 import {
   OPEN_DOCUMENT_STATUSES,
@@ -22,6 +22,8 @@ import {
   cashForecastSnapshots,
   invoices,
   payRuns,
+  leaseScheduleLines,
+  leases,
   paymentRuns,
   payrollSettings,
   promisesToPay,
@@ -121,6 +123,7 @@ export class CashForecastService {
       ...(await this.apFlows(companyId, asOf, horizonEnd, currency)),
       ...(await this.runFlows(companyId, asOf, horizonEnd, currency)),
       ...(await this.payrollFlows(companyId, asOf, horizonEnd, currency)),
+      ...(await this.leaseFlows(companyId, asOf, horizonEnd, currency)),
       ...(await this.transferFlows(companyId, asOf, horizonEnd, currency)),
       ...(await this.recurringFlows(companyId, asOf, horizonEnd, currency)),
       ...(await this.plannedFlows(companyId, asOf, horizonEnd, currency)),
@@ -663,6 +666,46 @@ export class CashForecastService {
     return out;
   }
 
+  /** Unpaid lease instalments of active leases on their payment date (Prompt #13); the lease's usual bank account when known. */
+  private async leaseFlows(
+    companyId: string,
+    asOf: string,
+    horizonEnd: string,
+    currency: string,
+  ): Promise<ForecastFlow[]> {
+    const rows = await this.db
+      .select({
+        leaseNumber: leases.leaseNumber,
+        name: leases.name,
+        bankAccountId: leases.bankAccountId,
+        payment: leaseScheduleLines.payment,
+        paymentDate: leaseScheduleLines.paymentDate,
+        sequence: leaseScheduleLines.sequence,
+      })
+      .from(leaseScheduleLines)
+      .innerJoin(leases, eq(leases.id, leaseScheduleLines.leaseId))
+      .where(
+        and(
+          eq(leases.companyId, companyId),
+          eq(leases.status, 'ACTIVE'),
+          ne(leaseScheduleLines.status, 'CANCELLED'),
+          isNull(leaseScheduleLines.paidAt),
+          sql`${leaseScheduleLines.payment} > 0`,
+          lte(leaseScheduleLines.paymentDate, horizonEnd),
+        ),
+      )
+      .orderBy(asc(leaseScheduleLines.paymentDate));
+    return rows.map((r) => ({
+      date: (r.paymentDate ?? asOf) < asOf ? asOf : (r.paymentDate ?? asOf),
+      source: 'LEASE_PAYMENTS' as const,
+      direction: 'OUTFLOW' as const,
+      amount: Money.of(r.payment, currency).toString(),
+      bankAccountId: r.bankAccountId ?? null,
+      reference: r.leaseNumber,
+      label: `Lease ${r.leaseNumber} ${r.name} (month ${r.sequence})`,
+    }));
+  }
+
   /** Posted vendor payments plus posted bank withdrawals / fees over the window, per day. */
   private async averageDailyOutflow(
     companyId: string,
@@ -678,6 +721,8 @@ export class CashForecastService {
         select amount from bank_transactions where company_id = ${companyId} and status = 'POSTED' and transaction_type in ('WITHDRAWAL', 'BANK_FEE') and transaction_date > ${from} and transaction_date <= ${asOf}
         union all
         select net_total as amount from pay_runs where company_id = ${companyId} and status = 'PAID' and payment_date > ${from} and payment_date <= ${asOf}
+        union all
+        select payment as amount from lease_schedule_lines where company_id = ${companyId} and paid_date > ${from} and paid_date <= ${asOf}
       ) x`);
     const row =
       (result as unknown as { rows?: Array<{ total: string }> }).rows?.[0] ??

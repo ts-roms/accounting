@@ -42,6 +42,7 @@ import { PayablesModule } from './modules/payables/payables.module';
 import { PurchasingModule } from './modules/purchasing/purchasing.module';
 import { BankFeedModule } from './modules/bank-feed/bank-feed.module';
 import { PayrollModule } from './modules/payroll/payroll.module';
+import { LeasesModule } from './modules/leases/leases.module';
 import { RevenueModule } from './modules/revenue/revenue.module';
 import { TreasuryModule } from './modules/treasury/treasury.module';
 import { ReceivablesModule } from './modules/receivables/receivables.module';
@@ -106,6 +107,7 @@ import { UsersModule } from './modules/users/users.module';
     TreasuryModule,
     RevenueModule,
     PayrollModule,
+    LeasesModule,
     BankFeedModule,
     SalesModule,
     PurchasingModule,

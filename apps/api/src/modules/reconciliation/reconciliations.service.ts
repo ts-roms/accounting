@@ -142,6 +142,7 @@ export class ReconciliationsService {
             input.closeRequireRevenueRecognition ?? before.closeRequireRevenueRecognition,
           closeRequirePayrollPosted:
             input.closeRequirePayrollPosted ?? before.closeRequirePayrollPosted,
+          closeRequireLeaseRuns: input.closeRequireLeaseRuns ?? before.closeRequireLeaseRuns,
           closeBlockOnUnapprovedJournals:
             input.closeBlockOnUnapprovedJournals ?? before.closeBlockOnUnapprovedJournals,
           closeBlockOnOpenExceptions:

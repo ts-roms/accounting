@@ -403,6 +403,19 @@ and past explanations, a review queue (accept / adjust / dismiss / explain
 by hand), KPIs, a daily sweep and integrity checks; the Plaid feed importer
 refreshes suggestions after every import. See `docs/bank-feed/`.
 
+### Prompt #13 - Lease accounting & fixed-asset extensions (COMPLETE)
+
+Lessee accounting as data: contracts with term, payment, frequency, timing
+and rate; a pure engine that derives the monthly schedule (present value,
+interest accretion, straight-line depreciation, rounding plug); commencement
+(Dr right-of-use asset / Cr lease liability), lease runs (one ADJUSTING
+journal per run), instalments paid from a bank account, remeasurement and
+termination with gain / loss, short-term / low-value exemptions expensed as
+paid; register, maturity and integrity reports, a `LEASE_RUNS_POSTED`
+close check, a `LEASE_PAYMENTS` forecast source and a scheduled job.
+Fixed assets gain a register-only split and the register rollforward note
+(right-of-use assets as their own class). See `docs/leases/`.
+
 ## Beyond the roadmap
 
 All nine phases of the specification are delivered. Candidates for follow-up

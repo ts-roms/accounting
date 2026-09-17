@@ -52,6 +52,8 @@ const DEFAULT_PREFIX: Record<DocumentType, string> = {
   RRN: 'RRN',
   EMP: 'EMP',
   PYR: 'PYR',
+  LSE: 'LSE',
+  LRN: 'LRN',
 };
 
 /** The rule that governs a document number, whether configured or the built-in default. */

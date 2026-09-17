@@ -176,6 +176,12 @@ export const ACCOUNT_MAPPING_KEYS = [
   'SALARY_EXPENSE',
   'EMPLOYER_CONTRIBUTION_EXPENSE',
   'STATUTORY_CONTRIBUTIONS_PAYABLE',
+  /** Lease accounting (Prompt #13): right-of-use asset, its accumulated depreciation, the lease liability, interest accretion and the expense for exempt leases. */
+  'RIGHT_OF_USE_ASSET',
+  'ROU_ACCUMULATED_DEPRECIATION',
+  'LEASE_LIABILITY',
+  'LEASE_INTEREST_EXPENSE',
+  'LEASE_EXPENSE',
 ] as const;
 export type AccountMappingKey = (typeof ACCOUNT_MAPPING_KEYS)[number];
 
@@ -231,6 +237,9 @@ export const DOCUMENT_TYPES = [
   /** Employee number and pay run (Prompt #11). */
   'EMP',
   'PYR',
+  /** Lease contract and lease run (Prompt #13). */
+  'LSE',
+  'LRN',
 ] as const;
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
 

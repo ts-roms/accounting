@@ -2,7 +2,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, Pencil, Plus, Scissors, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Money } from '@accounting/money';
 import { P } from '@accounting/types';
@@ -40,6 +40,7 @@ import {
   useFixedAsset,
   type AssetAction,
 } from '@/lib/api/assets-banking-hooks';
+import { useSplitAsset } from '@/lib/api/lease-hooks';
 import type { FixedAssetDetail } from '@/lib/api/types';
 import { formatDateTime, titleCase } from '@/lib/format';
 import { useSession } from '@/lib/auth/session';
@@ -64,6 +65,7 @@ export function FixedAssetDetailPage({ id }: { id: string }) {
   const [action, setAction] = React.useState<AssetAction | null>(null);
   const [editing, setEditing] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
+  const [splitting, setSplitting] = React.useState(false);
   if (asset.isLoading || !asset.data) return <Skeleton className="h-96" />;
   const a = asset.data;
   const canManage = hasPermission(P['fixed-asset.manage']);
@@ -105,6 +107,16 @@ export function FixedAssetDetailPage({ id }: { id: string }) {
             {canPost && a.status === 'DRAFT' ? (
               <Button size="sm" onClick={() => setAction('capitalize')} data-testid="capitalize">
                 Capitalise
+              </Button>
+            ) : null}
+            {canManage && carried ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSplitting(true)}
+                data-testid="split"
+              >
+                <Scissors /> Split
               </Button>
             ) : null}
             {canPost && carried ? (
@@ -318,6 +330,7 @@ export function FixedAssetDetailPage({ id }: { id: string }) {
         }}
       />
       <AssetActionDialog asset={a} action={action} onOpenChange={(o) => !o && setAction(null)} />
+      <SplitDialog asset={a} open={splitting} onOpenChange={setSplitting} />
     </>
   );
 }
@@ -472,6 +485,137 @@ function AssetActionDialog({
           </Button>
           <Button onClick={submit} disabled={run.isPending} data-testid="action-confirm">
             {ACTION_LABEL[action]}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Split (Prompt #13): carve child assets out of this one. Register only - the accounts do not move. */
+function SplitDialog({
+  asset,
+  open,
+  onOpenChange,
+}: {
+  asset: FixedAssetDetail;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const router = useRouter();
+  const split = useSplitAsset();
+  const [eventDate, setEventDate] = React.useState(today());
+  const [parts, setParts] = React.useState([{ name: '', percent: '50', location: '' }]);
+  const [notes, setNotes] = React.useState('');
+  React.useEffect(() => {
+    if (open) {
+      setEventDate(today());
+      setParts([{ name: '', percent: '50', location: '' }]);
+      setNotes('');
+    }
+  }, [open]);
+  const total = parts.reduce((n, p) => n + Number(p.percent || 0), 0);
+  const setPart = (i: number, patch: Partial<(typeof parts)[number]>) =>
+    setParts((ps) => ps.map((p, j) => (j === i ? { ...p, ...patch } : p)));
+  const submit = async () => {
+    try {
+      const result = await split.mutateAsync({
+        id: asset.id,
+        eventDate,
+        parts: parts.map((p) => ({
+          name: p.name.trim(),
+          percent: p.percent.trim(),
+          location: p.location.trim() || undefined,
+        })),
+        notes: notes.trim() || undefined,
+      });
+      toast.success(
+        `${asset.assetNumber} split into ${result.children.map((c) => c.assetNumber).join(', ')}.`,
+      );
+      onOpenChange(false);
+      if (result.parent.status === 'DISPOSED')
+        router.push(`${ASSETS_PATH}/${result.children[0]!.id}`);
+    } catch (err) {
+      toast.error(describeError(err));
+    }
+  };
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent size="md">
+        <DialogHeader>
+          <DialogTitle>Split {asset.assetNumber}</DialogTitle>
+          <DialogDescription>
+            Each part takes its share of cost, accumulated depreciation and salvage value and keeps
+            the depreciation clock. The parent keeps the remainder, or leaves the register when the
+            parts add up to 100%. Nothing posts.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <Label>Split date</Label>
+            <Input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
+          </div>
+          {parts.map((p, i) => (
+            <div key={i} className="grid grid-cols-[1fr_90px_1fr] gap-2">
+              <Input
+                placeholder="Part name"
+                value={p.name}
+                onChange={(e) => setPart(i, { name: e.target.value })}
+                data-testid="split-name"
+              />
+              <Input
+                inputMode="decimal"
+                className="text-right tabular"
+                placeholder="%"
+                value={p.percent}
+                onChange={(e) => setPart(i, { percent: e.target.value })}
+                data-testid="split-percent"
+              />
+              <Input
+                placeholder="Location (optional)"
+                value={p.location}
+                onChange={(e) => setPart(i, { location: e.target.value })}
+              />
+            </div>
+          ))}
+          <div className="flex items-center justify-between">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setParts((ps) => [...ps, { name: '', percent: '', location: '' }])}
+              disabled={parts.length >= 20}
+            >
+              <Plus /> Add part
+            </Button>
+            <span className={`text-xs ${total > 100 ? 'text-critical' : 'text-muted-foreground'}`}>
+              {total}% of {asset.cost}
+              {total < 100
+                ? ` · parent keeps ${(100 - total).toFixed(2)}%`
+                : total === 100
+                  ? ' · parent fully split'
+                  : ' · exceeds 100%'}
+            </span>
+          </div>
+          <div className="space-y-1">
+            <Label>Notes</Label>
+            <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={submit}
+            disabled={
+              split.isPending ||
+              total <= 0 ||
+              total > 100 ||
+              parts.some((p) => !p.name.trim() || !Number(p.percent))
+            }
+            data-testid="split-confirm"
+          >
+            Split
           </Button>
         </DialogFooter>
       </DialogContent>

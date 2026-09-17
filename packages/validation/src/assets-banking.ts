@@ -109,6 +109,38 @@ export const disposeAssetSchema = z.object({
 });
 export type DisposeAssetInput = z.infer<typeof disposeAssetSchema>;
 
+/**
+ * Split (Prompt #13): carve the asset into child assets. Each part takes a
+ * share of cost and accumulated depreciation; the parent keeps the rest (or
+ * is fully split when the parts add up to 100%). Register only - the
+ * accounts are unchanged, so nothing posts.
+ */
+export const splitAssetSchema = z.object({
+  eventDate: isoDateSchema,
+  parts: z
+    .array(
+      z.object({
+        name: nameSchema,
+        /** Share of the parent's cost, in percent (all parts together at most 100). */
+        percent: percentSchema.refine((v) => Number(v) > 0, 'Percent must be positive'),
+        location: optionalText(200),
+        serialNumber: optionalText(100),
+      }),
+    )
+    .min(1)
+    .max(20),
+  notes: optionalText(500),
+});
+export type SplitAssetInput = z.infer<typeof splitAssetSchema>;
+
+/** Register rollforward (Prompt #13): opening -> additions, depreciation, impairments, revaluations, disposals -> closing per category. */
+export const assetRollforwardQuerySchema = z.object({
+  from: isoDateSchema,
+  to: isoDateSchema,
+  categoryId: uuidSchema.optional(),
+});
+export type AssetRollforwardQuery = z.infer<typeof assetRollforwardQuerySchema>;
+
 export const createDepreciationRunSchema = z.object({
   fiscalPeriodId: uuidSchema,
   idempotencyKey: z.string().trim().min(8).max(100).optional(),

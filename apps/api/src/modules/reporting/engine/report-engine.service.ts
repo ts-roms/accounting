@@ -1,7 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, gte, lte, sql, type SQL } from 'drizzle-orm';
 import { Money } from '@accounting/money';
-import type { DimensionType, PaginatedResult, ReportBasis } from '@accounting/types';
+import {
+  NORMAL_BALANCE_BY_TYPE,
+  type AccountType,
+  type DimensionType,
+  type PaginatedResult,
+  type ReportBasis,
+} from '@accounting/types';
 import type {
   CreateReportDefinitionInput,
   ListReportDefinitionsQuery,
@@ -89,6 +95,14 @@ interface AccountRow {
 }
 
 type Activity = Map<string, { debit: Money; credit: Money }>;
+
+/**
+ * NATURAL presents a figure on the natural side of the account's *type*, so a
+ * contra account (accumulated depreciation, allowances) reduces its class
+ * instead of adding to it when a row sums several accounts.
+ */
+const naturalSide = (a: AccountRow): 'DEBIT' | 'CREDIT' =>
+  NORMAL_BALANCE_BY_TYPE[a.type as AccountType] ?? a.normalBalance;
 
 /**
  * Reporting engine (hardening H7): runs stored or ad-hoc report definitions.
@@ -444,7 +458,7 @@ export class ReportEngineService {
         return accts.reduce((sum, a) => {
           const amount = b.get(a.id) ?? Money.zero(currency);
           // Budget amounts are stored on the account's natural side.
-          const side = sign === 'NATURAL' ? a.normalBalance : sign;
+          const side = sign === 'NATURAL' ? naturalSide(a) : sign;
           return sum.add(side === a.normalBalance ? amount : amount.negate());
         }, Money.zero(currency));
       }
@@ -452,7 +466,7 @@ export class ReportEngineService {
       return accts.reduce((sum, a) => {
         const row = act.get(a.id);
         if (!row) return sum;
-        return sum.add(present(row.debit, row.credit, a.normalBalance, sign));
+        return sum.add(present(row.debit, row.credit, naturalSide(a), sign));
       }, Money.zero(currency));
     };
 
