@@ -273,6 +273,14 @@ export const PERMISSION_DEFINITIONS = [
   define('fixed-asset.manage', 'FIXED_ASSETS', 'Register and edit fixed assets and categories'),
   define('fixed-asset.post', 'FIXED_ASSETS', 'Capitalise, impair, revalue and dispose of assets'),
   define('depreciation.run', 'FIXED_ASSETS', 'Create and post depreciation runs'),
+  // Leases (Prompt #13)
+  define('lease.view', 'FIXED_ASSETS', 'View leases, schedules, runs and lease reports'),
+  define('lease.manage', 'FIXED_ASSETS', 'Capture and edit lease contracts and lease settings'),
+  define(
+    'lease.post',
+    'FIXED_ASSETS',
+    'Commence, run, pay, remeasure and terminate leases (posts to the ledger)',
+  ),
 
   // Budgeting & cost accounting
   define('budget.view', 'BUDGETING', 'View budgets and variance reports'),

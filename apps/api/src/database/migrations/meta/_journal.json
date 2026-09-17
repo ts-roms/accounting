@@ -218,6 +218,13 @@
       "when": 1789630283843,
       "tag": "0030_bank_feed",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1789634186583,
+      "tag": "0031_lease_accounting",
+      "breakpoints": true
     }
   ]
 }

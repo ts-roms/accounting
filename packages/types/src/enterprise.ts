@@ -148,6 +148,8 @@ export const CLOSE_AUTO_CHECKS = [
   'PAYROLL_POSTED',
   /** No deferred revenue due in the period is still waiting for a recognition run (Prompt #10). */
   'REVENUE_RECOGNITION',
+  /** Every active finance lease has its interest and depreciation posted through the period end (Prompt #13). */
+  'LEASE_RUNS_POSTED',
 ] as const;
 export type CloseAutoCheck = (typeof CLOSE_AUTO_CHECKS)[number];
 

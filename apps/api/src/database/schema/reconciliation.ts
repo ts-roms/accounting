@@ -57,6 +57,8 @@ export const accountingPolicies = pgTable('accounting_policies', {
     .default(true),
   /** Every pay run of the period must be posted before it closes (Prompt #11). */
   closeRequirePayrollPosted: boolean('close_require_payroll_posted').notNull().default(true),
+  /** Every active finance lease must have its runs posted through the period end (Prompt #13). */
+  closeRequireLeaseRuns: boolean('close_require_lease_runs').notNull().default(true),
   closeBlockOnUnapprovedJournals: boolean('close_block_on_unapproved_journals')
     .notNull()
     .default(true),

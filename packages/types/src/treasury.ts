@@ -87,6 +87,8 @@ export const FORECAST_SOURCES = [
   'AP_PAYMENT_RUNS',
   /** Calculated / approved / posted-unpaid pay runs on their pay date (Prompt #11). */
   'PAYROLL',
+  /** Unpaid lease payments on their payment date (Prompt #13). */
+  'LEASE_PAYMENTS',
   /** Planned items (rent, loans, taxes) maintained by treasury. */
   'PLANNED',
   /** Recurring journals with a cash account line. */

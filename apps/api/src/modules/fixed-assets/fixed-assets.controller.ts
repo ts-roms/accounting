@@ -24,9 +24,11 @@ import {
   fixedAssetSettingsSchema,
   impairAssetSchema,
   isoDateSchema,
+  assetRollforwardQuerySchema,
   listAssetsQuerySchema,
   listDepreciationRunsQuerySchema,
   revalueAssetSchema,
+  splitAssetSchema,
   transferAssetSchema,
   updateAssetCategorySchema,
   updateAssetSchema,
@@ -36,6 +38,7 @@ import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { CompanyScoped } from '@/common/decorators/company-scoped.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
+import { AssetReportsService } from './asset-reports.service';
 import { DepreciationRunsService } from './depreciation-runs.service';
 import { FixedAssetsService } from './fixed-assets.service';
 
@@ -49,6 +52,8 @@ class TransferDto extends createZodDto(transferAssetSchema) {}
 class ImpairDto extends createZodDto(impairAssetSchema) {}
 class RevalueDto extends createZodDto(revalueAssetSchema) {}
 class DisposeDto extends createZodDto(disposeAssetSchema) {}
+class SplitDto extends createZodDto(splitAssetSchema) {}
+class RollforwardQueryDto extends createZodDto(assetRollforwardQuerySchema) {}
 class SettingsDto extends createZodDto(fixedAssetSettingsSchema) {}
 class ListRunsQueryDto extends createZodDto(listDepreciationRunsQuerySchema) {}
 class CreateRunDto extends createZodDto(createDepreciationRunSchema) {}
@@ -60,7 +65,20 @@ class ScheduledDto extends createZodDto(z.object({ asOf: isoDateSchema.optional(
 @Controller('fixed-assets')
 @CompanyScoped()
 export class FixedAssetsController {
-  constructor(private readonly assets: FixedAssetsService) {}
+  constructor(
+    private readonly assets: FixedAssetsService,
+    private readonly reports: AssetReportsService,
+  ) {}
+
+  @Get('reports/rollforward')
+  @RequirePermissions(P['fixed-asset.view'])
+  @ApiOperation({
+    summary:
+      'Register rollforward per category (and right-of-use assets): opening, additions, depreciation, impairment, revaluation, disposals, closing',
+  })
+  rollforward(@CurrentUser() user: AuthenticatedUser, @Query() query: RollforwardQueryDto) {
+    return this.reports.rollforward(user.companyId!, query);
+  }
 
   @Get()
   @RequirePermissions(P['fixed-asset.view'])
@@ -150,6 +168,18 @@ export class FixedAssetsController {
     @Body() body: RevalueDto,
   ) {
     return this.assets.revalue(user.companyId!, user, id, body);
+  }
+
+  @Post(':id/split')
+  @HttpCode(200)
+  @RequirePermissions(P['fixed-asset.manage'])
+  @ApiOperation({ summary: 'Carve child assets out of this one (register only, no posting)' })
+  split(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: SplitDto,
+  ) {
+    return this.assets.split(user.companyId!, user, id, body);
   }
 
   @Post(':id/dispose')

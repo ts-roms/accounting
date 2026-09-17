@@ -34,6 +34,8 @@ import {
   journalEntries,
   reconciliationExceptions,
   payRuns,
+  leaseScheduleLines,
+  leases,
   reconciliations,
   revenueScheduleLines,
   revenueSchedules,
@@ -127,6 +129,7 @@ const TEMPLATE: Array<{
     required: true,
   },
   { key: 'PAYROLL_POSTED', title: 'Payroll posted', kind: 'AUTO', required: true },
+  { key: 'LEASE_RUNS_POSTED', title: 'Lease runs posted', kind: 'AUTO', required: true },
   { key: 'TAX_RECONCILIATION', title: 'Tax reconciliation approved', kind: 'AUTO', required: true },
   {
     key: 'MANUAL_INTERCOMPANY',
@@ -769,6 +772,33 @@ export class FinancialCloseService {
       { openRuns: openRuns.map((r) => r.documentNumber) },
     );
 
+    // Finance-lease months ending in this period whose interest / depreciation is not yet posted (Prompt #13).
+    const [leaseMonths] = await this.db
+      .select({
+        n: sql<number>`count(*)::int`,
+        leases: sql<number>`count(distinct ${leases.id})::int`,
+      })
+      .from(leaseScheduleLines)
+      .innerJoin(leases, eq(leases.id, leaseScheduleLines.leaseId))
+      .where(
+        and(
+          eq(leases.companyId, companyId),
+          eq(leases.status, 'ACTIVE'),
+          eq(leases.classification, 'FINANCE'),
+          eq(leaseScheduleLines.status, 'PENDING'),
+          gte(leaseScheduleLines.periodEnd, period.startDate),
+          lte(leaseScheduleLines.periodEnd, end),
+        ),
+      );
+    push(
+      'LEASE_RUNS_POSTED',
+      (leaseMonths?.n ?? 0) === 0,
+      leaseMonths?.n
+        ? `${leaseMonths.n} lease month(s) across ${leaseMonths.leases} lease(s) end in the period without a lease run`
+        : 'Every finance lease has its interest and depreciation posted through the period end',
+      { pendingMonths: leaseMonths?.n ?? 0, leases: leaseMonths?.leases ?? 0 },
+    );
+
     // Journals still in draft / submitted / approved inside the period.
     const unposted = await this.db
       .select({ documentNumber: journalEntries.documentNumber, status: journalEntries.status })
@@ -932,6 +962,7 @@ function blockersFrom(checks: CheckResult[], policy: AccountingPolicy): CloseBlo
     FX_REVALUATION: policy.closeRequireFxRevaluation,
     REVENUE_RECOGNITION: policy.closeRequireRevenueRecognition,
     PAYROLL_POSTED: policy.closeRequirePayrollPosted,
+    LEASE_RUNS_POSTED: policy.closeRequireLeaseRuns,
     UNAPPROVED_JOURNALS: policy.closeBlockOnUnapprovedJournals,
     OPEN_RECONCILIATION_EXCEPTIONS: policy.closeBlockOnOpenExceptions,
     TRIAL_BALANCE: true,

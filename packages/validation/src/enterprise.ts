@@ -280,6 +280,7 @@ export const closePolicySchema = z.object({
   closeRequireFxRevaluation: z.boolean().optional(),
   closeRequireRevenueRecognition: z.boolean().optional(),
   closeRequirePayrollPosted: z.boolean().optional(),
+  closeRequireLeaseRuns: z.boolean().optional(),
   closeBlockOnUnapprovedJournals: z.boolean().optional(),
   closeBlockOnOpenExceptions: z.boolean().optional(),
   closeRequireIntegrityOk: z.boolean().optional(),

@@ -23,6 +23,8 @@ export const ASSET_EVENT_TYPES = [
   'REVALUATION',
   'DISPOSAL',
   'WRITE_OFF',
+  /** Register-only: cost and accumulated depreciation carved out into child assets (Prompt #13). */
+  'SPLIT',
 ] as const;
 export type AssetEventType = (typeof ASSET_EVENT_TYPES)[number];
 

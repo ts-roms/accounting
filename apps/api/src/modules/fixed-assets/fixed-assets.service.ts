@@ -11,6 +11,7 @@ import type {
   ImpairAssetInput,
   ListAssetsQuery,
   RevalueAssetInput,
+  SplitAssetInput,
   TransferAssetInput,
   UpdateAssetCategoryInput,
   UpdateAssetInput,
@@ -986,6 +987,163 @@ export class FixedAssetsService {
       );
     });
     return this.get(companyId, id);
+  }
+
+  /**
+   * Split (Prompt #13): carve the asset into child assets that each take a
+   * share of cost, accumulated depreciation and salvage value; the parent
+   * keeps the remainder, or leaves the register (DISPOSED, nothing released
+   * to profit) when the parts add up to 100%. Register only - every child
+   * uses the parent's accounts, so the ledger does not move and nothing
+   * posts. Children continue the parent's depreciation clock.
+   */
+  async split(
+    companyId: string,
+    actor: AuthenticatedUser,
+    id: string,
+    input: SplitAssetInput,
+  ): Promise<{ parent: AssetDetail; children: AssetDetail[] }> {
+    const childIds = await this.db.transaction(async (tx) => {
+      const existing = await this.lock(tx, companyId, id);
+      this.assertCarried(existing);
+      if (input.eventDate < existing.inServiceDate)
+        throw new BusinessRuleError(
+          ErrorCodes.VALIDATION_FAILED,
+          'The split date cannot precede the in-service date.',
+        );
+      const currency = existing.currency;
+      // Percentages carry up to four decimals: scale to integers for an exact allocation.
+      const ratios = input.parts.map((p) => Math.round(Number(p.percent) * 10000));
+      const totalRatio = ratios.reduce((a, b) => a + b, 0);
+      if (totalRatio > 1_000_000)
+        throw new BusinessRuleError(
+          ErrorCodes.VALIDATION_FAILED,
+          'The parts add up to more than 100% of the asset.',
+        );
+      const remainder = 1_000_000 - totalRatio;
+      const weights = remainder > 0 ? [...ratios, remainder] : ratios;
+      const cost = Money.of(existing.cost, currency).allocate(weights);
+      const acquisition = Money.of(existing.acquisitionCost, currency).allocate(weights);
+      const accumulated = Money.of(existing.accumulatedDepreciation, currency).allocate(weights);
+      const salvage = Money.of(existing.salvageValue, currency).allocate(weights);
+      const year = Number(input.eventDate.slice(0, 4));
+      const ids: string[] = [];
+      const created: string[] = [];
+      for (let i = 0; i < input.parts.length; i += 1) {
+        const part = input.parts[i]!;
+        if (cost[i]!.isZero() || acquisition[i]!.isZero())
+          throw new BusinessRuleError(
+            ErrorCodes.VALIDATION_FAILED,
+            `Part "${part.name}" would carry no cost.`,
+          );
+        const assetNumber = await this.numbering.allocate(companyId, 'FA', year, tx);
+        const [child] = await tx
+          .insert(fixedAssets)
+          .values({
+            companyId,
+            assetNumber,
+            name: part.name,
+            description: `Split from ${existing.assetNumber} ${existing.name} (${Number(part.percent)}%)`,
+            categoryId: existing.categoryId,
+            status: existing.status,
+            acquisitionDate: existing.acquisitionDate,
+            inServiceDate: existing.inServiceDate,
+            acquisitionCost: acquisition[i]!.toString(),
+            salvageValue: salvage[i]!.toString(),
+            usefulLifeMonths: existing.usefulLifeMonths,
+            depreciationMethod: existing.depreciationMethod,
+            decliningRatePercent: existing.decliningRatePercent,
+            cost: cost[i]!.toString(),
+            accumulatedDepreciation: accumulated[i]!.toString(),
+            depreciatedMonths: existing.depreciatedMonths,
+            location: part.location ?? existing.location,
+            branchId: existing.branchId,
+            serialNumber: part.serialNumber ?? null,
+            vendorId: existing.vendorId,
+            reference: existing.reference,
+            currency,
+            capitalizationJournalEntryId: existing.capitalizationJournalEntryId,
+            capitalizedAt: existing.capitalizedAt,
+            createdBy: actor.id,
+          })
+          .returning({ id: fixedAssets.id });
+        ids.push(child!.id);
+        created.push(assetNumber);
+        await tx.insert(assetEvents).values({
+          assetId: child!.id,
+          eventType: 'SPLIT',
+          eventDate: input.eventDate,
+          amount: cost[i]!.toString(),
+          bookValueAfter: cost[i]!.subtract(accumulated[i]!).toString(),
+          notes: `From ${existing.assetNumber} (${Number(part.percent)}%)${input.notes ? ` - ${input.notes}` : ''}`,
+          createdBy: actor.id,
+        });
+      }
+      const keepIndex = input.parts.length;
+      const parentCost = remainder > 0 ? cost[keepIndex]! : Money.zero(currency);
+      const parentAccumulated = remainder > 0 ? accumulated[keepIndex]! : Money.zero(currency);
+      const parentSalvage = remainder > 0 ? salvage[keepIndex]! : Money.zero(currency);
+      const carvedOut = Money.of(existing.cost, currency).subtract(parentCost);
+      await tx
+        .update(fixedAssets)
+        .set(
+          remainder > 0
+            ? {
+                cost: parentCost.toString(),
+                accumulatedDepreciation: parentAccumulated.toString(),
+                salvageValue: parentSalvage.toString(),
+              }
+            : {
+                cost: '0',
+                accumulatedDepreciation: '0',
+                salvageValue: '0',
+                status: 'DISPOSED',
+                disposalDate: input.eventDate,
+                disposalProceeds: '0',
+                disposalGainLoss: '0',
+              },
+        )
+        .where(eq(fixedAssets.id, id));
+      await tx.insert(assetEvents).values({
+        assetId: id,
+        eventType: 'SPLIT',
+        eventDate: input.eventDate,
+        amount: carvedOut.negate().toString(),
+        bookValueAfter: parentCost.subtract(parentAccumulated).toString(),
+        notes: `Split into ${created.join(', ')}${remainder > 0 ? '' : ' (fully split)'}${input.notes ? ` - ${input.notes}` : ''}`,
+        createdBy: actor.id,
+      });
+      await this.audit.record(
+        {
+          action: 'UPDATE',
+          module: MODULE,
+          entityType: 'FixedAsset',
+          entityId: id,
+          previousValue: {
+            cost: existing.cost,
+            accumulatedDepreciation: existing.accumulatedDepreciation,
+            status: existing.status,
+          },
+          newValue: {
+            cost: parentCost.toString(),
+            accumulatedDepreciation: parentAccumulated.toString(),
+            status: remainder > 0 ? existing.status : 'DISPOSED',
+            children: created,
+          },
+          metadata: {
+            reason: input.notes ?? 'Asset split',
+            assetNumber: existing.assetNumber,
+            event: 'SPLIT',
+          },
+          companyId,
+        },
+        tx,
+      );
+      return ids;
+    });
+    const parent = await this.get(companyId, id);
+    const children = await Promise.all(childIds.map((c) => this.get(companyId, c)));
+    return { parent, children };
   }
 
   // ---------------------------------------------------------------- settings

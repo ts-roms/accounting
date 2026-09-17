@@ -240,6 +240,10 @@ export const OUTBOUND_EVENT_TYPES = [
   'pay_run.paid',
   'pay_run.reversed',
   'bank_line.explained',
+  'lease.commenced',
+  'lease.run_posted',
+  'lease.run_reversed',
+  'lease.terminated',
   'period.closed',
   'webhook.test',
 ] as const;
@@ -341,6 +345,7 @@ export const API_SCOPE_DEFINITIONS = [
     'Read employees, pay runs, payslips and payroll reports',
     ['employee.view', 'payroll.view'],
   ],
+  ['lease:read', 'Read leases, schedules, lease runs and lease reports', ['lease.view']],
   [
     'revenue:read',
     'Read revenue policies, schedules, recognition runs and deferred revenue reports',
@@ -469,5 +474,7 @@ export const NOTIFICATION_EVENT_TYPES = [
   'PAY_RUN_APPROVAL_REQUIRED',
   'PAY_RUN_DUE',
   'BANK_FEED_REVIEW',
+  'LEASE_RUN_DUE',
+  'LEASE_PAYMENT_DUE',
 ] as const;
 export type NotificationEventType = (typeof NOTIFICATION_EVENT_TYPES)[number];

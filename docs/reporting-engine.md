@@ -92,7 +92,9 @@ re-laid-out and deactivated; every change is audited (`ReportDefinition`).
   criteria; header accounts never match), `FORMULA` (`KEY [+|- KEY]...` over
   other rows, evaluated after its inputs), `DIMENSION_GROUP` (one line per
   active value of a dimension type, plus the group total). `sign` presents the
-  figure on the account's natural side (`NATURAL`, default), or forces
+  figure on the natural side of the account's type (`NATURAL`, default - so
+  contra accounts such as accumulated depreciation show negative within
+  their class), or forces
   `DEBIT` / `CREDIT`. `showAccounts` expands a row into one line per account
   (level 1, with the account id for drill-down); `hidden` computes a row
   without printing it.
