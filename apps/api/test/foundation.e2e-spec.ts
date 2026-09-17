@@ -8,7 +8,7 @@ import { runMigrations } from '@/database/migrate';
 import { runSeed } from '@/database/seed/seed';
 
 const DB_URL = process.env.DATABASE_URL!;
-const ADMIN = { email: 'admin@acme.local', password: 'Admin!Passw0rd' };
+const ADMIN = { email: 'admin@acme.local', password: 'P@ssw0rd123' };
 const CSRF = { 'x-requested-with': 'XMLHttpRequest' };
 
 /**
@@ -126,7 +126,7 @@ describe('Foundation (e2e)', () => {
   it('denies actions the role does not permit', async () => {
     const viewer = await http()
       .post('/api/v1/auth/login')
-      .send({ email: 'viewer@acme.local', password: 'Demo!Passw0rd' })
+      .send({ email: 'viewer@acme.local', password: 'P@ssw0rd123' })
       .expect(200);
     const cookies = (viewer.headers['set-cookie'] as unknown as string[]).map(
       (c) => c.split(';')[0]!,

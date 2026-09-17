@@ -85,7 +85,8 @@ export default function DashboardPage() {
   const prev = useIncomeStatement({ from: lastMonth.from, to: lastMonth.to }, canReport);
   const bs = useBalanceSheet({ asOf: now }, canReport);
   const prevBs = useBalanceSheet({ asOf: lastMonth.to }, canReport);
-  const pending = useJournalEntries({ page: 1, pageSize: 1, status: 'SUBMITTED' });
+  // Company-scoped: wait for the active company like the report queries do (avoids a 403 on first load).
+  const pending = useJournalEntries({ page: 1, pageSize: 1, status: 'SUBMITTED' }, canJournals);
   const arAging = useAging(AR_CONFIG, { asOf: now }, canReport);
   const apAging = useAging(AP_CONFIG, { asOf: now }, canReport);
 

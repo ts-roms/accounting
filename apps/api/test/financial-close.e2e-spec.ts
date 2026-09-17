@@ -8,9 +8,9 @@ import { runMigrations } from '@/database/migrate';
 import { runSeed } from '@/database/seed/seed';
 
 const DB_URL = process.env.DATABASE_URL!;
-const ADMIN = { email: 'admin@acme.local', password: 'Admin!Passw0rd' };
-const FINANCE = { email: 'finance@acme.local', password: 'Demo!Passw0rd' };
-const ACCOUNTANT = { email: 'accountant@acme.local', password: 'Demo!Passw0rd' };
+const ADMIN = { email: 'admin@acme.local', password: 'P@ssw0rd123' };
+const FINANCE = { email: 'finance@acme.local', password: 'P@ssw0rd123' };
+const ACCOUNTANT = { email: 'accountant@acme.local', password: 'P@ssw0rd123' };
 const CSRF = { 'x-requested-with': 'XMLHttpRequest' };
 type Cookies = string[];
 const AREAS = ['AR', 'AP', 'INVENTORY', 'FIXED_ASSETS', 'TAX'] as const;
@@ -120,7 +120,7 @@ describe('Financial close (e2e)', () => {
     expect(dup.body.code).toBe('DUPLICATE');
     await as(
       http().post('/api/v1/financial-closes'),
-      await login({ email: 'viewer@acme.local', password: 'Demo!Passw0rd' }),
+      await login({ email: 'viewer@acme.local', password: 'P@ssw0rd123' }),
     )
       .send({ fiscalPeriodId: jan.id })
       .expect(403);

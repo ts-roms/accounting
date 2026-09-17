@@ -22,6 +22,7 @@ import { DelegationsModule } from './modules/delegations/delegations.module';
 import { ApiKeysModule } from './modules/integrations/api-keys/api-keys.module';
 import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { OutboxModule } from './modules/integrations/events/outbox.module';
+import { AuthorizationCacheModule } from './modules/rbac/authorization-cache.service';
 import { NotificationsModule } from './modules/integrations/notifications/notifications.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AttachmentsModule } from './modules/attachments/attachments.module';
@@ -93,6 +94,7 @@ import { UsersModule } from './modules/users/users.module';
     DatabaseModule,
     AuditModule,
     OutboxModule,
+    AuthorizationCacheModule,
     NotificationsModule,
     HealthModule,
     JobsModule,

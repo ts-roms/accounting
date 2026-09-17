@@ -8,8 +8,8 @@ import { runMigrations } from '@/database/migrate';
 import { runSeed } from '@/database/seed/seed';
 
 const DB_URL = process.env.DATABASE_URL!;
-const ADMIN = { email: 'admin@acme.local', password: 'Admin!Passw0rd' };
-const FINANCE = { email: 'finance@acme.local', password: 'Demo!Passw0rd' };
+const ADMIN = { email: 'admin@acme.local', password: 'P@ssw0rd123' };
+const FINANCE = { email: 'finance@acme.local', password: 'P@ssw0rd123' };
 const CSRF = { 'x-requested-with': 'XMLHttpRequest' };
 type Cookies = string[];
 
@@ -421,7 +421,7 @@ describe('Enterprise: multi-currency, intercompany, workflows, attachments (e2e)
   let bigEntryId: string;
 
   it('a two-step workflow gates journal approval above its amount band', async () => {
-    const accountant = await login({ email: 'accountant@acme.local', password: 'Demo!Passw0rd' });
+    const accountant = await login({ email: 'accountant@acme.local', password: 'P@ssw0rd123' });
     const workflow = await as(http().post('/api/v1/approval-workflows'))
       .send({
         documentType: 'JOURNAL_ENTRY',
@@ -519,7 +519,7 @@ describe('Enterprise: multi-currency, intercompany, workflows, attachments (e2e)
   });
 
   it('a rejection ends the request; deactivating the workflow lifts the gate', async () => {
-    const accountant = await login({ email: 'accountant@acme.local', password: 'Demo!Passw0rd' });
+    const accountant = await login({ email: 'accountant@acme.local', password: 'P@ssw0rd123' });
     const je = await as(http().post('/api/v1/journal-entries'), accountant)
       .send({
         entryDate: '2026-09-11',

@@ -9,11 +9,11 @@ import { runSeed } from '@/database/seed/seed';
 import { DelegationsService } from '@/modules/delegations/delegations.service';
 
 const DB_URL = process.env.DATABASE_URL!;
-const ADMIN = { email: 'admin@acme.local', password: 'Admin!Passw0rd' };
-const FINANCE = { email: 'finance@acme.local', password: 'Demo!Passw0rd' };
-const ACCOUNTANT = { email: 'accountant@acme.local', password: 'Demo!Passw0rd' };
-const AUDITOR = { email: 'auditor@acme.local', password: 'Demo!Passw0rd' };
-const VIEWER = { email: 'viewer@acme.local', password: 'Demo!Passw0rd' };
+const ADMIN = { email: 'admin@acme.local', password: 'P@ssw0rd123' };
+const FINANCE = { email: 'finance@acme.local', password: 'P@ssw0rd123' };
+const ACCOUNTANT = { email: 'accountant@acme.local', password: 'P@ssw0rd123' };
+const AUDITOR = { email: 'auditor@acme.local', password: 'P@ssw0rd123' };
+const VIEWER = { email: 'viewer@acme.local', password: 'P@ssw0rd123' };
 const CSRF = { 'x-requested-with': 'XMLHttpRequest' };
 type Cookies = string[];
 

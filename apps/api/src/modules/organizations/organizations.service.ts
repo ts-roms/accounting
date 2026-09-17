@@ -8,6 +8,7 @@ import type {
   UpdateOrganizationInput,
 } from '@accounting/validation';
 import { AuditService } from '@/modules/audit/audit.service';
+import { AuthorizationCacheService } from '@/modules/rbac/authorization-cache.service';
 import { DuplicateError, NotFoundError } from '@/common/errors/app-error';
 import { shallowDiff } from '@/common/utils/diff';
 import { isUniqueViolation } from '@/common/utils/pg-errors';
@@ -28,6 +29,7 @@ export class OrganizationsService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly audit: AuditService,
+    private readonly cache: AuthorizationCacheService,
   ) {}
 
   // ---------------------------------------------------------------- organization
@@ -51,6 +53,8 @@ export class OrganizationsService {
         .where(eq(organizations.id, id))
         .returning();
       if (!updated) throw new Error('Update returned no row');
+      // Company status changes what every user may access.
+      this.cache.invalidateAll();
       const { previous, next } = shallowDiff(existing, updated);
       await this.audit.record(
         {

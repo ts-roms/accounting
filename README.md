@@ -36,7 +36,7 @@ pnpm db:seed
 pnpm dev                   # web http://localhost:3000  |  api http://localhost:3001/api/v1  |  docs /api/docs
 ```
 
-Sign in with `admin@acme.local` / `Admin!Passw0rd` (other demo users in
+Sign in with `admin@acme.local` / `P@ssw0rd123` (other demo users in
 [docs/deployment.md](docs/deployment.md)).
 
 ## Repository layout

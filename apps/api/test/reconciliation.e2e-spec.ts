@@ -8,9 +8,9 @@ import { runMigrations } from '@/database/migrate';
 import { runSeed } from '@/database/seed/seed';
 
 const DB_URL = process.env.DATABASE_URL!;
-const ADMIN = { email: 'admin@acme.local', password: 'Admin!Passw0rd' };
-const FINANCE = { email: 'finance@acme.local', password: 'Demo!Passw0rd' };
-const ACCOUNTANT = { email: 'accountant@acme.local', password: 'Demo!Passw0rd' };
+const ADMIN = { email: 'admin@acme.local', password: 'P@ssw0rd123' };
+const FINANCE = { email: 'finance@acme.local', password: 'P@ssw0rd123' };
+const ACCOUNTANT = { email: 'accountant@acme.local', password: 'P@ssw0rd123' };
 const CSRF = { 'x-requested-with': 'XMLHttpRequest' };
 type Cookies = string[];
 const AREAS = ['AR', 'AP', 'INVENTORY', 'FIXED_ASSETS', 'TAX'] as const;
@@ -109,7 +109,7 @@ describe('Subledger reconciliation (e2e)', () => {
     const list = await as(http().get('/api/v1/reconciliations?area=AR')).expect(200);
     expect(list.body.total).toBe(1);
     expect(list.body.items[0].id).toBe(again.body.id);
-    const viewer = await login({ email: 'viewer@acme.local', password: 'Demo!Passw0rd' });
+    const viewer = await login({ email: 'viewer@acme.local', password: 'P@ssw0rd123' });
     await as(http().post('/api/v1/reconciliations'), viewer)
       .send({ area: 'AR', asOf: '2026-12-31' })
       .expect(403);

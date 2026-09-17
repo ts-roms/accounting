@@ -8,6 +8,7 @@ import type {
   UpdateUserInput,
 } from '@accounting/validation';
 import { AuditService } from '@/modules/audit/audit.service';
+import { AuthorizationCacheService } from '@/modules/rbac/authorization-cache.service';
 import { RoleAssignmentService } from '@/modules/rbac/role-assignment.service';
 import { BusinessRuleError, DuplicateError, NotFoundError } from '@/common/errors/app-error';
 import { ErrorCodes } from '@/common/errors/error-codes';
@@ -60,6 +61,7 @@ export class UsersService {
     private readonly audit: AuditService,
     private readonly passwords: PasswordService,
     private readonly assignments: RoleAssignmentService,
+    private readonly cache: AuthorizationCacheService,
   ) {}
 
   async list(organizationId: string, query: ListUsersQuery): Promise<PaginatedResult<UserView>> {
@@ -188,6 +190,7 @@ export class UsersService {
         },
         tx,
       );
+      this.cache.invalidateUser(id);
       return toUserView(updated);
     });
   }
@@ -230,6 +233,7 @@ export class UsersService {
         },
         tx,
       );
+      this.cache.invalidateUser(id);
       return toUserView(updated);
     });
   }

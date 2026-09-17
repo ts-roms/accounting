@@ -4,6 +4,7 @@ import { PinoLogger } from 'nestjs-pino';
 import type { DelegatedGrant } from '@accounting/types';
 import type { ChangePasswordInput, LoginInput } from '@accounting/validation';
 import { AuditService } from '@/modules/audit/audit.service';
+import { AuthorizationCacheService } from '@/modules/rbac/authorization-cache.service';
 import { OrganizationsService } from '@/modules/organizations/organizations.service';
 import { PermissionResolverService } from '@/modules/rbac/permission-resolver.service';
 import { PasswordService } from '@/modules/users/password.service';
@@ -50,6 +51,7 @@ export class AuthService {
     private readonly resolver: PermissionResolverService,
     private readonly organizations: OrganizationsService,
     private readonly logger: PinoLogger,
+    private readonly cache: AuthorizationCacheService,
   ) {
     this.logger.setContext(AuthService.name);
   }
@@ -105,6 +107,8 @@ export class AuthService {
           .where(eq(users.id, user.id));
       }
 
+      // A fresh sign-in always rebuilds the authorization context (roles changed out of band, etc.).
+      this.cache.invalidateUser(user.id);
       const { sessionId, tokens } = await this.createSession(tx, updated);
       await this.audit.record(
         {
@@ -236,6 +240,7 @@ export class AuthService {
         .update(users)
         .set({ passwordHash, passwordChangedAt: new Date() })
         .where(eq(users.id, user.id));
+      this.cache.invalidateUser(user.id);
       // Invalidate every other session; the current one stays valid.
       await tx
         .update(sessions)
@@ -339,6 +344,7 @@ export class AuthService {
           lockedUntil: lock ? new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000) : null,
         })
         .where(eq(users.id, user.id));
+      if (lock) this.cache.invalidateUser(user.id);
       await this.audit.record(
         {
           action: 'LOGIN_FAILED',

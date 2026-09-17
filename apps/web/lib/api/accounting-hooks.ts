@@ -158,11 +158,12 @@ export const useCloseFiscalYear = () => {
 
 // ----------------------------------------------------------------- journals
 
-export const useJournalEntries = (query: Partial<ListJournalEntriesQuery>) =>
+export const useJournalEntries = (query: Partial<ListJournalEntriesQuery>, enabled = true) =>
   useQuery({
     queryKey: accountingKeys.journals(query),
     queryFn: () => api.get<PaginatedResult<JournalEntryView>>('/journal-entries', { query }),
     placeholderData: (prev) => prev,
+    enabled,
   });
 
 export const useJournalEntry = (id: string | null) =>

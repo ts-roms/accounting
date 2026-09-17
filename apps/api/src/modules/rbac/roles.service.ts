@@ -6,6 +6,7 @@ import type {
   UpdateRoleInput,
 } from '@accounting/validation';
 import { AuditService } from '@/modules/audit/audit.service';
+import { AuthorizationCacheService } from '@/modules/rbac/authorization-cache.service';
 import { BusinessRuleError, DuplicateError, NotFoundError } from '@/common/errors/app-error';
 import { ErrorCodes } from '@/common/errors/error-codes';
 import { shallowDiff } from '@/common/utils/diff';
@@ -32,6 +33,7 @@ export class RolesService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly audit: AuditService,
+    private readonly cache: AuthorizationCacheService,
   ) {}
 
   async listPermissions(): Promise<Permission[]> {
@@ -132,6 +134,8 @@ export class RolesService {
       );
       return created.id;
     });
+    // Every holder of the role is affected.
+    this.cache.invalidateAll();
     return this.getWithPermissions(organizationId, id);
   }
 

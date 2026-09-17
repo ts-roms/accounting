@@ -11,9 +11,9 @@ import { RuntimeStatusService } from '@/modules/operations/runtime-status.servic
 import { StaleJobsService } from '@/modules/operations/stale-jobs.service';
 
 const DB_URL = process.env.DATABASE_URL!;
-const ADMIN = { email: 'admin@acme.local', password: 'Admin!Passw0rd' };
-const AUDITOR = { email: 'auditor@acme.local', password: 'Demo!Passw0rd' };
-const VIEWER = { email: 'viewer@acme.local', password: 'Demo!Passw0rd' };
+const ADMIN = { email: 'admin@acme.local', password: 'P@ssw0rd123' };
+const AUDITOR = { email: 'auditor@acme.local', password: 'P@ssw0rd123' };
+const VIEWER = { email: 'viewer@acme.local', password: 'P@ssw0rd123' };
 const CSRF = { 'x-requested-with': 'XMLHttpRequest' };
 type Cookies = string[];
 

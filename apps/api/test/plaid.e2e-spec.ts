@@ -11,7 +11,7 @@ import { IntegrationsService } from '@/modules/integrations/core/integrations.se
 import { JobRunnerService } from '@/modules/jobs/job-runner.service';
 
 const DB_URL = process.env.DATABASE_URL!;
-const ADMIN = { email: 'admin@acme.local', password: 'Admin!Passw0rd' };
+const ADMIN = { email: 'admin@acme.local', password: 'P@ssw0rd123' };
 const CSRF = { 'x-requested-with': 'XMLHttpRequest' };
 type Cookies = string[];
 
