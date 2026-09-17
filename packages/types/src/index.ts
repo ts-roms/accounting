@@ -17,3 +17,4 @@ export * from './receivables';
 export * from './payables';
 export * from './treasury';
 export * from './consolidation';
+export * from './revenue';

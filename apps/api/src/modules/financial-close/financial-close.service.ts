@@ -34,6 +34,8 @@ import {
   journalEntries,
   reconciliationExceptions,
   reconciliations,
+  revenueScheduleLines,
+  revenueSchedules,
   users,
   type AccountingPolicy,
   type CloseTask,
@@ -117,6 +119,12 @@ const TEMPLATE: Array<{
   { key: 'MANUAL_ACCRUALS', title: 'Accruals reviewed and posted', kind: 'MANUAL', required: true },
   { key: 'MANUAL_PREPAYMENTS', title: 'Prepayments recognised', kind: 'MANUAL', required: true },
   { key: 'FX_REVALUATION', title: 'FX revaluation run', kind: 'AUTO', required: false },
+  {
+    key: 'REVENUE_RECOGNITION',
+    title: 'Deferred revenue recognized',
+    kind: 'AUTO',
+    required: true,
+  },
   { key: 'TAX_RECONCILIATION', title: 'Tax reconciliation approved', kind: 'AUTO', required: true },
   {
     key: 'MANUAL_INTERCOMPANY',
@@ -712,6 +720,32 @@ export class FinancialCloseService {
       fx ? `FX revaluation run as of ${end}` : `No FX revaluation as of ${end}`,
     );
 
+    // Deferred revenue due by the period end that no recognition run has posted (Prompt #10).
+    const [dueRevenue] = await this.db
+      .select({
+        n: sql<number>`count(*)::int`,
+        amount: sql<string>`coalesce(sum(${revenueScheduleLines.amount}), 0)`,
+      })
+      .from(revenueScheduleLines)
+      .innerJoin(revenueSchedules, eq(revenueSchedules.id, revenueScheduleLines.scheduleId))
+      .where(
+        and(
+          eq(revenueSchedules.companyId, companyId),
+          eq(revenueSchedules.status, 'ACTIVE'),
+          eq(revenueScheduleLines.status, 'PENDING'),
+          lte(revenueScheduleLines.recognitionDate, end),
+          sql`(${revenueSchedules.method} <> 'MILESTONE' or ${revenueScheduleLines.completedAt} is not null)`,
+        ),
+      );
+    push(
+      'REVENUE_RECOGNITION',
+      (dueRevenue?.n ?? 0) === 0,
+      dueRevenue?.n
+        ? `${dueRevenue.n} deferred revenue line(s) due by ${end} (${dueRevenue.amount}) await a recognition run`
+        : `Deferred revenue due by ${end} is recognized`,
+      { pendingLines: dueRevenue?.n ?? 0, pendingAmount: dueRevenue?.amount ?? '0' },
+    );
+
     // Journals still in draft / submitted / approved inside the period.
     const unposted = await this.db
       .select({ documentNumber: journalEntries.documentNumber, status: journalEntries.status })
@@ -873,6 +907,7 @@ function blockersFrom(checks: CheckResult[], policy: AccountingPolicy): CloseBlo
     TAX_RECONCILIATION: policy.closeRequireReconciliations,
     DEPRECIATION: policy.closeRequireDepreciation,
     FX_REVALUATION: policy.closeRequireFxRevaluation,
+    REVENUE_RECOGNITION: policy.closeRequireRevenueRecognition,
     UNAPPROVED_JOURNALS: policy.closeBlockOnUnapprovedJournals,
     OPEN_RECONCILIATION_EXCEPTIONS: policy.closeBlockOnOpenExceptions,
     TRIAL_BALANCE: true,

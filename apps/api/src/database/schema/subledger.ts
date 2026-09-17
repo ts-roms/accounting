@@ -24,6 +24,7 @@ import {
   MATCH_STATUSES,
   SUBLEDGER_DOCUMENT_TYPES,
   type MatchException,
+  type RevenueMilestone,
 } from '@accounting/types';
 import { entityStatusEnum, primaryId, timestamps } from './_shared';
 import { accounts, journalEntries, money } from './accounting';
@@ -42,6 +43,7 @@ import {
 } from './receivables';
 import { goodsReceipts } from './orders';
 import { paymentRuns, vendorGroups, vendorStatusEnum, vendorTypeEnum } from './payables';
+import { revenuePolicies } from './revenue';
 import { users } from './users';
 
 export const customerTypeEnum = pgEnum('customer_type', CUSTOMER_TYPES);
@@ -359,6 +361,13 @@ export const invoiceLines = pgTable(
     invoiceId: uuid('invoice_id')
       .notNull()
       .references(() => invoices.id, { onDelete: 'cascade' }),
+    /** Revenue recognition (Prompt #10): explicit policy, service window and milestones. */
+    revenuePolicyId: uuid('revenue_policy_id').references((): AnyPgColumn => revenuePolicies.id, {
+      onDelete: 'restrict',
+    }),
+    serviceStartDate: date('service_start_date'),
+    serviceEndDate: date('service_end_date'),
+    milestones: jsonb('milestones').$type<RevenueMilestone[]>().notNull().default([]),
   },
   (t) => [
     uniqueIndex('invoice_lines_number_uq').on(t.invoiceId, t.lineNumber),

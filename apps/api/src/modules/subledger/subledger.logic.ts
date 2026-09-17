@@ -5,6 +5,7 @@ import {
   type SubledgerDocumentStatus,
   type SubledgerDocumentType,
 } from '@accounting/types';
+import type { RevenueMilestone } from '@accounting/types';
 import type { DocumentLineInput } from '@accounting/validation';
 import { BusinessRuleError } from '@/common/errors/app-error';
 import { ErrorCodes } from '@/common/errors/error-codes';
@@ -30,6 +31,11 @@ export interface ComputedLine {
   projectId: string | null;
   taxCodeId: string | null;
   withholdingTaxCodeId: string | null;
+  /** Revenue recognition (Prompt #10) - stored on invoice lines only. */
+  revenuePolicyId: string | null;
+  serviceStartDate: string | null;
+  serviceEndDate: string | null;
+  milestones: RevenueMilestone[];
 }
 
 /** Gross = quantity x unit price; net = gross x (1 - discount%), each rounded half-even to 4 places. */
@@ -73,6 +79,10 @@ export function computeLines(
       projectId: line.projectId ?? null,
       taxCodeId: line.taxCodeId ?? null,
       withholdingTaxCodeId: line.withholdingTaxCodeId ?? null,
+      revenuePolicyId: line.revenuePolicyId ?? null,
+      serviceStartDate: line.serviceStartDate ?? null,
+      serviceEndDate: line.serviceEndDate ?? null,
+      milestones: line.milestones ?? [],
     };
   });
   if (subtotal.isZero()) {

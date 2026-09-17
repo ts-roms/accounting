@@ -139,6 +139,7 @@ describe('navigation', () => {
         'settings',
       ].map((p) => `/treasury/${p}`),
       ...['groups', 'runs', 'intercompany-reconciliation'].map((p) => `/consolidation/${p}`),
+      ...['schedules', 'runs', 'reports', 'policies'].map((p) => `/revenue/${p}`),
     ]);
     for (const section of NAVIGATION) {
       for (const item of section.items) {

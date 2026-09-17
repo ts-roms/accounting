@@ -75,6 +75,7 @@ import { NotificationsService } from '@/modules/integrations/notifications/notif
 import { ApprovalsService } from '@/modules/workflows/approvals.service';
 import { ArConfigService } from './ar-config.service';
 import { CreditService } from './credit.service';
+import { RevenueSchedulesService } from '@/modules/revenue/revenue-schedules.service';
 import { dueDateFor, type CreditFinding } from './receivables.logic';
 
 const MODULE = 'RECEIVABLES';
@@ -150,6 +151,7 @@ export class InvoicesService {
     private readonly approvals: ApprovalsService,
     private readonly config: ArConfigService,
     private readonly credit: CreditService,
+    private readonly revenue: RevenueSchedulesService,
   ) {}
 
   // ----------------------------------------------------------------- queries
@@ -290,6 +292,13 @@ export class InvoicesService {
       );
       await this.stock.validateLines(tx, companyId, lines);
       await this.dimensions.validateRefs(tx, companyId, lines, input.documentDate);
+      await this.revenue.validateDraftLines(
+        tx,
+        companyId,
+        input.documentType,
+        input.documentDate,
+        lines,
+      );
       const taxed = await this.tax.applyToLines(
         tx,
         companyId,
@@ -459,6 +468,13 @@ export class InvoicesService {
         );
         await this.stock.validateLines(tx, companyId, lines);
         await this.dimensions.validateRefs(tx, companyId, lines, documentDate);
+        await this.revenue.validateDraftLines(
+          tx,
+          companyId,
+          existing.documentType,
+          documentDate,
+          lines,
+        );
         const taxed = await this.tax.applyToLines(
           tx,
           companyId,
@@ -756,6 +772,13 @@ export class InvoicesService {
           .set({ costAmount: cost.toString() })
           .where(eq(invoiceLines.id, lineId));
       }
+      // Lines under a deferring revenue policy credit DEFERRED_REVENUE and get a schedule (Prompt #10).
+      const deferral = await this.revenue.deferInvoiceLines(
+        tx,
+        companyId,
+        { ...existing, currency: baseCurrency },
+        baseLines,
+      );
       const entry = await this.posting.postEvent(
         tx,
         {
@@ -776,7 +799,7 @@ export class InvoicesService {
               description: `${existing.documentNumber} - customer receivable`,
             },
             ...baseLines.map((l) => ({
-              accountId: l.accountId,
+              accountId: deferral.deferredAccountByLine.get(l.id) ?? l.accountId,
               debit: debitSide ? '0' : l.amount,
               credit: debitSide ? l.amount : '0',
               description: l.description,
@@ -900,6 +923,8 @@ export class InvoicesService {
       let reversalId: string | null = null;
       if (existing.accountingStatus === 'POSTED' && existing.journalEntryId) {
         const reversalDate = input.reversalDate ?? existing.documentDate;
+        // Deferred revenue already recognized cannot be unwound by a void (Prompt #10).
+        await this.revenue.cancelForInvoice(tx, companyId, existing.id);
         // Stock goes back the way it came (at the original cost) so the mirror entry stays exact.
         const stockReversal = await this.inventory.reverseDocument(
           tx,

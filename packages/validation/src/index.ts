@@ -23,3 +23,4 @@ export * from './reporting-engine';
 export * from './operations';
 export * from './treasury';
 export * from './consolidation';
+export * from './revenue';

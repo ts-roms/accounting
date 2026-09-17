@@ -143,6 +143,8 @@ export const CLOSE_AUTO_CHECKS = [
   'TRIAL_BALANCE',
   'INTEGRITY',
   'SUSPENSE_BALANCES',
+  /** No deferred revenue due in the period is still waiting for a recognition run (Prompt #10). */
+  'REVENUE_RECOGNITION',
 ] as const;
 export type CloseAutoCheck = (typeof CLOSE_AUTO_CHECKS)[number];
 

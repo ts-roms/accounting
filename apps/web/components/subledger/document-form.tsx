@@ -42,6 +42,7 @@ import { useTaxCodes } from '@/lib/api/budgeting-tax-hooks';
 import { useResolvedRate } from '@/lib/api/enterprise-hooks';
 import { SuggestAccountButton } from '@/components/ai/suggest-account';
 import { PartyCombobox } from './party-combobox';
+import { RevenueLinePopover } from '@/components/receivables/revenue-line';
 
 /** Superset of the invoice and bill inputs; the resolver enforces the side-specific schema. */
 export type DocumentFormInput = z.input<typeof createInvoiceSchema> &
@@ -140,6 +141,10 @@ function toFormValues(
       departmentId: l.departmentId,
       costCenterId: l.costCenterId,
       projectId: l.projectId,
+      revenuePolicyId: l.revenuePolicyId ?? null,
+      serviceStartDate: l.serviceStartDate ?? null,
+      serviceEndDate: l.serviceEndDate ?? null,
+      milestones: l.milestones?.length ? l.milestones : undefined,
     })),
   };
 }
@@ -622,7 +627,47 @@ export function DocumentForm({
                       />
                     </TableCell>
                   ) : null}
-                  <TableCell>
+                  <TableCell className="flex items-center gap-1">
+                    {cfg.side === 'AR' && documentType === 'INVOICE' ? (
+                      <RevenueLinePopover
+                        value={{
+                          revenuePolicyId: watchedLines?.[index]?.revenuePolicyId,
+                          serviceStartDate: watchedLines?.[index]?.serviceStartDate,
+                          serviceEndDate: watchedLines?.[index]?.serviceEndDate,
+                          milestones: watchedLines?.[index]?.milestones,
+                        }}
+                        onChange={(next) => {
+                          form.setValue(
+                            `lines.${index}.revenuePolicyId`,
+                            next.revenuePolicyId ?? null,
+                            {
+                              shouldDirty: true,
+                            },
+                          );
+                          form.setValue(
+                            `lines.${index}.serviceStartDate`,
+                            next.serviceStartDate ?? null,
+                            {
+                              shouldDirty: true,
+                            },
+                          );
+                          form.setValue(
+                            `lines.${index}.serviceEndDate`,
+                            next.serviceEndDate ?? null,
+                            {
+                              shouldDirty: true,
+                            },
+                          );
+                          form.setValue(
+                            `lines.${index}.milestones`,
+                            next.milestones?.length ? next.milestones : undefined,
+                            {
+                              shouldDirty: true,
+                            },
+                          );
+                        }}
+                      />
+                    ) : null}
                     <DimensionsPopover
                       value={{
                         departmentId: watchedLines?.[index]?.departmentId,

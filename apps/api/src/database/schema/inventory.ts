@@ -30,6 +30,7 @@ import {
 import { entityStatusEnum, primaryId, timestamps } from './_shared';
 import { accounts, journalEntries, money } from './accounting';
 import { branches, companies } from './organizations';
+import { revenuePolicies } from './revenue';
 import { users } from './users';
 
 export const productTypeEnum = pgEnum('product_type', PRODUCT_TYPES);
@@ -97,6 +98,10 @@ export const products = pgTable(
     unitOfMeasure: text('unit_of_measure').notNull().default('pc'),
     barcode: text('barcode'),
     salePrice: money('sale_price'),
+    /** Revenue recognition policy applied to invoice lines of this product (Prompt #10). */
+    revenuePolicyId: uuid('revenue_policy_id').references((): AnyPgColumn => revenuePolicies.id, {
+      onDelete: 'set null',
+    }),
     purchasePrice: money('purchase_price'),
     standardCost: money('standard_cost'),
     reorderLevel: money('reorder_level'),
