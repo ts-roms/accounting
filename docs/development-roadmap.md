@@ -385,6 +385,15 @@ rollforward / waterfall / backlog reports proven against the ledger, a
 financial-close check, a scheduled job and integrity checks. See
 `docs/revenue-recognition/`.
 
+### Prompt #11 - Payroll & employee expenses (COMPLETE)
+
+Employee master and pay items as data (earnings, deductions, progressive
+withholding, employer contributions), pay runs (calculate / four-eyes
+approve / post one journal / pay from the bank / reverse), reimbursement of
+posted expense claims through payroll, payroll reports (cost, withholding
+remittance, employee YTD), a financial-close check, a treasury forecast
+source, pay-date reminders and integrity checks. See `docs/payroll/`.
+
 ## Beyond the roadmap
 
 All nine phases of the specification are delivered. Candidates for follow-up

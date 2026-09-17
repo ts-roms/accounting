@@ -19,6 +19,7 @@ export const PERMISSION_MODULES = [
   'AUDIT',
   'AI',
   'INTEGRATIONS',
+  'PAYROLL',
 ] as const;
 
 export type PermissionModule = (typeof PERMISSION_MODULES)[number];
@@ -85,6 +86,13 @@ export const PERMISSION_DEFINITIONS = [
   ),
   define('revenue.manage', 'ACCOUNTING', 'Maintain revenue policies, settings and milestones'),
   define('revenue.recognize', 'ACCOUNTING', 'Post and reverse revenue recognition runs'),
+  // Payroll (Prompt #11)
+  define('employee.view', 'PAYROLL', 'View employees'),
+  define('employee.manage', 'PAYROLL', 'Create and update employees and their pay assignments'),
+  define('payroll.view', 'PAYROLL', 'View pay items, pay runs, payslips and payroll reports'),
+  define('payroll.manage', 'PAYROLL', 'Maintain pay items and settings; create, calculate and submit pay runs'),
+  define('payroll.approve', 'PAYROLL', 'Approve pay runs'),
+  define('payroll.post', 'PAYROLL', 'Post, pay and reverse pay runs'),
   define('posting-rule.view', 'ACCOUNTING', 'View posting rules'),
   define(
     'posting-rule.manage',

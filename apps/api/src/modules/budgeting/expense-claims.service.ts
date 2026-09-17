@@ -1,5 +1,17 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, getTableColumns, gte, lte, or, sql, type SQL } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  getTableColumns,
+  gte,
+  inArray,
+  lte,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import { Money } from '@accounting/money';
 import { P, type ExpenseClaimStatus, type PaginatedResult } from '@accounting/types';
 import type {
@@ -600,6 +612,102 @@ export class ExpenseClaimsService {
       );
     });
     return this.get(companyId, id);
+  }
+
+  // ------------------------------------------------------------ payroll hooks
+
+  /** Posted (unpaid) claims of these users, for reimbursement through a pay run (Prompt #11). */
+  async postedClaimsForUsers(
+    tx: DbExecutor,
+    companyId: string,
+    userIds: readonly string[],
+  ): Promise<Array<{ id: string; claimNumber: string; claimantUserId: string; total: string }>> {
+    if (userIds.length === 0) return [];
+    return tx
+      .select({
+        id: expenseClaims.id,
+        claimNumber: expenseClaims.claimNumber,
+        claimantUserId: expenseClaims.claimantUserId,
+        total: expenseClaims.total,
+      })
+      .from(expenseClaims)
+      .where(
+        and(
+          eq(expenseClaims.companyId, companyId),
+          eq(expenseClaims.status, 'POSTED'),
+          inArray(expenseClaims.claimantUserId, [...userIds]),
+        ),
+      )
+      .orderBy(asc(expenseClaims.claimDate));
+  }
+
+  /**
+   * Marks claims settled by a pay run's payment journal (which debited the
+   * employee payable for them). Refuses when a claim is no longer POSTED -
+   * it was paid or cancelled since the run was calculated.
+   */
+  async settleThroughPayroll(
+    tx: DbExecutor,
+    companyId: string,
+    actor: AuthenticatedUser,
+    claimIds: readonly string[],
+    payment: {
+      journalEntryId: string;
+      bankAccountId: string;
+      paymentDate: string;
+      reference: string;
+    },
+  ): Promise<void> {
+    if (claimIds.length === 0) return;
+    const rows = await tx
+      .select({
+        id: expenseClaims.id,
+        claimNumber: expenseClaims.claimNumber,
+        status: expenseClaims.status,
+      })
+      .from(expenseClaims)
+      .where(and(eq(expenseClaims.companyId, companyId), inArray(expenseClaims.id, [...claimIds])))
+      .for('update');
+    const stale = rows.filter((r) => r.status !== 'POSTED');
+    if (stale.length || rows.length !== claimIds.length)
+      throw new BusinessRuleError(
+        ErrorCodes.DOCUMENT_INVALID_STATE,
+        `Expense claim(s) ${stale.map((r) => r.claimNumber).join(', ') || 'missing'} are no longer awaiting payment - recalculate the pay run.`,
+      );
+    await tx
+      .update(expenseClaims)
+      .set({
+        status: 'PAID',
+        paymentJournalEntryId: payment.journalEntryId,
+        paymentBankAccountId: payment.bankAccountId,
+        paymentDate: payment.paymentDate,
+        paymentReference: payment.reference,
+        paidBy: actor.id,
+        paidAt: new Date(),
+      })
+      .where(inArray(expenseClaims.id, [...claimIds]));
+    for (const r of rows)
+      await this.audit.record(
+        {
+          action: 'POST',
+          module: MODULE,
+          entityType: 'ExpenseClaim',
+          entityId: r.id,
+          previousValue: { status: 'POSTED' },
+          newValue: {
+            status: 'PAID',
+            paymentJournalEntryId: payment.journalEntryId,
+            via: 'PAYROLL',
+          },
+          metadata: {
+            actor: actor.email,
+            claimNumber: r.claimNumber,
+            reference: payment.reference,
+          },
+          companyId,
+        },
+        tx,
+      );
   }
 
   // ----------------------------------------------------------------- helpers

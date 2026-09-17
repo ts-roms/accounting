@@ -2035,6 +2035,7 @@ export interface AccountingPolicy {
   closeRequireBankReconciliation: boolean;
   closeRequireDepreciation: boolean;
   closeRequireRevenueRecognition: boolean;
+  closeRequirePayrollPosted: boolean;
   closeRequireFxRevaluation: boolean;
   closeBlockOnUnapprovedJournals: boolean;
   closeBlockOnOpenExceptions: boolean;

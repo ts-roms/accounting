@@ -109,6 +109,13 @@ export const DEFAULT_SOD_POLICIES: readonly SodPolicyDefinition[] = [
     enforcement: 'WARN',
   },
   {
+    name: 'Payroll preparer vs approver',
+    description: 'A user who prepares pay runs should not approve them.',
+    permissionA: P['payroll.manage'],
+    permissionB: P['payroll.approve'],
+    enforcement: 'WARN',
+  },
+  {
     name: 'Petty cash preparer vs approver',
     description:
       'A user who prepares petty cash vouchers should not approve them above the fund limit.',

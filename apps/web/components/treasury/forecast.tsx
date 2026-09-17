@@ -60,6 +60,7 @@ const SOURCE_LABEL: Record<string, string> = {
   AR_PROMISES: 'Promises to pay',
   AP_BILLS: 'Vendor bills',
   AP_PAYMENT_RUNS: 'Approved payment runs',
+  PAYROLL: 'Pay runs',
   TRANSFERS: 'Transfers in flight',
   RECURRING: 'Recurring journals',
   PLANNED: 'Planned items',

@@ -85,7 +85,9 @@ export const FORECAST_SOURCES = [
   'AP_BILLS',
   /** Approved / submitted payment runs on their payment date. */
   'AP_PAYMENT_RUNS',
-  /** Planned items (payroll, rent, loans, taxes) maintained by treasury. */
+  /** Calculated / approved / posted-unpaid pay runs on their pay date (Prompt #11). */
+  'PAYROLL',
+  /** Planned items (rent, loans, taxes) maintained by treasury. */
   'PLANNED',
   /** Recurring journals with a cash account line. */
   'RECURRING',

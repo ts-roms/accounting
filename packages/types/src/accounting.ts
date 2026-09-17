@@ -172,6 +172,10 @@ export const ACCOUNT_MAPPING_KEYS = [
   'SHARE_OF_ASSOCIATE_PROFIT',
   /** Unearned revenue on invoices recognized over time (Prompt #10). */
   'DEFERRED_REVENUE',
+  /** Payroll (Prompt #11): gross pay expense, employer contributions expense, statutory payables. */
+  'SALARY_EXPENSE',
+  'EMPLOYER_CONTRIBUTION_EXPENSE',
+  'STATUTORY_CONTRIBUTIONS_PAYABLE',
 ] as const;
 export type AccountMappingKey = (typeof ACCOUNT_MAPPING_KEYS)[number];
 
@@ -224,6 +228,9 @@ export const DOCUMENT_TYPES = [
   'CON',
   /** Revenue recognition run (Prompt #10). */
   'RRN',
+  /** Employee number and pay run (Prompt #11). */
+  'EMP',
+  'PYR',
 ] as const;
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
 

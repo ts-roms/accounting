@@ -94,6 +94,7 @@ const DOCUMENT_PATH: Record<WorkflowDocumentType, string> = {
   BANK_TRANSFER: '/treasury/transfers',
   PETTY_CASH_VOUCHER: '/treasury/petty-cash',
   CONSOLIDATION_RUN: '/consolidation/runs',
+  PAY_RUN: '/payroll/runs',
 };
 const STATUS_VARIANT: Record<
   ApprovalRequestStatus,
