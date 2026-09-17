@@ -251,9 +251,8 @@ async function ensureUsers(
   log: (m: string) => void,
 ) {
   const adminEmail = options.adminEmail ?? process.env.SEED_ADMIN_EMAIL ?? 'admin@acme.local';
-  const adminPassword =
-    options.adminPassword ?? process.env.SEED_ADMIN_PASSWORD ?? 'Admin!Passw0rd';
-  const demoPassword = options.demoPassword ?? process.env.SEED_DEMO_PASSWORD ?? 'Demo!Passw0rd';
+  const adminPassword = options.adminPassword ?? process.env.SEED_ADMIN_PASSWORD ?? 'P@ssw0rd123';
+  const demoPassword = options.demoPassword ?? process.env.SEED_DEMO_PASSWORD ?? 'P@ssw0rd123';
 
   const demo: Array<{
     email: string;
@@ -337,6 +336,24 @@ async function ensureUsers(
         })
         .returning();
       log(`user created: ${u.email}`);
+    } else if (!(await argon2.verify(user.passwordHash, u.password).catch(() => false))) {
+      // Re-seeding with a different configured password resets the demo login (development data only).
+      const passwordHash = await argon2.hash(u.password, {
+        type: argon2.argon2id,
+        memoryCost: 19 * 1024,
+        timeCost: 2,
+        parallelism: 1,
+      });
+      await tx
+        .update(schema.users)
+        .set({
+          passwordHash,
+          passwordChangedAt: new Date(),
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+        })
+        .where(eq(schema.users.id, user.id));
+      log(`user password reset to the configured seed password: ${u.email}`);
     }
     if (!user) throw new Error('user insert failed');
 

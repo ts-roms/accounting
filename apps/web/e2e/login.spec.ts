@@ -1,6 +1,6 @@
 import { expect, test } from './fixtures';
 
-const ADMIN = { email: 'admin@acme.local', password: 'Admin!Passw0rd' };
+const ADMIN = { email: 'admin@acme.local', password: 'P@ssw0rd123' };
 
 test.describe('authentication', () => {
   test.use({ storageState: { cookies: [], origins: [] } });

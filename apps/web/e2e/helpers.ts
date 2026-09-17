@@ -1,7 +1,7 @@
 import { expect, type BrowserContext, type Page } from '@playwright/test';
 
-export const ADMIN = { email: 'admin@acme.local', password: 'Admin!Passw0rd' };
-export const FINANCE = { email: 'finance@acme.local', password: 'Demo!Passw0rd' };
+export const ADMIN = { email: 'admin@acme.local', password: 'P@ssw0rd123' };
+export const FINANCE = { email: 'finance@acme.local', password: 'P@ssw0rd123' };
 
 /** Storage state written by the `setup` project and re-persisted after every admin test (see fixtures.ts). */
 export const ADMIN_STATE = 'e2e/.auth/admin.json';

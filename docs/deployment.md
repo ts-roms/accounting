@@ -13,9 +13,9 @@ pnpm dev                        # turbo: packages in watch mode + API (3001) + w
 
 Or: `bash infrastructure/scripts/dev-setup.sh`.
 
-Seeded accounts (development only): `admin@acme.local / Admin!Passw0rd`
+Seeded accounts (development only): `admin@acme.local / P@ssw0rd123`
 (SUPER_ADMIN), `accountant@`, `finance@`, `auditor@`, `viewer@acme.local` with
-`Demo!Passw0rd`.
+`P@ssw0rd123`.
 
 Note: PostgreSQL is published on **5433** to coexist with a locally installed
 PostgreSQL on 5432; change `POSTGRES_HOST_PORT` / `DATABASE_URL` if needed.

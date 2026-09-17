@@ -9,6 +9,7 @@ import {
   isApiKeySecret,
 } from '@/modules/integrations/api-keys/api-key.logic';
 import { OrganizationsService } from '@/modules/organizations/organizations.service';
+import { AuthorizationCacheService } from '@/modules/rbac/authorization-cache.service';
 import { PermissionResolverService } from '@/modules/rbac/permission-resolver.service';
 import { UsersService } from '@/modules/users/users.service';
 import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
@@ -42,6 +43,7 @@ export class JwtAuthGuard implements CanActivate {
     private readonly organizations: OrganizationsService,
     private readonly apiKeys: ApiKeysService,
     private readonly delegations: DelegationsService,
+    private readonly cache: AuthorizationCacheService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -83,7 +85,7 @@ export class JwtAuthGuard implements CanActivate {
       );
 
     const [user, sessionActive] = await Promise.all([
-      this.users.findById(payload.sub),
+      this.cache.remember(payload.sub, 'user', () => this.users.findById(payload.sub)),
       this.auth.isSessionActive(payload.sid),
     ]);
     if (!user || user.organizationId !== payload.org) throw new UnauthenticatedError();
@@ -93,10 +95,17 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthenticatedError('This account is not active.', ErrorCodes.ACCOUNT_INACTIVE);
 
     const companyId = await this.resolveCompany(req, user.id, user.organizationId);
-    const [access, delegations] = await Promise.all([
-      this.resolver.resolve(user.id, companyId),
-      companyId ? this.delegations.grantsFor(user.id, companyId) : Promise.resolve([]),
-    ]);
+    const context = await this.cache.remember(user.id, `context:${companyId ?? ''}`, async () => {
+      const [access, delegations] = await Promise.all([
+        this.resolver.resolve(user.id, companyId),
+        companyId ? this.delegations.grantsFor(user.id, companyId) : Promise.resolve([]),
+      ]);
+      return { access, delegations };
+    });
+    const { access } = context;
+    // Grants expire by the clock, not by a write: never honour one past its end from the cache.
+    const nowIso = new Date().toISOString();
+    const delegations = context.delegations.filter((d) => d.endAt > nowIso);
 
     return {
       id: user.id,
@@ -131,7 +140,9 @@ export class JwtAuthGuard implements CanActivate {
         HttpStatus.TOO_MANY_REQUESTS,
         { limitPerMinute: key.rateLimitPerMinute },
       );
-    const owner = await this.users.findById(key.ownerUserId);
+    const owner = await this.cache.remember(key.ownerUserId, 'user', () =>
+      this.users.findById(key.ownerUserId),
+    );
     if (!owner || owner.organizationId !== key.organizationId || owner.status !== 'ACTIVE')
       throw new UnauthenticatedError(
         'The API key owner is not active.',
@@ -145,7 +156,9 @@ export class JwtAuthGuard implements CanActivate {
         ErrorCodes.COMPANY_NOT_ACCESSIBLE,
         { companyId },
       );
-    const ownerAccess = await this.resolver.resolve(owner.id, companyId);
+    const ownerAccess = await this.cache.remember(owner.id, `access:${companyId ?? ''}`, () =>
+      this.resolver.resolve(owner.id, companyId),
+    );
     this.apiKeys.touch(key.id);
     return {
       id: owner.id,
@@ -181,7 +194,9 @@ export class JwtAuthGuard implements CanActivate {
     if (!UUID_RE.test(raw)) {
       throw new ForbiddenError('X-Company-Id must be a UUID.', ErrorCodes.COMPANY_NOT_ACCESSIBLE);
     }
-    const accessible = await this.auth.accessibleCompanies(userId, organizationId);
+    const accessible = await this.cache.remember(userId, 'companies', () =>
+      this.auth.accessibleCompanies(userId, organizationId),
+    );
     if (!accessible.some((c) => c.id === raw)) {
       throw new ForbiddenError(
         'You do not have access to the selected company.',

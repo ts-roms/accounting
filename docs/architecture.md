@@ -94,6 +94,14 @@ Organization (tenant, reporting currency)
 - The active company is selected per request through the `X-Company-Id` header;
   `JwtAuthGuard` validates the user may act in it and resolves permissions for
   that scope. Accounting endpoints will be annotated `@CompanyScoped()`.
+- The per-request authorization context (user row, accessible companies,
+  resolved permissions, delegated grants) is remembered in-process by
+  `AuthorizationCacheService` for `AUTHZ_CACHE_TTL_MS` (default 30 s; 0
+  disables). The session row is still checked on every request, so logout and
+  revocation are immediate; role assignments, role permissions, delegations,
+  user status and company status invalidate the cache when they change, and
+  expired grants are dropped on read. Login itself is bounded by Argon2id
+  verification (~50 ms) and is not cached.
 
 ## Frontend structure
 

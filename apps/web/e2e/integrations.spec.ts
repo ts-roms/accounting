@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { login } from './helpers';
 
-const ACCOUNTANT = { email: 'accountant@acme.local', password: 'Demo!Passw0rd' };
+const ACCOUNTANT = { email: 'accountant@acme.local', password: 'P@ssw0rd123' };
 
 /** Calls the API through the page's cookie jar with the active company header. */
 async function apiCall(

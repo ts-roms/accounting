@@ -37,6 +37,7 @@ import {
   type DelegationUsage,
 } from '@/database/schema';
 import { AuditService } from '@/modules/audit/audit.service';
+import { AuthorizationCacheService } from '@/modules/rbac/authorization-cache.service';
 import { NotificationsService } from '@/modules/integrations/notifications/notifications.service';
 import { PermissionResolverService } from '@/modules/rbac/permission-resolver.service';
 import { SodService } from '@/modules/rbac/sod.service';
@@ -82,6 +83,7 @@ export class DelegationsService {
     private readonly sod: SodService,
     private readonly notifications: NotificationsService,
     private readonly logger: PinoLogger,
+    private readonly cache: AuthorizationCacheService,
   ) {
     this.logger.setContext(DelegationsService.name);
   }
@@ -466,6 +468,7 @@ export class DelegationsService {
       }
       return row!.id;
     });
+    this.cache.invalidateAll();
     return this.get(actor, id);
   }
 
@@ -539,6 +542,7 @@ export class DelegationsService {
         tx,
       );
     });
+    this.cache.invalidateAll();
     return this.get(actor, id);
   }
 
@@ -671,6 +675,7 @@ export class DelegationsService {
         );
       }
     });
+    this.cache.invalidateAll();
     return this.get(actor, id);
   }
 
@@ -726,6 +731,7 @@ export class DelegationsService {
         tx,
       );
     });
+    this.cache.invalidateAll();
     return this.get(actor, id);
   }
 
@@ -761,6 +767,7 @@ export class DelegationsService {
         tx,
       );
     });
+    this.cache.invalidateAll();
     return this.get(actor, id);
   }
 
@@ -828,6 +835,7 @@ export class DelegationsService {
         .where(eq(delegations.id, row.id));
       warned += 1;
     }
+    if (due.length) this.cache.invalidateAll();
     return { expired: due.length, warned };
   }
 

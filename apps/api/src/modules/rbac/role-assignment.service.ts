@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import type { AssignUserRoleInput } from '@accounting/validation';
 import { AuditService } from '@/modules/audit/audit.service';
+import { AuthorizationCacheService } from '@/modules/rbac/authorization-cache.service';
 import { BusinessRuleError, NotFoundError } from '@/common/errors/app-error';
 import { ErrorCodes } from '@/common/errors/error-codes';
 import { isUniqueViolation } from '@/common/utils/pg-errors';
@@ -38,6 +39,7 @@ export class RoleAssignmentService {
     private readonly rolesService: RolesService,
     private readonly resolver: PermissionResolverService,
     private readonly sod: SodService,
+    private readonly cache: AuthorizationCacheService,
   ) {}
 
   async listForUser(organizationId: string, userId: string): Promise<UserRoleView[]> {
@@ -62,7 +64,11 @@ export class RoleAssignmentService {
     userId: string,
     input: AssignUserRoleInput,
   ): Promise<AssignmentResult> {
-    return this.db.transaction(async (tx) => this.assignWithin(tx, organizationId, userId, input));
+    const result = await this.db.transaction(async (tx) =>
+      this.assignWithin(tx, organizationId, userId, input),
+    );
+    this.cache.invalidateUser(userId);
+    return result;
   }
 
   /** Same as `assign` but participates in an outer transaction (user creation). */
@@ -148,6 +154,7 @@ export class RoleAssignmentService {
       }
 
       await tx.delete(userRoles).where(eq(userRoles.id, assignmentId));
+      this.cache.invalidateUser(userId);
       await this.audit.record(
         {
           action: 'ROLE_REVOKE',
