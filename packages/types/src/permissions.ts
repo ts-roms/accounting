@@ -231,6 +231,11 @@ export const PERMISSION_DEFINITIONS = [
   define('bank-transaction.post', 'BANKING', 'Post and void bank transactions'),
   define('bank-statement.import', 'BANKING', 'Import bank statements'),
   define(
+    'bank-feed.manage',
+    'BANKING',
+    'Maintain bank feed matching rules and settings, apply or dismiss suggestions',
+  ),
+  define(
     'bank-reconciliation.perform',
     'BANKING',
     'Match statement lines and complete reconciliations',

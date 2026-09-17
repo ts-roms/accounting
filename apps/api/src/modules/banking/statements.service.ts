@@ -13,7 +13,7 @@ import {
   type SQL,
 } from 'drizzle-orm';
 import { Money } from '@accounting/money';
-import type { PaginatedResult } from '@accounting/types';
+import type { MatchKind, PaginatedResult } from '@accounting/types';
 import type {
   ImportStatementInput,
   ListStatementLinesQuery,
@@ -71,7 +71,7 @@ export interface StatementLineView extends BankStatementLine {
   matchedJournalNumber: string | null;
   matchedEntryDate: string | null;
   matchedDescription: string | null;
-  matchKind: 'AUTO' | 'MANUAL' | null;
+  matchKind: MatchKind | null;
 }
 
 export interface LedgerLineView {

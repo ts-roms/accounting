@@ -25,3 +25,4 @@ export * from './treasury';
 export * from './consolidation';
 export * from './revenue';
 export * from './payroll';
+export * from './bank-feed';

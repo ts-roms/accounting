@@ -239,6 +239,7 @@ export const OUTBOUND_EVENT_TYPES = [
   'pay_run.posted',
   'pay_run.paid',
   'pay_run.reversed',
+  'bank_line.explained',
   'period.closed',
   'webhook.test',
 ] as const;
@@ -467,5 +468,6 @@ export const NOTIFICATION_EVENT_TYPES = [
   'REVENUE_RUN_POSTED',
   'PAY_RUN_APPROVAL_REQUIRED',
   'PAY_RUN_DUE',
+  'BANK_FEED_REVIEW',
 ] as const;
 export type NotificationEventType = (typeof NOTIFICATION_EVENT_TYPES)[number];

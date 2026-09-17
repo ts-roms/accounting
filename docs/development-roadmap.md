@@ -394,6 +394,15 @@ posted expense claims through payroll, payroll reports (cost, withholding
 remittance, employee YTD), a financial-close check, a treasury forecast
 source, pay-date reminders and integrity checks. See `docs/payroll/`.
 
+### Prompt #12 - Bank feed auto-reconciliation (COMPLETE)
+
+Matching rules as data (patterns, amount bounds, direction -> bank
+transaction / customer receipt / vendor payment / ignore, optional
+auto-apply), a suggestion engine that also proposes open invoices and bills
+and past explanations, a review queue (accept / adjust / dismiss / explain
+by hand), KPIs, a daily sweep and integrity checks; the Plaid feed importer
+refreshes suggestions after every import. See `docs/bank-feed/`.
+
 ## Beyond the roadmap
 
 All nine phases of the specification are delivered. Candidates for follow-up

@@ -1,6 +1,7 @@
 import { Module, type OnModuleInit } from '@nestjs/common';
 import { APP_INTERCEPTOR, ModuleRef } from '@nestjs/core';
 import { AccountingModule } from '@/modules/accounting/accounting.module';
+import { BankFeedModule } from '@/modules/bank-feed/bank-feed.module';
 import { BankingModule } from '@/modules/banking/banking.module';
 import { InventoryModule } from '@/modules/inventory/inventory.module';
 import { PayablesModule } from '@/modules/payables/payables.module';
@@ -71,6 +72,7 @@ import { WebhooksController } from './webhooks/webhooks.controller';
     BankingModule,
     PayablesModule,
     InventoryModule,
+    BankFeedModule,
   ],
   controllers: [
     IntegrationsController,

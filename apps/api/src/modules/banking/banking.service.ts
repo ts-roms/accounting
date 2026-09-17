@@ -296,7 +296,20 @@ export class BankingService {
     actor: AuthenticatedUser,
     input: CreateBankTransactionInput,
   ): Promise<BankTransactionView> {
-    const id = await this.db.transaction(async (tx) => {
+    const id = await this.db.transaction((tx) =>
+      this.createTransactionInTx(tx, companyId, actor, input),
+    );
+    return this.getTransaction(companyId, id);
+  }
+
+  /** Same as `createTransaction` inside a caller's transaction (bank feed rules, petty cash). Returns the id. */
+  async createTransactionInTx(
+    tx: DbExecutor,
+    companyId: string,
+    actor: AuthenticatedUser,
+    input: CreateBankTransactionInput,
+  ): Promise<string> {
+    {
       if (input.idempotencyKey) {
         const [existing] = await tx
           .select({ id: bankTransactions.id })
@@ -357,8 +370,7 @@ export class BankingService {
         tx,
       );
       return created!.id;
-    });
-    return this.getTransaction(companyId, id);
+    }
   }
 
   async updateTransaction(
@@ -446,9 +458,20 @@ export class BankingService {
     actor: AuthenticatedUser,
     id: string,
   ): Promise<BankTransactionView> {
-    await this.db.transaction(async (tx) => {
+    await this.db.transaction((tx) => this.postTransactionInTx(tx, companyId, actor, id));
+    return this.getTransaction(companyId, id);
+  }
+
+  /** Same as `postTransaction` inside a caller's transaction; returns the journal entry id. */
+  async postTransactionInTx(
+    tx: DbExecutor,
+    companyId: string,
+    actor: AuthenticatedUser,
+    id: string,
+  ): Promise<string | null> {
+    {
       const existing = await this.lock(tx, companyId, id);
-      if (existing.status === 'POSTED') return;
+      if (existing.status === 'POSTED') return existing.journalEntryId;
       if (existing.status !== 'DRAFT')
         throw new BusinessRuleError(
           ErrorCodes.DOCUMENT_INVALID_STATE,
@@ -521,8 +544,8 @@ export class BankingService {
         },
         tx,
       );
-    });
-    return this.getTransaction(companyId, id);
+      return entry.id;
+    }
   }
 
   async voidTransaction(
