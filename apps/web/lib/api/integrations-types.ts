@@ -14,6 +14,7 @@ import type {
   IntegrationStatus,
   NotificationEventType,
   NotificationSeverity,
+  SyncEntity,
   SyncJobStatus,
   SyncMode,
   SyncTrigger,
@@ -157,6 +158,44 @@ export interface ExternalReferenceView {
   externalId: string;
   internalId: string;
   lastSeenAt: string;
+}
+
+/** One provider's knowledge of an internal record (record-links endpoint). */
+export interface RecordReferenceView {
+  id: string;
+  integrationId: string;
+  integrationName: string;
+  provider: string;
+  providerName: string;
+  integrationStatus: IntegrationStatus;
+  entityType: string;
+  externalId: string;
+  direction: 'INBOUND' | 'OUTBOUND';
+  canPush: boolean;
+  metadata: Record<string, unknown>;
+  lastSeenAt: string;
+  createdAt: string;
+}
+
+export interface PushTargetView {
+  integrationId: string;
+  integrationName: string;
+  provider: string;
+  providerName: string;
+}
+
+export interface RecordLinksView {
+  references: RecordReferenceView[];
+  pushTargets: PushTargetView[];
+}
+
+export interface PushRecordResult {
+  integrationId: string;
+  entity: SyncEntity;
+  internalId: string;
+  outcome: 'CREATED' | 'UPDATED' | 'FAILED';
+  externalId: string | null;
+  error: { code: string; message: string } | null;
 }
 
 export interface InboundEventView {

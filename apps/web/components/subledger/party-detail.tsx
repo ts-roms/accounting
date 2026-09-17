@@ -45,6 +45,7 @@ import {
   CustomerMasterTab,
 } from '@/components/receivables/ar-panels';
 import { VendorMasterTab, VendorStatusCard } from '@/components/payables/ap-panels';
+import { RecordLinksPanel } from '@/components/integrations/record-links-panel';
 
 export function PartyDetailPage({ cfg, id }: { cfg: SubledgerConfig; id: string }) {
   const { hasPermission } = useSession();
@@ -127,6 +128,10 @@ export function PartyDetailPage({ cfg, id }: { cfg: SubledgerConfig; id: string 
         />
       </div>
       {cfg.side === 'AR' ? <CustomerCreditCard customer={p} /> : <VendorStatusCard vendor={p} />}
+      <RecordLinksPanel
+        entityType={cfg.side === 'AR' ? 'customers' : 'vendors'}
+        internalId={p.id}
+      />
 
       <Tabs defaultValue="documents">
         <TabsList>

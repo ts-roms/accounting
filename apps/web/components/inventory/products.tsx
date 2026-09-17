@@ -71,6 +71,7 @@ import { DataTable, useTableState } from '@/components/ui-ext/data-table';
 import { Can, EmptyState, PageHeader, TableSkeleton } from '@/components/ui-ext/page';
 import { AccountCombobox, Amount } from '@/components/accounting/primitives';
 import { trimAmount } from '@/components/subledger/document-detail';
+import { RecordLinksPanel } from '@/components/integrations/record-links-panel';
 import { WarehouseSelect } from './pickers';
 
 export const PRODUCTS_PATH = '/inventory/products';
@@ -953,6 +954,7 @@ export function ProductDetailPage({ id }: { id: string }) {
           </Card>
         </div>
       ) : null}
+      <RecordLinksPanel entityType="products" internalId={p.id} />
       <ProductDialog open={edit} product={p} onOpenChange={setEdit} />
     </>
   );
@@ -971,9 +973,7 @@ function Stat({
     <Card>
       <CardContent className="p-4">
         <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
-        <div className={`mt-1 text-lg font-semibold ${danger ? 'text-critical' : ''}`}>
-          {value}
-        </div>
+        <div className={`mt-1 text-lg font-semibold ${danger ? 'text-critical' : ''}`}>{value}</div>
       </CardContent>
     </Card>
   );

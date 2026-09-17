@@ -1,11 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { eq, ne } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import { DRIZZLE, type Database } from '@/database/database.types';
 import { invoices, vendorBills } from '@/database/schema';
 import { BillsService } from '@/modules/payables/bills.service';
 import { InvoicesService } from '@/modules/receivables/invoices.service';
 import { assertScope } from '../importers/importer';
-import type { ExportContext, ExportPage, ExportQuery, Exporter } from './exporter';
+import type { ExportContext, ExportPage, ExportQuery, ExportRecord, Exporter } from './exporter';
 import { selectKeyset } from './keyset';
 
 /**
@@ -46,6 +46,28 @@ export class InvoicesExporter implements Exporter {
     }
     return { records, hasMore };
   }
+
+  async byId(ctx: ExportContext, internalId: string): Promise<ExportRecord | null> {
+    assertScope(ctx, 'invoice.view');
+    const [row] = await this.db
+      .select({ id: invoices.id, updatedAt: invoices.updatedAt })
+      .from(invoices)
+      .where(
+        and(
+          eq(invoices.id, internalId),
+          eq(invoices.companyId, ctx.companyId),
+          ne(invoices.accountingStatus, 'UNPOSTED'),
+        ),
+      );
+    if (!row) return null;
+    const detail = await this.invoices.get(ctx.companyId, row.id);
+    return {
+      internalId: row.id,
+      updatedAt: row.updatedAt,
+      label: detail.documentNumber,
+      data: { ...detail } as Record<string, unknown>,
+    };
+  }
 }
 
 @Injectable()
@@ -78,5 +100,27 @@ export class BillsExporter implements Exporter {
       });
     }
     return { records, hasMore };
+  }
+
+  async byId(ctx: ExportContext, internalId: string): Promise<ExportRecord | null> {
+    assertScope(ctx, 'bill.view');
+    const [row] = await this.db
+      .select({ id: vendorBills.id, updatedAt: vendorBills.updatedAt })
+      .from(vendorBills)
+      .where(
+        and(
+          eq(vendorBills.id, internalId),
+          eq(vendorBills.companyId, ctx.companyId),
+          ne(vendorBills.accountingStatus, 'UNPOSTED'),
+        ),
+      );
+    if (!row) return null;
+    const detail = await this.bills.get(ctx.companyId, row.id);
+    return {
+      internalId: row.id,
+      updatedAt: row.updatedAt,
+      label: detail.documentNumber,
+      data: { ...detail } as Record<string, unknown>,
+    };
   }
 }
