@@ -1,12 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { DRIZZLE, type Database } from '@/database/database.types';
 import { customers, products, vendors } from '@/database/schema';
 import { CatalogService } from '@/modules/inventory/catalog.service';
 import { VendorsService } from '@/modules/payables/vendors.service';
 import { CustomersService } from '@/modules/receivables/customers.service';
 import { assertScope } from '../importers/importer';
-import type { ExportContext, ExportPage, ExportQuery, Exporter } from './exporter';
+import type { ExportContext, ExportPage, ExportQuery, ExportRecord, Exporter } from './exporter';
 import { selectKeyset } from './keyset';
 
 /**
@@ -46,6 +46,22 @@ export class CustomersExporter implements Exporter {
     }
     return { records, hasMore };
   }
+
+  async byId(ctx: ExportContext, internalId: string): Promise<ExportRecord | null> {
+    assertScope(ctx, 'customer.view');
+    const [row] = await this.db
+      .select({ id: customers.id, updatedAt: customers.updatedAt })
+      .from(customers)
+      .where(and(eq(customers.id, internalId), eq(customers.companyId, ctx.companyId)));
+    if (!row) return null;
+    const view = await this.customers.getView(ctx.companyId, row.id);
+    return {
+      internalId: row.id,
+      updatedAt: row.updatedAt,
+      label: view.code,
+      data: { ...view } as Record<string, unknown>,
+    };
+  }
 }
 
 @Injectable()
@@ -79,6 +95,22 @@ export class VendorsExporter implements Exporter {
     }
     return { records, hasMore };
   }
+
+  async byId(ctx: ExportContext, internalId: string): Promise<ExportRecord | null> {
+    assertScope(ctx, 'vendor.view');
+    const [row] = await this.db
+      .select({ id: vendors.id, updatedAt: vendors.updatedAt })
+      .from(vendors)
+      .where(and(eq(vendors.id, internalId), eq(vendors.companyId, ctx.companyId)));
+    if (!row) return null;
+    const view = await this.vendors.getView(ctx.companyId, row.id);
+    return {
+      internalId: row.id,
+      updatedAt: row.updatedAt,
+      label: view.code,
+      data: { ...view } as Record<string, unknown>,
+    };
+  }
 }
 
 @Injectable()
@@ -111,5 +143,21 @@ export class ProductsExporter implements Exporter {
       });
     }
     return { records, hasMore };
+  }
+
+  async byId(ctx: ExportContext, internalId: string): Promise<ExportRecord | null> {
+    assertScope(ctx, 'product.view');
+    const [row] = await this.db
+      .select({ id: products.id, updatedAt: products.updatedAt })
+      .from(products)
+      .where(and(eq(products.id, internalId), eq(products.companyId, ctx.companyId)));
+    if (!row) return null;
+    const view = await this.catalog.getProduct(ctx.companyId, row.id);
+    return {
+      internalId: row.id,
+      updatedAt: row.updatedAt,
+      label: view.sku,
+      data: { ...view } as Record<string, unknown>,
+    };
   }
 }

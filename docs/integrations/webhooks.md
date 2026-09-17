@@ -8,6 +8,7 @@ Business transaction  --same tx-->  integration_events (OUTBOUND, PENDING)   [tr
                      dispatch-outbox job (on commit nudge + every 30 s)
                                           |
                      integration_webhook_deliveries (one per matching subscription)
+                     + PushTriggerService.onEvent: debounced push for PUSH-capable integrations
                                           |
                      deliver job: POST signed JSON -> DELIVERED | RETRYING (backoff) | EXHAUSTED
 ```

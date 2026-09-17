@@ -51,6 +51,7 @@ import type { BankLedgerLine, BankStatementLine } from '@/lib/api/types';
 import { formatDateTime, titleCase } from '@/lib/format';
 import { useSession } from '@/lib/auth/session';
 import { PageHeader } from '@/components/ui-ext/page';
+import { RecordLinksPanel } from '@/components/integrations/record-links-panel';
 import { Amount } from '@/components/accounting/primitives';
 import { Stat } from '@/components/fixed-assets/shared';
 import { ReconciliationCounters } from './reconciliation-counters';
@@ -137,6 +138,7 @@ export function ReconciliationPage({ id }: { id: string }) {
           </>
         }
       />
+      <RecordLinksPanel entityType="bank-transactions" internalId={s.id} showTargets={false} />
       {rec?.status === 'COMPLETED' ? (
         <Alert>
           <CheckCircle2 />

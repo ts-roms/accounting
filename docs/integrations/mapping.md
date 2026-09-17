@@ -89,6 +89,17 @@ API (`createInvoiceSchema`) - mapping can only produce what a user could type.
 - `DELETE /integrations/:id/mappings/:mappingId`
 - `POST /integrations/:id/mappings/preview` - dry-run a sample record (`direction: OUTBOUND` previews a push payload from a domain view)
 - `GET /integrations/:id/external-references` - internal <-> external ids
+- `GET /integrations/record-links?entityType=&internalId=` - every provider that
+  knows one internal record, plus the push-capable integrations that have not
+  received it yet; gated by the record's own view permission (`invoice.view`,
+  `bill.view`, ...), not `integration.view`, because the trail is part of the
+  record
+- `POST /integrations/:id/push-record { entity, internalId }` - send one record
+  now (`integration.manage`); same exporter -> outbound mapping -> `push` path
+  as a job, returns `{ outcome: CREATED | UPDATED | FAILED, externalId, error }`,
+  writes the reference (with `pushedBy`), a log line and an audit row, but no
+  job row and no cursor movement. Drafts are refused (404) because exporters
+  never send what is still UNPOSTED
 
 ## External references
 
@@ -97,3 +108,11 @@ to one internal id, and one internal id to one external id per integration.
 Importers consult it first, which makes re-runs, replays and overlapping
 cursor pages idempotent. User-supplied mappings are validated (Zod) and never
 executed as code.
+
+On the document, party, product and bank-statement pages the
+`RecordLinksPanel` (`components/integrations/record-links-panel.tsx`) shows
+the same rows to whoever can see the record: imported from / sent to, the
+provider's id or acknowledgement number, when and by whom, a link to the
+integration, and - for integration managers - "Push again" / "Send now"
+for push-capable providers. It renders nothing when no integration is
+involved.

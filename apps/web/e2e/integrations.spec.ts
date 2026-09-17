@@ -123,4 +123,59 @@ test.describe('integration platform', () => {
     await page.getByRole('dialog').getByRole('button', { name: 'Approve' }).click();
     await expect(page.getByText('APPROVED', { exact: true }).first()).toBeVisible();
   });
+
+  test('a posted invoice shows the providers that received it and can be pushed again from its page', async ({
+    page,
+  }) => {
+    await login(page);
+    const stamp = Date.now();
+    // A push-only e-invoicing integration (event-driven pushes off so the test drives the send itself).
+    const authority = await (
+      await apiCall(page, 'post', '/integrations', {
+        provider: 'DEMO_TAX_AUTHORITY',
+        name: `Playwright e-invoicing ${stamp}`,
+        scopes: ['invoices:read'],
+        credentials: { apiKey: `demo-tax-playwright-${stamp}` },
+        config: { taxpayerId: '000-999-888-777', pushOnEvents: false },
+      })
+    ).json();
+    const customers = await (await apiCall(page, 'get', '/customers?pageSize=1')).json();
+    const accounts = await (await apiCall(page, 'get', '/accounts')).json();
+    const revenue = accounts.find((a: { code: string }) => a.code === '4100');
+    const invoice = await (
+      await apiCall(page, 'post', '/invoices', {
+        customerId: customers.items[0].id,
+        documentDate: '2026-09-14',
+        reference: `PW-LINKS-${stamp}`,
+        lines: [{ description: 'Integration trail demo', unitPrice: '500', accountId: revenue.id }],
+      })
+    ).json();
+    // Drafts are never pushable: the page shows no integration panel at all.
+    await page.goto(`/sales/invoices/${invoice.id}`);
+    await expect(page.getByText('Integration trail demo')).toBeVisible();
+    await expect(page.getByTestId('record-links-panel')).toHaveCount(0);
+
+    await apiCall(page, 'post', `/invoices/${invoice.id}/approve`);
+    await apiCall(page, 'post', `/invoices/${invoice.id}/post`);
+    await page.reload();
+    // Posted and not yet sent: the authority is offered as a target; sending stores the acknowledgement.
+    const panel = page.getByTestId('record-links-panel');
+    await expect(panel).toBeVisible();
+    await expect(panel.getByTestId('record-links-targets')).toContainText(
+      `Playwright e-invoicing ${stamp}`,
+    );
+    await panel.getByTestId('record-links-push').first().click();
+    await expect(page.getByText(/sent to Playwright e-invoicing/)).toBeVisible();
+    const row = panel.getByTestId('record-links-row').first();
+    await expect(row).toHaveAttribute('data-direction', 'OUTBOUND');
+    await expect(row.getByTestId('record-links-external-id')).toHaveText(/^ACK-/);
+    const ack = await row.getByTestId('record-links-external-id').textContent();
+    // Push again keeps the acknowledgement number (a resubmission, not a new document).
+    await row.getByTestId('record-links-repush').click();
+    await expect(page.getByText(/sent to Playwright e-invoicing/).last()).toBeVisible();
+    await expect(row.getByTestId('record-links-external-id')).toHaveText(ack!);
+    await expect(row).toContainText('by admin@acme.local');
+    // Cleanup so the seeded stack does not accumulate authorities.
+    await apiCall(page, 'delete', `/integrations/${authority.id}`);
+  });
 });

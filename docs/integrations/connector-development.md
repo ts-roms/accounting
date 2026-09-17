@@ -81,7 +81,8 @@ export class AcmeBankConnector extends BaseConnector {
   push so the provider can update rather than duplicate. Reject bad records
   per result (`ok: false, error`) - throw only for transport / auth failures.
   Describe the payload with `defaultOutboundMappings` (domain view -> provider
-  shape); see `DEMO_TAX_AUTHORITY`.
+  shape) and spread `pushConfigSchema` into `configSchema` so operators can
+  switch event-driven pushes off (`pushOnEvents`); see `DEMO_TAX_AUTHORITY`.
 - **New entity?** Add an importer in `sync/importers/` that validates with the
   same Zod schema as the REST API and calls the existing domain service, then
   register it in `SyncService` and `InboundWebhooksService`; for pushes add an

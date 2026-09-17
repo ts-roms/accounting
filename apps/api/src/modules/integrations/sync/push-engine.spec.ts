@@ -21,6 +21,9 @@ function exporterOf(records: ExportRecord[]): Exporter & { calls: number } {
   const ex = {
     entity: 'invoices' as const,
     calls: 0,
+    async byId(_ctx: unknown, id: string) {
+      return records.find((r) => r.internalId === id) ?? null;
+    },
     async select(
       _ctx: unknown,
       q: { after: { updatedAt: string; id: string } | null; limit: number },

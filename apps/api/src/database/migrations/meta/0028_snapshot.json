@@ -1,6 +1,6 @@
 {
-  "id": "c2090887-21f0-4e54-a959-8b8edf77c048",
-  "prevId": "b49baa72-928e-4d07-bcf8-75b2e508759c",
+  "id": "adcf315e-c290-49a0-a004-06898e3393bb",
+  "prevId": "c2090887-21f0-4e54-a959-8b8edf77c048",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -6045,6 +6045,31 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
+        },
+        "revenue_policy_id": {
+          "name": "revenue_policy_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "service_start_date": {
+          "name": "service_start_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "service_end_date": {
+          "name": "service_end_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "milestones": {
+          "name": "milestones",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
         }
       },
       "indexes": {
@@ -6227,6 +6252,19 @@
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "invoice_lines_revenue_policy_id_revenue_policies_id_fk": {
+          "name": "invoice_lines_revenue_policy_id_revenue_policies_id_fk",
+          "tableFrom": "invoice_lines",
+          "tableTo": "revenue_policies",
+          "columnsFrom": [
+            "revenue_policy_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
           "onUpdate": "no action"
         }
       },
@@ -11681,6 +11719,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "revenue_policy_id": {
+          "name": "revenue_policy_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "purchase_price": {
           "name": "purchase_price",
           "type": "numeric(19, 4)",
@@ -11821,6 +11865,19 @@
             "id"
           ],
           "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "products_revenue_policy_id_revenue_policies_id_fk": {
+          "name": "products_revenue_policy_id_revenue_policies_id_fk",
+          "tableFrom": "products",
+          "tableTo": "revenue_policies",
+          "columnsFrom": [
+            "revenue_policy_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         },
         "products_inventory_account_id_accounts_id_fk": {
@@ -19471,6 +19528,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "close_require_revenue_recognition": {
+          "name": "close_require_revenue_recognition",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
         },
         "close_block_on_unapproved_journals": {
           "name": "close_block_on_unapproved_journals",
@@ -34578,6 +34642,1028 @@
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
+    },
+    "public.revenue_policies": {
+      "name": "revenue_policies",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "method": {
+          "name": "method",
+          "type": "revenue_recognition_method",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "default_term_months": {
+          "name": "default_term_months",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "auto_recognize": {
+          "name": "auto_recognize",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "status": {
+          "name": "status",
+          "type": "revenue_policy_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'ACTIVE'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "revenue_policies_company_code_uq": {
+          "name": "revenue_policies_company_code_uq",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "code",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "revenue_policies_company_id_companies_id_fk": {
+          "name": "revenue_policies_company_id_companies_id_fk",
+          "tableFrom": "revenue_policies",
+          "tableTo": "companies",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.revenue_recognition_runs": {
+      "name": "revenue_recognition_runs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "document_number": {
+          "name": "document_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "period_end": {
+          "name": "period_end",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "revenue_run_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'POSTED'"
+        },
+        "currency": {
+          "name": "currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "total_amount": {
+          "name": "total_amount",
+          "type": "numeric(19, 4)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "line_count": {
+          "name": "line_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "journal_entry_id": {
+          "name": "journal_entry_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reversal_journal_entry_id": {
+          "name": "reversal_journal_entry_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reversed_at": {
+          "name": "reversed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reversal_reason": {
+          "name": "reversal_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "revenue_runs_company_number_uq": {
+          "name": "revenue_runs_company_number_uq",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "document_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "revenue_runs_company_period_idx": {
+          "name": "revenue_runs_company_period_idx",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "period_end",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "revenue_recognition_runs_company_id_companies_id_fk": {
+          "name": "revenue_recognition_runs_company_id_companies_id_fk",
+          "tableFrom": "revenue_recognition_runs",
+          "tableTo": "companies",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "revenue_recognition_runs_journal_entry_id_journal_entries_id_fk": {
+          "name": "revenue_recognition_runs_journal_entry_id_journal_entries_id_fk",
+          "tableFrom": "revenue_recognition_runs",
+          "tableTo": "journal_entries",
+          "columnsFrom": [
+            "journal_entry_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "revenue_recognition_runs_reversal_journal_entry_id_journal_entries_id_fk": {
+          "name": "revenue_recognition_runs_reversal_journal_entry_id_journal_entries_id_fk",
+          "tableFrom": "revenue_recognition_runs",
+          "tableTo": "journal_entries",
+          "columnsFrom": [
+            "reversal_journal_entry_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "revenue_recognition_runs_created_by_users_id_fk": {
+          "name": "revenue_recognition_runs_created_by_users_id_fk",
+          "tableFrom": "revenue_recognition_runs",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.revenue_schedule_lines": {
+      "name": "revenue_schedule_lines",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "schedule_id": {
+          "name": "schedule_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sequence": {
+          "name": "sequence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "recognition_date": {
+          "name": "recognition_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "amount": {
+          "name": "amount",
+          "type": "numeric(19, 4)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "revenue_schedule_line_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'PENDING'"
+        },
+        "milestone_name": {
+          "name": "milestone_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "milestone_percent": {
+          "name": "milestone_percent",
+          "type": "numeric(19, 4)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "completed_by": {
+          "name": "completed_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "completion_note": {
+          "name": "completion_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "run_id": {
+          "name": "run_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "journal_entry_id": {
+          "name": "journal_entry_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recognized_at": {
+          "name": "recognized_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "revenue_schedule_lines_sequence_uq": {
+          "name": "revenue_schedule_lines_sequence_uq",
+          "columns": [
+            {
+              "expression": "schedule_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "sequence",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "revenue_schedule_lines_status_date_idx": {
+          "name": "revenue_schedule_lines_status_date_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "recognition_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "revenue_schedule_lines_run_idx": {
+          "name": "revenue_schedule_lines_run_idx",
+          "columns": [
+            {
+              "expression": "run_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "revenue_schedule_lines_schedule_id_revenue_schedules_id_fk": {
+          "name": "revenue_schedule_lines_schedule_id_revenue_schedules_id_fk",
+          "tableFrom": "revenue_schedule_lines",
+          "tableTo": "revenue_schedules",
+          "columnsFrom": [
+            "schedule_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "revenue_schedule_lines_completed_by_users_id_fk": {
+          "name": "revenue_schedule_lines_completed_by_users_id_fk",
+          "tableFrom": "revenue_schedule_lines",
+          "tableTo": "users",
+          "columnsFrom": [
+            "completed_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "revenue_schedule_lines_run_id_revenue_recognition_runs_id_fk": {
+          "name": "revenue_schedule_lines_run_id_revenue_recognition_runs_id_fk",
+          "tableFrom": "revenue_schedule_lines",
+          "tableTo": "revenue_recognition_runs",
+          "columnsFrom": [
+            "run_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "revenue_schedule_lines_journal_entry_id_journal_entries_id_fk": {
+          "name": "revenue_schedule_lines_journal_entry_id_journal_entries_id_fk",
+          "tableFrom": "revenue_schedule_lines",
+          "tableTo": "journal_entries",
+          "columnsFrom": [
+            "journal_entry_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "revenue_schedule_lines_amount_chk": {
+          "name": "revenue_schedule_lines_amount_chk",
+          "value": "\"revenue_schedule_lines\".\"amount\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.revenue_schedules": {
+      "name": "revenue_schedules",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "invoice_id": {
+          "name": "invoice_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "invoice_line_id": {
+          "name": "invoice_line_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "customer_id": {
+          "name": "customer_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "policy_id": {
+          "name": "policy_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "method": {
+          "name": "method",
+          "type": "revenue_recognition_method",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "total_amount": {
+          "name": "total_amount",
+          "type": "numeric(19, 4)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "recognized_amount": {
+          "name": "recognized_amount",
+          "type": "numeric(19, 4)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        },
+        "deferred_account_id": {
+          "name": "deferred_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "revenue_account_id": {
+          "name": "revenue_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "service_start_date": {
+          "name": "service_start_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "service_end_date": {
+          "name": "service_end_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "branch_id": {
+          "name": "branch_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "department_id": {
+          "name": "department_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cost_center_id": {
+          "name": "cost_center_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "revenue_schedule_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'ACTIVE'"
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cancelled_at": {
+          "name": "cancelled_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "revenue_schedules_invoice_line_uq": {
+          "name": "revenue_schedules_invoice_line_uq",
+          "columns": [
+            {
+              "expression": "invoice_line_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "revenue_schedules_company_status_idx": {
+          "name": "revenue_schedules_company_status_idx",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "revenue_schedules_invoice_idx": {
+          "name": "revenue_schedules_invoice_idx",
+          "columns": [
+            {
+              "expression": "invoice_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "revenue_schedules_customer_idx": {
+          "name": "revenue_schedules_customer_idx",
+          "columns": [
+            {
+              "expression": "customer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "revenue_schedules_company_id_companies_id_fk": {
+          "name": "revenue_schedules_company_id_companies_id_fk",
+          "tableFrom": "revenue_schedules",
+          "tableTo": "companies",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "revenue_schedules_invoice_id_invoices_id_fk": {
+          "name": "revenue_schedules_invoice_id_invoices_id_fk",
+          "tableFrom": "revenue_schedules",
+          "tableTo": "invoices",
+          "columnsFrom": [
+            "invoice_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "revenue_schedules_invoice_line_id_invoice_lines_id_fk": {
+          "name": "revenue_schedules_invoice_line_id_invoice_lines_id_fk",
+          "tableFrom": "revenue_schedules",
+          "tableTo": "invoice_lines",
+          "columnsFrom": [
+            "invoice_line_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "revenue_schedules_customer_id_customers_id_fk": {
+          "name": "revenue_schedules_customer_id_customers_id_fk",
+          "tableFrom": "revenue_schedules",
+          "tableTo": "customers",
+          "columnsFrom": [
+            "customer_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "revenue_schedules_policy_id_revenue_policies_id_fk": {
+          "name": "revenue_schedules_policy_id_revenue_policies_id_fk",
+          "tableFrom": "revenue_schedules",
+          "tableTo": "revenue_policies",
+          "columnsFrom": [
+            "policy_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "revenue_schedules_deferred_account_id_accounts_id_fk": {
+          "name": "revenue_schedules_deferred_account_id_accounts_id_fk",
+          "tableFrom": "revenue_schedules",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "deferred_account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "revenue_schedules_revenue_account_id_accounts_id_fk": {
+          "name": "revenue_schedules_revenue_account_id_accounts_id_fk",
+          "tableFrom": "revenue_schedules",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "revenue_account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "revenue_schedules_branch_id_branches_id_fk": {
+          "name": "revenue_schedules_branch_id_branches_id_fk",
+          "tableFrom": "revenue_schedules",
+          "tableTo": "branches",
+          "columnsFrom": [
+            "branch_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "revenue_schedules_department_id_dimensions_id_fk": {
+          "name": "revenue_schedules_department_id_dimensions_id_fk",
+          "tableFrom": "revenue_schedules",
+          "tableTo": "dimensions",
+          "columnsFrom": [
+            "department_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "revenue_schedules_cost_center_id_dimensions_id_fk": {
+          "name": "revenue_schedules_cost_center_id_dimensions_id_fk",
+          "tableFrom": "revenue_schedules",
+          "tableTo": "dimensions",
+          "columnsFrom": [
+            "cost_center_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "revenue_schedules_project_id_dimensions_id_fk": {
+          "name": "revenue_schedules_project_id_dimensions_id_fk",
+          "tableFrom": "revenue_schedules",
+          "tableTo": "dimensions",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "revenue_schedules_amount_chk": {
+          "name": "revenue_schedules_amount_chk",
+          "value": "\"revenue_schedules\".\"total_amount\" > 0 AND \"revenue_schedules\".\"recognized_amount\" >= 0 AND \"revenue_schedules\".\"recognized_amount\" <= \"revenue_schedules\".\"total_amount\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.revenue_settings": {
+      "name": "revenue_settings",
+      "schema": "",
+      "columns": {
+        "company_id": {
+          "name": "company_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "auto_recognize": {
+          "name": "auto_recognize",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "overdue_grace_days": {
+          "name": "overdue_grace_days",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "default_policy_id": {
+          "name": "default_policy_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "revenue_settings_company_id_companies_id_fk": {
+          "name": "revenue_settings_company_id_companies_id_fk",
+          "tableFrom": "revenue_settings",
+          "tableTo": "companies",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "revenue_settings_default_policy_id_revenue_policies_id_fk": {
+          "name": "revenue_settings_default_policy_id_revenue_policies_id_fk",
+          "tableFrom": "revenue_settings",
+          "tableTo": "revenue_policies",
+          "columnsFrom": [
+            "default_policy_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     }
   },
   "enums": {
@@ -34709,7 +35795,8 @@
         "NON_CONTROLLING_INTEREST",
         "CUMULATIVE_TRANSLATION_ADJUSTMENT",
         "INTERCOMPANY_DIFFERENCE",
-        "SHARE_OF_ASSOCIATE_PROFIT"
+        "SHARE_OF_ASSOCIATE_PROFIT",
+        "DEFERRED_REVENUE"
       ]
     },
     "public.account_subtype": {
@@ -34807,7 +35894,8 @@
         "BTR",
         "PCV",
         "PMF",
-        "CON"
+        "CON",
+        "RRN"
       ]
     },
     "public.fiscal_period_status": {
@@ -36359,6 +37447,49 @@
       "values": [
         "CURRENT_RATE",
         "CLOSING_RATE"
+      ]
+    },
+    "public.revenue_policy_status": {
+      "name": "revenue_policy_status",
+      "schema": "public",
+      "values": [
+        "ACTIVE",
+        "INACTIVE"
+      ]
+    },
+    "public.revenue_recognition_method": {
+      "name": "revenue_recognition_method",
+      "schema": "public",
+      "values": [
+        "POINT_IN_TIME",
+        "RATABLE",
+        "MILESTONE"
+      ]
+    },
+    "public.revenue_run_status": {
+      "name": "revenue_run_status",
+      "schema": "public",
+      "values": [
+        "POSTED",
+        "REVERSED"
+      ]
+    },
+    "public.revenue_schedule_line_status": {
+      "name": "revenue_schedule_line_status",
+      "schema": "public",
+      "values": [
+        "PENDING",
+        "RECOGNIZED",
+        "CANCELLED"
+      ]
+    },
+    "public.revenue_schedule_status": {
+      "name": "revenue_schedule_status",
+      "schema": "public",
+      "values": [
+        "ACTIVE",
+        "COMPLETED",
+        "CANCELLED"
       ]
     }
   },
