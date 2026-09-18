@@ -434,3 +434,54 @@ export type JournalEntry = typeof journalEntries.$inferSelect;
 export type NewJournalEntry = typeof journalEntries.$inferInsert;
 export type JournalLine = typeof journalLines.$inferSelect;
 export type NewJournalLine = typeof journalLines.$inferInsert;
+
+// ---------------------------------------------------------- period balances
+
+/**
+ * Derived read model of posted journal lines: debit / credit per company,
+ * account, calendar month, journal type, branch and dimensions. Maintained by
+ * database triggers (migration 0037) whenever an entry enters the ledger
+ * statuses, so it is exact for every client - services, seeds, ad-hoc SQL - and
+ * never written by application code. The ledger stays the source of truth:
+ * statements read full months from here and the days of a partial month from
+ * the lines, and the PERIOD_BALANCES_VS_LEDGER integrity check proves the two
+ * agree (rebuild through `rebuild_account_period_balances(company_id)`).
+ */
+export const accountPeriodBalances = pgTable(
+  'account_period_balances',
+  {
+    id: primaryId(),
+    companyId: uuid('company_id')
+      .notNull()
+      .references(() => companies.id, { onDelete: 'cascade' }),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    /** First day of the calendar month of the entry date. */
+    periodStart: date('period_start').notNull(),
+    journalType: journalTypeEnum('journal_type').notNull(),
+    branchId: uuid('branch_id'),
+    departmentId: uuid('department_id'),
+    costCenterId: uuid('cost_center_id'),
+    projectId: uuid('project_id'),
+    debit: money('debit').notNull().default('0'),
+    credit: money('credit').notNull().default('0'),
+    lineCount: integer('line_count').notNull().default(0),
+  },
+  (t) => [
+    unique('account_period_balances_key_uq')
+      .on(
+        t.companyId,
+        t.accountId,
+        t.periodStart,
+        t.journalType,
+        t.branchId,
+        t.departmentId,
+        t.costCenterId,
+        t.projectId,
+      )
+      .nullsNotDistinct(),
+    index('account_period_balances_company_period_idx').on(t.companyId, t.periodStart),
+  ],
+);
+export type AccountPeriodBalance = typeof accountPeriodBalances.$inferSelect;

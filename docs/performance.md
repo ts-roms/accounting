@@ -12,9 +12,13 @@ ledger grows. Every report still derives from posted journal lines (see
   `journal_lines(company_id, account_id)`, never by aggregating the whole
   company and picking one row out of the result. `GeneralLedgerService`
   repeats the company filter on the line side so the index applies.
-- **Whole-ledger aggregates are for statements.** Trial balance, income
-  statement, balance sheet, cash flow and the report engine legitimately read
-  every posted line of the window (one `GROUP BY account_id` per window).
+- **Whole-ledger aggregates are for statements - and read the period-balance
+  model.** Trial balance, income statement, balance sheet, cash flow and the
+  report engine legitimately aggregate the whole window, but `activity()` and
+  `activityByMonth()` serve every whole calendar month inside the window from
+  `account_period_balances` (one row per account / month / journal type /
+  dimension set) and touch `journal_lines` only for the days of a partial
+  first or last month. See "Period-balance read model" below.
 - **Trends are one read.** `GET /reports/income-statement/trend?to&months`
   buckets `activity()` by calendar month (`activityByMonth`) and returns
   section totals per month; the dashboard uses it for the chart and the
@@ -35,6 +39,37 @@ ledger grows. Every report still derives from posted journal lines (see
   `await`s multiply.
 - **Cache authorization, not figures.** `AuthorizationCacheService` caches who
   may do what for a short TTL; ledger figures are never cached.
+
+## Period-balance read model
+
+`account_period_balances` is the one derived table beside the ledger. It is
+not an independent total - the "no independent totals" rule still holds - for
+three reasons:
+
+- **The database maintains it, not the application.** Triggers on
+  `journal_lines` (insert / update / delete) and `journal_entries` (status
+  entering or leaving `POSTED / LOCKED / REVERSED`) add or subtract each
+  line's debit, credit and count in the same transaction as the ledger write
+  (migration `0037_account_period_balances.sql`). No service writes it; a
+  posting cannot succeed without the matching balance change.
+- **It is proven, every run.** `PERIOD_BALANCES_VS_LEDGER` (CRITICAL) joins
+  the stored rows to the same aggregation computed from the lines and reports
+  every key whose debit, credit or line count differs - in the nightly
+  integrity run, on the dashboard health card and in the e2e suite
+  (`apps/api/test/period-balances.e2e-spec.ts`, which also checks
+  `activity()` against the pure line scan `lineActivity()` under every
+  statement filter).
+- **It can always be thrown away.** `rebuild_account_period_balances(company)`
+  (exposed as `POST /operations/period-balances/rebuild`, `operations.manage`,
+  audited as `REBUILD`) recomputes a company from its lines. Use it after a
+  repair that bypassed the triggers; nothing else ever needs it.
+
+The key is (company, account, month, journal type, branch, department, cost
+centre, project) with `UNIQUE NULLS NOT DISTINCT`, so every filter the
+statements use (`branchId`, dimensions, `accountTypes` via the chart join,
+`excludeJournalTypes`) applies to the model exactly as it applies to the
+lines. A statement over N months therefore reads O(accounts x N x dimension
+sets) rows instead of every posted line of the window.
 
 ## Measuring
 
@@ -89,10 +124,10 @@ reconciliations show variance afterwards).
   latency-bound alone and pool-bound under load; they were serialised per area
   and per bank account.
 
-Scaling beyond this means either more database cores or fewer whole-ledger
-aggregates per page (for example a period-balance read model - a deliberate
-design decision, not a tuning change, because the ledger must stay the only
-source of truth).
+Scaling beyond this meant fewer whole-ledger aggregates per page: the
+period-balance read model above (a deliberate design decision, not a tuning
+change - the ledger stays the only source of truth because the database keeps
+the model in step and the integrity check proves it).
 
 ## Audit baseline (2026-09, 40k journals, production build)
 
@@ -111,3 +146,31 @@ Statements (`/reports/*`) were 35-60 ms before and after: they are the
 whole-ledger reads the rules above allow. The remaining floor of the
 integrity report is the balanced-journal check (one aggregate over every
 posted entry, ~140 ms at 40k journals).
+
+### Period-balance read model (2026-09, 40k journals, production build)
+
+Best of three interleaved rounds against the same database, main build on one
+port and this branch on another (the workstation was noisy, so single runs
+varied by 50 %; interleaving and taking the best keeps the comparison honest):
+
+| Endpoint                                     | Lines only | Read model |
+| -------------------------------------------- | ---------- | ---------- |
+| `GET /reports/trial-balance` (Jan-Sep)       | 53 ms      | 10 ms      |
+| `GET /reports/balance-sheet`                 | 47 ms      | 8 ms       |
+| `GET /reports/cash-flow` (Jan-Sep)           | 44 ms      | 7 ms       |
+| `GET /reports/income-statement` (Jan-Sep)    | 40 ms      | 8 ms       |
+| `GET /reports/income-statement` (one month)  | 23 ms      | 7 ms       |
+| `GET /reports/income-statement/trend` (6 mo) | 70 ms      | 28 ms      |
+| `GET /reconciliations/summary`               | 58 ms      | 34 ms      |
+| `GET /treasury/dashboard`                    | 112 ms     | 69 ms      |
+| `GET /integrity` (now 23 checks)             | 200 ms     | 191 ms     |
+
+Whole-window statements no longer scale with the number of posted lines: a
+year of history is ~12 rows per account per dimension set. Endpoints that
+never aggregate the ledger (lists, agings, single-account reads) are unchanged
+within noise. The integrity report gained `PERIOD_BALANCES_VS_LEDGER` (one
+full-ledger aggregate) and still came out level because every other ledger
+read inside it got cheaper. The ten-user dashboard load test was inconclusive
+on the day (4.1-8.3 pages/s for both builds across rounds); its page is now
+dominated by the reconciliation summary and the AR / AP agings, which read
+subledgers, not the ledger.
