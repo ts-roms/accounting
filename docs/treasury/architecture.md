@@ -62,7 +62,12 @@ daily outflow x minimum days cash on hand, sum of account minimums)`), the
 - Approvals are delegable (`bank-transfer.approve`, `petty-cash.approve`) and
   go through `AuthorityService.assert`; workflow gating uses
   `ApprovalsService.open / assertApproved` with document types `BANK_TRANSFER`
-  and `PETTY_CASH_VOUCHER`.
+  (submit opens, approve asserts), `PETTY_CASH_VOUCHER` (`POST
+/vouchers/:id/submit` opens the request and notifies approvers; `approve`
+  asserts it, so a voucher above a workflow's threshold cannot be approved
+  directly) and `PAYMENT_FILE` (generating a file opens the request on its
+  total; moving it to `TRANSMITTED` asserts, `CANCELLED` withdraws it - money
+  never leaves on a file nobody signed).
 - SoD: `Bank transfer creator vs approver` and `Petty cash preparer vs
 approver` (the latter applied above the fund's voucher limit). Both ship as
   WARN like every default policy - a BLOCK default would make roles holding

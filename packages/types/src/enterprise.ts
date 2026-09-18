@@ -40,6 +40,7 @@ export const WORKFLOW_DOCUMENT_TYPES = [
   'PETTY_CASH_VOUCHER',
   'CONSOLIDATION_RUN',
   'PAY_RUN',
+  'PAYMENT_FILE',
 ] as const;
 export type WorkflowDocumentType = (typeof WORKFLOW_DOCUMENT_TYPES)[number];
 

@@ -427,6 +427,15 @@ export class PettyCashController {
     return this.pettyCash.updateVoucher(user.companyId!, user, id, body);
   }
 
+  @Post('vouchers/:id/submit')
+  @RequirePermissions(P['petty-cash.manage'])
+  @ApiOperation({
+    summary: 'Submit a voucher for approval (opens the workflow when one is configured)',
+  })
+  submitVoucher(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.pettyCash.submitVoucher(user.companyId!, user, id);
+  }
+
   @Post('vouchers/:id/approve')
   @RequirePermissions(P['petty-cash.approve'])
   @ApiOperation({

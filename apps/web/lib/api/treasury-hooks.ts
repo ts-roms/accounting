@@ -330,7 +330,7 @@ export const useUpdatePettyCashVoucher = () => {
     onSuccess: () => invalidateAll(qc),
   });
 };
-export type PettyCashVoucherAction = 'approve' | 'post' | 'void';
+export type PettyCashVoucherAction = 'submit' | 'approve' | 'post' | 'void';
 export const usePettyCashVoucherAction = () => {
   const qc = useQueryClient();
   return useMutation({

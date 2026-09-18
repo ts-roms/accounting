@@ -42,6 +42,7 @@ import {
   type VendorProfile,
 } from '@/database/schema';
 import { AuthorityService } from '@/modules/delegations/authority.service';
+import { ApprovalsService } from '@/modules/workflows/approvals.service';
 import { OutboxService } from '@/modules/integrations/events/outbox.service';
 import { NotificationsService } from '@/modules/integrations/notifications/notifications.service';
 import { ApConfigService } from './ap-config.service';
@@ -100,6 +101,7 @@ export class VendorsService {
     private readonly notifications: NotificationsService,
     private readonly authority: AuthorityService,
     private readonly config: ApConfigService,
+    private readonly approvals: ApprovalsService,
   ) {}
 
   async list(companyId: string, query: ListVendorsQuery): Promise<PaginatedResult<VendorView>> {
@@ -311,6 +313,8 @@ export class VendorsService {
         },
       });
       if (created.vendorStatus === 'PENDING' && actor) {
+        // Onboarding may be workflow-gated (VENDOR rules): open the request with the vendor.
+        await this.approvals.open(tx, this.workflowRef(companyId, created, actor.id));
         const [company] = await tx
           .select({ organizationId: companies.organizationId })
           .from(companies)
@@ -396,7 +400,24 @@ export class VendorsService {
 
   // ------------------------------------------------------- approval and holds
 
-  /** Vendor onboarding decision; delegable `vendor.approve`. */
+  private workflowRef(
+    companyId: string,
+    vendor: { id: string; code: string; currency: string; branchId: string | null },
+    requestedBy: string,
+  ) {
+    return {
+      companyId,
+      documentType: 'VENDOR' as const,
+      documentId: vendor.id,
+      documentNumber: vendor.code,
+      amount: '0',
+      currency: vendor.currency,
+      branchId: vendor.branchId,
+      requestedBy,
+    };
+  }
+
+  /** Vendor onboarding decision; delegable `vendor.approve`, workflow-gated when a VENDOR rule exists. */
   async decide(
     companyId: string,
     actor: AuthenticatedUser,
@@ -405,6 +426,9 @@ export class VendorsService {
   ): Promise<VendorDetail> {
     await this.db.transaction(async (tx) => {
       const vendor = await this.getOrThrow(companyId, id, tx);
+      if (input.decision === 'APPROVE')
+        await this.approvals.assertApproved(tx, this.workflowRef(companyId, vendor, actor.id));
+      else await this.approvals.cancelFor(tx, 'VENDOR', id);
       await this.authority.assert(tx, actor, P['vendor.approve'], {
         companyId,
         branchId: vendor.branchId,

@@ -539,6 +539,151 @@ describe('Treasury platform (e2e)', () => {
     await expectIntegrity();
   });
 
+  it('approval workflows gate payment-file transmission, petty cash approval and vendor onboarding', async () => {
+    // Rules: any payment file, vouchers from 1,000, every new vendor - one finance step each.
+    const rule = (documentType: string, name: string, minAmount?: string) =>
+      as(admin, http().post('/api/v1/approval-workflows'))
+        .send({
+          documentType,
+          name,
+          ...(minAmount ? { minAmount } : {}),
+          steps: [
+            {
+              name: 'Finance review',
+              requiredPermission: 'bank-transfer.approve',
+              minApprovers: 1,
+            },
+          ],
+        })
+        .expect(201);
+    const rules = [
+      await rule('PAYMENT_FILE', 'Payment files'),
+      await rule('PETTY_CASH_VOUCHER', 'Large vouchers', '1000'),
+      await rule('VENDOR', 'Vendor onboarding'),
+    ];
+    // Four-eyes: the requester never decides, so the admin signs the finance-generated file.
+    const decide = async (id: string, who = admin) => {
+      const res = await as(who, http().post(`/api/v1/approvals/${id}/decide`)).send({
+        decision: 'APPROVE',
+      });
+      if (res.status !== 201) throw new Error('decide: ' + JSON.stringify(res.body));
+    };
+    const requestFor = async (documentType: string, documentId: string) => {
+      const list = await as(
+        admin,
+        http().get(`/api/v1/approvals?documentType=${documentType}`),
+      ).expect(200);
+      return list.body.items.find((r: { documentId: string }) => r.documentId === documentId);
+    };
+
+    // Payment file: generated with a pending request; transmission waits for the decision.
+    // Reuse the seeded DPI payment: cancel the live file the previous test left, then file it again.
+    const { rows: dpi } = await pool.query(
+      `select id from vendor_payments where company_id = $1 and reference = 'PAY-DPI-0781' and status = 'POSTED'`,
+      [companyId],
+    );
+    const { rows: live } = await pool.query(
+      `select f.id from payment_files f join payment_file_lines l on l.file_id = f.id
+        where l.payment_id = $1 and f.status = 'GENERATED'`,
+      [dpi[0]!.id],
+    );
+    for (const f of live)
+      await as(finance, http().post(`/api/v1/treasury/payment-files/${f.id}/status`))
+        .send({ status: 'CANCELLED', note: 'refiled under workflow' })
+        .expect(201);
+    const unfiled = dpi;
+    const file = await as(finance, http().post('/api/v1/treasury/payment-files'))
+      .send({
+        bankAccountId: bank['BDO-MAIN']!.id,
+        format: 'PESONET_CSV',
+        paymentIds: [unfiled[0]!.id],
+        valueDate: TODAY,
+      })
+      .expect(201);
+    const pendingFile = await requestFor('PAYMENT_FILE', file.body.id);
+    expect(pendingFile?.status).toBe('PENDING');
+    const blocked = await as(
+      finance,
+      http().post(`/api/v1/treasury/payment-files/${file.body.id}/status`),
+    )
+      .send({ status: 'TRANSMITTED' })
+      .expect(422);
+    expect(blocked.body.code).toBe('APPROVAL_REQUIRED');
+    await decide(pendingFile.id);
+    await as(finance, http().post(`/api/v1/treasury/payment-files/${file.body.id}/status`))
+      .send({ status: 'TRANSMITTED', bankReference: 'BDO-BATCH-WF-1' })
+      .expect(201);
+
+    // Petty cash: a 1,500 voucher needs the workflow (submit opens it); a 200 one does not.
+    const funds = await as(admin, http().get('/api/v1/treasury/petty-cash/funds')).expect(200);
+    const big = await as(accountant, http().post('/api/v1/treasury/petty-cash/vouchers'))
+      .send({
+        fundId: funds.body[0].id,
+        voucherDate: TODAY,
+        payee: 'Grab',
+        description: 'Client visits',
+        lines: [{ description: 'Transport', accountId: acc['6400'], amount: '1500' }],
+      })
+      .expect(201);
+    const early = await as(
+      finance,
+      http().post(`/api/v1/treasury/petty-cash/vouchers/${big.body.id}/approve`),
+    ).expect(422);
+    expect(early.body.code).toBe('APPROVAL_REQUIRED');
+    await as(
+      accountant,
+      http().post(`/api/v1/treasury/petty-cash/vouchers/${big.body.id}/submit`),
+    ).expect(201);
+    const pendingVoucher = await requestFor('PETTY_CASH_VOUCHER', big.body.id);
+    expect(pendingVoucher?.status).toBe('PENDING');
+    await decide(pendingVoucher.id);
+    const approved = await as(
+      finance,
+      http().post(`/api/v1/treasury/petty-cash/vouchers/${big.body.id}/approve`),
+    ).expect(201);
+    expect(approved.body.status).toBe('APPROVED');
+    const small = await as(accountant, http().post('/api/v1/treasury/petty-cash/vouchers'))
+      .send({
+        fundId: funds.body[0].id,
+        voucherDate: TODAY,
+        payee: 'Mercury Drug',
+        description: 'First aid',
+        lines: [{ description: 'Supplies', accountId: acc['6400'], amount: '200' }],
+      })
+      .expect(201);
+    await as(
+      finance,
+      http().post(`/api/v1/treasury/petty-cash/vouchers/${small.body.id}/approve`),
+    ).expect(201);
+
+    // Vendor onboarding: creation opens the request; approval waits for it, rejection cancels it.
+    await as(admin, http().patch('/api/v1/ap-settings'))
+      .send({ requireVendorApproval: true })
+      .expect(200);
+    const vendor = await as(accountant, http().post('/api/v1/vendors'))
+      .send({ code: 'VEND-WF', name: 'Workflow Supplies Inc' })
+      .expect(201);
+    expect(vendor.body.vendorStatus).toBe('PENDING');
+    const pendingVendor = await requestFor('VENDOR', vendor.body.id);
+    expect(pendingVendor?.status).toBe('PENDING');
+    const tooSoon = await as(finance, http().post(`/api/v1/vendors/${vendor.body.id}/approve`))
+      .send({ decision: 'APPROVE' })
+      .expect(422);
+    expect(tooSoon.body.code).toBe('APPROVAL_REQUIRED');
+    await decide(pendingVendor.id);
+    const onboarded = await as(finance, http().post(`/api/v1/vendors/${vendor.body.id}/approve`))
+      .send({ decision: 'APPROVE' })
+      .expect(201);
+    expect(onboarded.body.vendorStatus).toBe('APPROVED');
+    await as(admin, http().patch('/api/v1/ap-settings'))
+      .send({ requireVendorApproval: false })
+      .expect(200);
+    for (const r of rules)
+      await as(admin, http().patch(`/api/v1/approval-workflows/${r.body.id}`))
+        .send({ status: 'INACTIVE' })
+        .expect(200);
+  });
+
   // --------------------------------------------------------------- petty cash
 
   let fundId: string;
