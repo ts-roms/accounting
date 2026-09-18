@@ -19,7 +19,9 @@ import type {
   ApprovalRequest,
   ApprovalRequestDetail,
   ApprovalWorkflow,
+  ApproverOptions,
   Attachment,
+  MatrixRow,
   ConsolidationReport,
   ExchangeRate,
   FxRevaluation,
@@ -208,6 +210,19 @@ export const useUpdateWorkflow = () => {
     onSuccess: () => void qc.invalidateQueries({ queryKey: [WF] }),
   });
 };
+
+export const useApprovalMatrix = () =>
+  useQuery({
+    queryKey: key(WF, 'matrix'),
+    queryFn: () => api.get<MatrixRow[]>('/approval-workflows/matrix'),
+  });
+
+export const useApproverOptions = () =>
+  useQuery({
+    queryKey: key(WF, 'approver-options'),
+    queryFn: () => api.get<ApproverOptions>('/approval-workflows/approver-options'),
+    staleTime: 60_000,
+  });
 
 export const useApprovals = (query: Partial<ListApprovalsQuery>) =>
   useQuery({

@@ -31,6 +31,22 @@ export class WorkflowsController {
     return this.approvals.listWorkflows(user.companyId!);
   }
 
+  @Get('matrix')
+  @RequirePermissions(P['approval.view'])
+  @ApiOperation({
+    summary: 'Approval matrix: per document type, the amount bands and who decides each step',
+  })
+  matrix(@CurrentUser() user: AuthenticatedUser) {
+    return this.approvals.matrix(user.companyId!);
+  }
+
+  @Get('approver-options')
+  @RequirePermissions(P['workflow.manage'])
+  @ApiOperation({ summary: 'Users and roles that can be named as step approvers' })
+  approverOptions(@CurrentUser() user: AuthenticatedUser) {
+    return this.approvals.approverOptions(user.companyId!);
+  }
+
   @Post()
   @RequirePermissions(P['workflow.manage'])
   create(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateWorkflowDto) {

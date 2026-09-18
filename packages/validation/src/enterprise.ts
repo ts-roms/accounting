@@ -129,6 +129,10 @@ export const workflowStepSchema = z.object({
   requiredPermission: z.string().trim().min(3).max(100),
   /** Distinct approvers needed before the step completes. */
   minApprovers: z.coerce.number().int().min(1).max(10).default(1),
+  /** Approval matrix: named users who may decide this step (empty = anyone with the permission). */
+  approverUserIds: z.array(uuidSchema).max(50).default([]),
+  /** Approval matrix: roles whose holders may decide this step. */
+  approverRoleIds: z.array(uuidSchema).max(20).default([]),
 });
 export type WorkflowStepInput = z.infer<typeof workflowStepSchema>;
 

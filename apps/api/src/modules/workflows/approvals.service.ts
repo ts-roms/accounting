@@ -1,11 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, getTableColumns, inArray, sql, type SQL } from 'drizzle-orm';
 import { Money } from '@accounting/money';
-import type {
-  ApprovalRequestStatus,
-  PaginatedResult,
-  PermissionKey,
-  WorkflowDocumentType,
+import {
+  WORKFLOW_DOCUMENT_TYPES,
+  type ApprovalRequestStatus,
+  type PaginatedResult,
+  type PermissionKey,
+  type WorkflowDocumentType,
 } from '@accounting/types';
 import type {
   CreateWorkflowInput,
@@ -22,12 +23,16 @@ import {
   approvalDecisions,
   approvalRequests,
   approvalWorkflows,
+  companies,
+  roles,
+  userRoles,
   users,
   type ApprovalRequest,
   type ApprovalWorkflow,
   type WorkflowStep,
 } from '@/database/schema';
 import { AuditService } from '@/modules/audit/audit.service';
+import { NotificationsService } from '@/modules/integrations/notifications/notifications.service';
 import { PermissionResolverService } from '@/modules/rbac/permission-resolver.service';
 import { AuthorityService } from '@/modules/delegations/authority.service';
 
@@ -58,6 +63,55 @@ export interface ApprovalRequestDetail extends ApprovalRequestView {
   }>;
 }
 
+/** One cell of the approval matrix: who decides a step of a workflow band. */
+export interface MatrixApprover {
+  kind: 'USER' | 'ROLE';
+  id: string;
+  name: string;
+}
+
+export interface MatrixStep extends WorkflowStep {
+  approvers: MatrixApprover[];
+}
+
+export interface MatrixWorkflow {
+  id: string;
+  name: string;
+  minAmount: string;
+  maxAmount: string | null;
+  priority: number;
+  branchId: string | null;
+  status: ApprovalWorkflow['status'];
+  deadlineHours: number | null;
+  escalationPermission: string | null;
+  openRequests: number;
+  steps: MatrixStep[];
+}
+
+export interface MatrixRow {
+  documentType: WorkflowDocumentType;
+  /** Amount bands in matching order (priority, then min amount); empty = no approval required. */
+  workflows: MatrixWorkflow[];
+}
+
+/** Users and roles a workflow editor may name as approvers. */
+export interface ApproverOptions {
+  users: Array<{ id: string; name: string; email: string }>;
+  roles: Array<{ id: string; key: string; name: string }>;
+}
+
+/** Whether a step's named approvers (if any) admit this actor. */
+export function namedApproverAdmits(
+  step: WorkflowStep,
+  actorId: string,
+  roleIds: ReadonlyArray<string>,
+): boolean {
+  const userIds = step.approverUserIds ?? [];
+  const stepRoles = step.approverRoleIds ?? [];
+  if (userIds.length === 0 && stepRoles.length === 0) return true;
+  return userIds.includes(actorId) || stepRoles.some((r) => roleIds.includes(r));
+}
+
 export interface DocumentRef {
   companyId: string;
   documentType: WorkflowDocumentType;
@@ -84,6 +138,7 @@ export class ApprovalsService {
     private readonly audit: AuditService,
     private readonly resolver: PermissionResolverService,
     private readonly authority: AuthorityService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // --------------------------------------------------------------- workflows
@@ -111,6 +166,7 @@ export class ApprovalsService {
     input: CreateWorkflowInput,
   ): Promise<ApprovalWorkflow> {
     return this.db.transaction(async (tx) => {
+      await this.assertApprovers(tx, companyId, input.steps);
       const [row] = await tx
         .insert(approvalWorkflows)
         .values({
@@ -169,6 +225,7 @@ export class ApprovalsService {
           ErrorCodes.VALIDATION_FAILED,
           'Max amount must exceed min amount.',
         );
+      if (input.steps) await this.assertApprovers(tx, companyId, input.steps);
       const [row] = await tx
         .update(approvalWorkflows)
         .set({
@@ -205,6 +262,189 @@ export class ApprovalsService {
       );
       return row!;
     });
+  }
+
+  /**
+   * The approval matrix: for every document type, the amount bands in matching
+   * order with each step's named approvers resolved to user / role names. A
+   * document type without workflows needs no workflow approval (the plain
+   * approve / post permission still applies).
+   */
+  async matrix(companyId: string): Promise<MatrixRow[]> {
+    const workflows = await this.listWorkflows(companyId);
+    const userIds = new Set<string>();
+    const roleIds = new Set<string>();
+    for (const w of workflows)
+      for (const s of w.steps) {
+        for (const id of s.approverUserIds ?? []) userIds.add(id);
+        for (const id of s.approverRoleIds ?? []) roleIds.add(id);
+      }
+    const [userRows, roleRows] = await Promise.all([
+      userIds.size
+        ? this.db
+            .select({
+              id: users.id,
+              name: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
+            })
+            .from(users)
+            .where(inArray(users.id, [...userIds]))
+        : [],
+      roleIds.size
+        ? this.db
+            .select({ id: roles.id, name: roles.name })
+            .from(roles)
+            .where(inArray(roles.id, [...roleIds]))
+        : [],
+    ]);
+    const userName = new Map(userRows.map((u) => [u.id, u.name]));
+    const roleName = new Map(roleRows.map((r) => [r.id, r.name]));
+    const byType = new Map<WorkflowDocumentType, MatrixWorkflow[]>();
+    for (const w of workflows) {
+      const list = byType.get(w.documentType) ?? [];
+      list.push({
+        id: w.id,
+        name: w.name,
+        minAmount: w.minAmount,
+        maxAmount: w.maxAmount,
+        priority: w.priority,
+        branchId: w.branchId,
+        status: w.status,
+        deadlineHours: w.deadlineHours,
+        escalationPermission: w.escalationPermission,
+        openRequests: w.openRequests,
+        steps: w.steps.map((s) => ({
+          ...s,
+          approvers: [
+            ...(s.approverUserIds ?? []).map((id): MatrixApprover => ({
+              kind: 'USER',
+              id,
+              name: userName.get(id) ?? 'Unknown user',
+            })),
+            ...(s.approverRoleIds ?? []).map((id): MatrixApprover => ({
+              kind: 'ROLE',
+              id,
+              name: roleName.get(id) ?? 'Unknown role',
+            })),
+          ],
+        })),
+      });
+      byType.set(w.documentType, list);
+    }
+    return WORKFLOW_DOCUMENT_TYPES.map((documentType) => ({
+      documentType,
+      workflows: byType.get(documentType) ?? [],
+    }));
+  }
+
+  /** Active users and roles of the company's organization, for the matrix editor. */
+  async approverOptions(companyId: string): Promise<ApproverOptions> {
+    const organizationId = await this.organizationOf(this.db, companyId);
+    const [userRows, roleRows] = await Promise.all([
+      this.db
+        .select({
+          id: users.id,
+          name: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
+          email: users.email,
+        })
+        .from(users)
+        .where(and(eq(users.organizationId, organizationId), eq(users.status, 'ACTIVE')))
+        .orderBy(asc(users.firstName), asc(users.lastName)),
+      this.db
+        .select({ id: roles.id, key: roles.key, name: roles.name })
+        .from(roles)
+        .where(eq(roles.organizationId, organizationId))
+        .orderBy(asc(roles.name)),
+    ]);
+    return { users: userRows, roles: roleRows };
+  }
+
+  /** Named approvers must be users / roles of the company's organization. */
+  private async assertApprovers(
+    tx: DbExecutor,
+    companyId: string,
+    steps: ReadonlyArray<WorkflowStep>,
+  ): Promise<void> {
+    const userIds = [...new Set(steps.flatMap((s) => s.approverUserIds ?? []))];
+    const roleIds = [...new Set(steps.flatMap((s) => s.approverRoleIds ?? []))];
+    if (userIds.length === 0 && roleIds.length === 0) return;
+    const organizationId = await this.organizationOf(tx, companyId);
+    if (userIds.length) {
+      const found = await tx
+        .select({ id: users.id })
+        .from(users)
+        .where(and(eq(users.organizationId, organizationId), inArray(users.id, userIds)));
+      if (found.length !== userIds.length)
+        throw new BusinessRuleError(
+          ErrorCodes.VALIDATION_FAILED,
+          'A named approver is not a user of this organization.',
+        );
+    }
+    if (roleIds.length) {
+      const found = await tx
+        .select({ id: roles.id })
+        .from(roles)
+        .where(and(eq(roles.organizationId, organizationId), inArray(roles.id, roleIds)));
+      if (found.length !== roleIds.length)
+        throw new BusinessRuleError(
+          ErrorCodes.VALIDATION_FAILED,
+          'A named approver role does not belong to this organization.',
+        );
+    }
+  }
+
+  private async organizationOf(executor: DbExecutor, companyId: string): Promise<string> {
+    const [company] = await executor
+      .select({ organizationId: companies.organizationId })
+      .from(companies)
+      .where(eq(companies.id, companyId));
+    if (!company) throw new NotFoundError('Company', companyId);
+    return company.organizationId;
+  }
+
+  /**
+   * Notifies the approvers of one step of a request: its named users and the
+   * holders of its named roles, or everyone with the step permission when the
+   * step names nobody. Runs inside the caller's transaction.
+   */
+  private async notifyStep(
+    tx: DbExecutor,
+    request: Pick<
+      ApprovalRequest,
+      'id' | 'companyId' | 'documentType' | 'documentNumber' | 'amount' | 'currency'
+    >,
+    step: WorkflowStep,
+  ): Promise<void> {
+    const organizationId = await this.organizationOf(tx, request.companyId);
+    const named = (step.approverUserIds ?? []).length + (step.approverRoleIds ?? []).length > 0;
+    const userIds = new Set(step.approverUserIds ?? []);
+    if ((step.approverRoleIds ?? []).length) {
+      const holders = await tx
+        .select({ userId: userRoles.userId })
+        .from(userRoles)
+        .where(
+          and(
+            inArray(userRoles.roleId, step.approverRoleIds!),
+            sql`(${userRoles.companyId} is null or ${userRoles.companyId} = ${request.companyId})`,
+          ),
+        );
+      for (const h of holders) userIds.add(h.userId);
+    }
+    await this.notifications.notify(
+      {
+        organizationId,
+        companyId: request.companyId,
+        eventType: 'APPROVAL_REQUIRED',
+        title: `${request.documentNumber} awaits your approval (${step.name})`,
+        body: `${request.currency} ${request.amount} ${request.documentType.toLowerCase().replace(/_/g, ' ')}.`,
+        link: '/admin/approvals',
+        entityType: 'ApprovalRequest',
+        entityId: request.id,
+        userIds: [...userIds],
+        permission: named ? undefined : step.requiredPermission,
+        dedupeKey: `approval:${request.id}:${step.name}`,
+      },
+      tx,
+    );
   }
 
   /**
@@ -287,6 +527,7 @@ export class ApprovalsService {
           : null,
       })
       .returning();
+    if (workflow.steps[0]) await this.notifyStep(tx, row!, workflow.steps[0]);
     await this.audit.record(
       {
         action: 'SUBMIT',
@@ -411,6 +652,7 @@ export class ApprovalsService {
         actor.id,
         access.permissions,
         actor.delegations,
+        access.roleIds,
       ),
     );
     if (query.mine) {
@@ -453,7 +695,14 @@ export class ApprovalsService {
       .orderBy(asc(approvalDecisions.decidedAt));
     const access = await this.resolver.resolve(actor.id, companyId);
     return {
-      ...this.enrich(row, decisions, actor.id, access.permissions, actor.delegations),
+      ...this.enrich(
+        row,
+        decisions,
+        actor.id,
+        access.permissions,
+        actor.delegations,
+        access.roleIds,
+      ),
       decisions,
     };
   }
@@ -528,6 +777,12 @@ export class ApprovalsService {
           .set({ escalatedAt: new Date() })
           .where(eq(approvalRequests.id, id));
       }
+      // Approval matrix: a step that names its approvers admits only them.
+      if (!escalated && !namedApproverAdmits(step, actor.id, access.roleIds))
+        throw new BusinessRuleError(
+          ErrorCodes.APPROVAL_NOT_ELIGIBLE,
+          `Step "${step.name}" is reserved for its named approvers.`,
+        );
       if (!workflow?.allowSelfApproval && request.requestedBy === actor.id) {
         throw new BusinessRuleError(
           ErrorCodes.SOD_VIOLATION,
@@ -563,6 +818,9 @@ export class ApprovalsService {
         .update(approvalRequests)
         .set({ status, currentStep, completedAt: status === 'PENDING' ? null : new Date() })
         .where(eq(approvalRequests.id, id));
+      const next = request.steps[currentStep];
+      if (status === 'PENDING' && currentStep !== request.currentStep && next)
+        await this.notifyStep(tx, request, next);
       await this.audit.record(
         {
           action: input.decision === 'APPROVE' ? 'APPROVE' : 'REJECT',
@@ -648,19 +906,21 @@ export class ApprovalsService {
     actorId: string,
     permissions: ReadonlySet<string>,
     delegations: readonly { permission: string }[] = [],
+    roleIds: ReadonlyArray<string> = [],
   ): ApprovalRequestView {
     const step: WorkflowStep | undefined = row.steps[row.currentStep];
     const approvalsSoFar = decisions.filter((d) => d.step === row.currentStep).length;
     const pendingApprovals = step ? Math.max(step.minApprovers - approvalsSoFar, 0) : 0;
     const overdue =
       row.status === 'PENDING' && row.dueAt !== null && row.dueAt.getTime() < Date.now();
+    const escalationOpen =
+      overdue && row.escalationPermission !== null && permissions.has(row.escalationPermission);
     const eligible =
       Boolean(step) &&
-      (permissions.has(step!.requiredPermission) ||
-        delegations.some((d) => d.permission === step!.requiredPermission) ||
-        (overdue &&
-          row.escalationPermission !== null &&
-          permissions.has(row.escalationPermission)));
+      (escalationOpen ||
+        ((permissions.has(step!.requiredPermission) ||
+          delegations.some((d) => d.permission === step!.requiredPermission)) &&
+          namedApproverAdmits(step!, actorId, roleIds)));
     const canDecide =
       row.status === 'PENDING' &&
       eligible &&

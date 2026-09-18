@@ -74,6 +74,7 @@ import { useSession } from '@/lib/auth/session';
 import { DataTable, useTableState } from '@/components/ui-ext/data-table';
 import { Can, EmptyState, PageHeader, TableSkeleton } from '@/components/ui-ext/page';
 import { Amount } from '@/components/accounting/primitives';
+import { ApprovalMatrix, ApproverPicker } from '@/components/enterprise/approval-matrix';
 import { toneOf } from '@/components/status';
 
 type WorkflowFormInput = z.input<typeof createWorkflowSchema>;
@@ -111,24 +112,49 @@ export function WorkflowsPage() {
   const { hasPermission } = useSession();
   const workflows = useWorkflows();
   const update = useUpdateWorkflow();
-  const [dialog, setDialog] = React.useState<{ open: boolean; workflow?: ApprovalWorkflow }>({
-    open: false,
-  });
+  const [dialog, setDialog] = React.useState<{
+    open: boolean;
+    workflow?: ApprovalWorkflow;
+    documentType?: WorkflowDocumentType;
+  }>({ open: false });
+  const [view, setView] = React.useState<'matrix' | 'list'>('matrix');
   const canManage = hasPermission(P['workflow.manage']);
+  const workflowsById = React.useMemo(
+    () => new Map((workflows.data ?? []).map((w) => [w.id, w])),
+    [workflows.data],
+  );
   return (
     <>
       <PageHeader
         title="Approval workflows"
-        description="Per document type and amount band, the chain of approvals a document needs before it can be approved or posted. Requests snapshot the steps, so editing a workflow never changes an open chain."
+        description="Per document type and amount band, the chain of approvals a document needs before it can be approved or posted - and who may decide each step. Requests snapshot the steps, so editing a workflow never changes an open chain."
         actions={
-          <Can permissions={[P['workflow.manage']]}>
-            <Button onClick={() => setDialog({ open: true })} data-testid="new-workflow">
-              <Plus /> New workflow
-            </Button>
-          </Can>
+          <div className="flex items-center gap-2">
+            <Tabs value={view} onValueChange={(v) => setView(v as 'matrix' | 'list')}>
+              <TabsList>
+                <TabsTrigger value="matrix" data-testid="workflows-view-matrix">
+                  Matrix
+                </TabsTrigger>
+                <TabsTrigger value="list" data-testid="workflows-view-list">
+                  Workflows
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <Can permissions={[P['workflow.manage']]}>
+              <Button onClick={() => setDialog({ open: true })} data-testid="new-workflow">
+                <Plus /> New workflow
+              </Button>
+            </Can>
+          </div>
         }
       />
-      {workflows.isLoading ? (
+      {view === 'matrix' ? (
+        <ApprovalMatrix
+          workflowsById={workflowsById}
+          onEdit={(workflow) => setDialog({ open: true, workflow })}
+          onAdd={(documentType) => setDialog({ open: true, documentType })}
+        />
+      ) : workflows.isLoading ? (
         <TableSkeleton columns={6} />
       ) : workflows.data?.length === 0 ? (
         <EmptyState
@@ -218,6 +244,7 @@ export function WorkflowsPage() {
       <WorkflowDialog
         open={dialog.open}
         workflow={dialog.workflow}
+        documentType={dialog.documentType}
         onOpenChange={(open) => setDialog({ open })}
       />
     </>
@@ -227,17 +254,20 @@ export function WorkflowsPage() {
 function WorkflowDialog({
   open,
   workflow,
+  documentType,
   onOpenChange,
 }: {
   open: boolean;
   workflow?: ApprovalWorkflow;
+  /** Preset for a new workflow opened from a matrix row. */
+  documentType?: WorkflowDocumentType;
   onOpenChange: (o: boolean) => void;
 }) {
   const create = useCreateWorkflow();
   const update = useUpdateWorkflow();
   const defaults = React.useCallback(
     (): WorkflowFormInput => ({
-      documentType: workflow?.documentType ?? 'JOURNAL_ENTRY',
+      documentType: workflow?.documentType ?? documentType ?? 'JOURNAL_ENTRY',
       name: workflow?.name ?? '',
       description: workflow?.description ?? undefined,
       minAmount: workflow?.minAmount ?? '0',
@@ -247,11 +277,21 @@ function WorkflowDialog({
       branchId: workflow?.branchId ?? null,
       deadlineHours: workflow?.deadlineHours ?? null,
       escalationPermission: workflow?.escalationPermission ?? null,
-      steps: workflow?.steps ?? [
-        { name: 'Finance review', requiredPermission: 'journal.approve', minApprovers: 1 },
+      steps: workflow?.steps.map((s) => ({
+        ...s,
+        approverUserIds: s.approverUserIds ?? [],
+        approverRoleIds: s.approverRoleIds ?? [],
+      })) ?? [
+        {
+          name: 'Finance review',
+          requiredPermission: 'journal.approve',
+          minApprovers: 1,
+          approverUserIds: [],
+          approverRoleIds: [],
+        },
       ],
     }),
-    [workflow],
+    [workflow, documentType],
   );
   const form = useForm<WorkflowFormInput, unknown, CreateWorkflowInput>({
     resolver: zodResolver(createWorkflowSchema),
@@ -281,8 +321,8 @@ function WorkflowDialog({
         <DialogHeader>
           <DialogTitle>{workflow ? `Edit ${workflow.name}` : 'New approval workflow'}</DialogTitle>
           <DialogDescription>
-            Each step names the permission an approver must hold; one person decides at most once
-            per request.
+            Each step names the permission an approver must hold and, optionally, the users or roles
+            allowed to decide it (the approval matrix); one person decides at most once per request.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -499,6 +539,8 @@ function WorkflowDialog({
                       name: '',
                       requiredPermission: 'journal.approve',
                       minApprovers: 1,
+                      approverUserIds: [],
+                      approverRoleIds: [],
                     })
                   }
                 >
@@ -588,6 +630,40 @@ function WorkflowDialog({
                         >
                           <Trash2 />
                         </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {steps.fields.map((f, i) => (
+                    <TableRow key={`${f.id}-approvers`} className="hover:bg-transparent">
+                      <TableCell />
+                      <TableCell colSpan={4} className="pt-0">
+                        <FormField
+                          control={form.control}
+                          name={`steps.${i}.approverUserIds`}
+                          render={({ field: usersField }) => (
+                            <FormField
+                              control={form.control}
+                              name={`steps.${i}.approverRoleIds`}
+                              render={({ field: rolesField }) => (
+                                <FormItem>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <FormLabel className="text-xs text-muted-foreground">
+                                      Step {i + 1} approvers
+                                    </FormLabel>
+                                    <ApproverPicker
+                                      userIds={usersField.value ?? []}
+                                      roleIds={rolesField.value ?? []}
+                                      onChange={(next) => {
+                                        usersField.onChange(next.userIds);
+                                        rolesField.onChange(next.roleIds);
+                                      }}
+                                    />
+                                  </div>
+                                </FormItem>
+                              )}
+                            />
+                          )}
+                        />
                       </TableCell>
                     </TableRow>
                   ))}
@@ -756,7 +832,7 @@ export function ApprovalsPage() {
   );
 }
 
-function ApprovalDialog({
+export function ApprovalDialog({
   id,
   onOpenChange,
 }: {
