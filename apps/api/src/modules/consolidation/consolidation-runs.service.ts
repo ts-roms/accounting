@@ -909,7 +909,45 @@ export class ConsolidationRunsService {
             .join('; ')
         : `${recon.pairs.length} pair(s) reconciled`,
     });
-    // 4. The previous group close (earlier period end) is finalized.
+    // 4. Member accounts outside the parent's chart are mapped (or have no balance).
+    const parentCodes = new Set(
+      (
+        await executor
+          .select({ code: accounts.code })
+          .from(accounts)
+          .where(eq(accounts.companyId, group.parentCompanyId))
+      ).map((a) => a.code),
+    );
+    const mappingIndex = await this.groups.mappingIndex(groupId, executor);
+    const unmapped: string[] = [];
+    for (const m of members) {
+      if (m.companyId === group.parentCompanyId) continue;
+      const chart = await executor
+        .select({ id: accounts.id, code: accounts.code })
+        .from(accounts)
+        .where(and(eq(accounts.companyId, m.companyId), eq(accounts.isHeader, false)));
+      const foreign = chart.filter(
+        (a) => !parentCodes.has(a.code) && !mappingIndex.get(m.companyId)?.has(a.id),
+      );
+      if (!foreign.length) continue;
+      const balances = await this.ledger.activity(
+        { companyId: m.companyId, to: periodEnd, accountIds: foreign.map((a) => a.id) },
+        executor,
+      );
+      const withBalance = balances.filter((b) => b.debit !== b.credit);
+      for (const b of withBalance)
+        unmapped.push(`${m.companyCode}: ${chart.find((a) => a.id === b.accountId)?.code}`);
+    }
+    items.push({
+      key: 'CHART_MAPPED',
+      label: "Member accounts outside the parent's chart are mapped to group accounts",
+      ok: unmapped.length === 0,
+      blocking: false,
+      detail: unmapped.length
+        ? `Unmapped with balances: ${unmapped.slice(0, 10).join(', ')}${unmapped.length > 10 ? ` +${unmapped.length - 10}` : ''}`
+        : undefined,
+    });
+    // 5. The previous group close (earlier period end) is finalized.
     const [previous] = await executor
       .select({
         documentNumber: consolidationRuns.documentNumber,
@@ -1116,6 +1154,7 @@ export class ConsolidationRunsService {
     const organizationId = group.organizationId;
     const currency = group.presentationCurrency;
     const out: MemberInput[] = [];
+    const mappingIndex = await this.groups.mappingIndex(group.id, executor);
     for (const m of members) {
       const rates =
         run.status === 'FINALIZED' && run.rates[m.companyId]
@@ -1137,6 +1176,7 @@ export class ConsolidationRunsService {
           }));
       } else {
         const dayBefore = addDays(run.periodStart, -1);
+        const mapping = mappingIndex.get(m.companyId);
         const [chart, closing, opening, period] = await Promise.all([
           executor
             .select()
@@ -1163,9 +1203,10 @@ export class ConsolidationRunsService {
               ).toString()
             : '0.0000';
         };
-        rows = chart
+        const raw = chart
           .map((a) => ({
-            code: a.code,
+            // Explicit group chart mapping wins over the member's own code.
+            code: mapping?.get(a.id) ?? a.code,
             name: a.name,
             type: a.type,
             subtype: a.subtype,
@@ -1175,6 +1216,27 @@ export class ConsolidationRunsService {
             period: pick(period, a.id, a.type),
           }))
           .filter((r) => r.closing !== '0.0000' || r.opening !== '0.0000' || r.period !== '0.0000');
+        // Several member accounts may roll into one group code: sum them.
+        const merged = new Map<string, MemberInput['rows'][number]>();
+        for (const r of raw) {
+          const prev = merged.get(r.code);
+          if (!prev) merged.set(r.code, r);
+          else
+            merged.set(r.code, {
+              ...prev,
+              isIntercompany: prev.isIntercompany || r.isIntercompany,
+              closing: Money.of(prev.closing, m.currency)
+                .add(Money.of(r.closing, m.currency))
+                .toString(),
+              opening: Money.of(prev.opening, m.currency)
+                .add(Money.of(r.opening, m.currency))
+                .toString(),
+              period: Money.of(prev.period, m.currency)
+                .add(Money.of(r.period, m.currency))
+                .toString(),
+            });
+        }
+        rows = [...merged.values()];
       }
       // The parent's investment cost is in the parent's currency; bring it to presentation at its historical rate.
       const parent = members.find((x) => x.isParent);

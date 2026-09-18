@@ -30,6 +30,7 @@ import { ExpenseClaimsService } from '@/modules/budgeting/expense-claims.service
 import { BillsService } from '@/modules/payables/bills.service';
 import { AiClassifierService } from './ai-classifier.service';
 import { AiProviderService } from './ai-provider.service';
+import { OcrService } from './ocr.service';
 import type { AccountSuggestion } from './ai.logic';
 
 const MODULE = 'AI';
@@ -66,6 +67,7 @@ export class AiIntakeService {
     private readonly audit: AuditService,
     private readonly attachments: AttachmentsService,
     private readonly provider: AiProviderService,
+    private readonly ocr: OcrService,
     private readonly classifier: AiClassifierService,
     private readonly bills: BillsService,
     private readonly claims: ExpenseClaimsService,
@@ -158,6 +160,18 @@ export class AiIntakeService {
     const image = IMAGE_TYPES.has(file.mimetype)
       ? { mimeType: file.mimetype, buffer: file.buffer }
       : null;
+    // No model to read the picture: OCR it locally so the text extractor has
+    // something to work from (a model backend reads the image itself).
+    let ocrConfidence: number | null = null;
+    if (image && !sourceText && this.provider.name !== 'ANTHROPIC') {
+      const read = await this.ocr.recognize(image.buffer);
+      if (read) {
+        sourceText = read.text;
+        ocrConfidence = read.confidence;
+      } else if (!this.ocr.enabled && !error)
+        error =
+          'Images need a model backend or OCR_PROVIDER=TESSERACT to be read; fill the fields in manually.';
+    }
     const extraction =
       sourceText || image
         ? await this.provider.extract(sourceText, image)
@@ -170,6 +184,11 @@ export class AiIntakeService {
           };
     if (!sourceText && !image && !error)
       error = 'This file type cannot be read for extraction; fill the fields in manually.';
+    if (ocrConfidence !== null)
+      this.logger.info(
+        { id: doc.id, ocrConfidence, chars: sourceText?.length ?? 0 },
+        'AI intake read the image with OCR',
+      );
 
     const kind = kindHint ?? extraction.kind;
     const vendorId = await this.matchVendor(companyId, extraction.fields);

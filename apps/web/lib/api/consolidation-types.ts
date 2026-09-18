@@ -45,6 +45,24 @@ export interface EliminationRule {
   createdAt: string;
 }
 
+export interface AccountMappingView {
+  id: string;
+  accountId: string;
+  accountCode: string;
+  accountName: string;
+  accountType: string;
+  groupAccountCode: string;
+  groupAccountName: string | null;
+  notes: string | null;
+}
+
+export interface AccountMappingsView {
+  companyId: string;
+  mappings: AccountMappingView[];
+  unmatched: Array<{ accountId: string; code: string; name: string; type: string }>;
+  targets: Array<{ code: string; name: string; type: string }>;
+}
+
 export interface ConsolidationGroup {
   id: string;
   code: string;

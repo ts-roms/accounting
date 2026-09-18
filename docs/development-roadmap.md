@@ -418,7 +418,12 @@ Fixed assets gain a register-only split and the register rollforward note
 
 ## Beyond the roadmap
 
-All nine phases of the specification are delivered. Candidates for follow-up
-work: OCR for scanned images without a model backend (e.g. Tesseract), bank
-feed connectors, multi-entity consolidation adjustments beyond intercompany
-eliminations, and workflow rules on more document families.
+All nine phases of the specification are delivered, and the follow-ups that
+were listed here have landed: OCR for scanned images without a model backend
+(tesseract.js, `OCR_PROVIDER=TESSERACT`), bank statement file connectors
+(MT940, camt.053, OFX / QFX beside CSV and the Plaid feed), explicit group
+chart mappings for subsidiaries with their own charts, workflow rules on every
+money-moving document family with an approval matrix, and the period-balance
+read model behind the statements. Remaining candidates: live bank API
+connectors beyond Plaid (one connector class each), rasterising scanned PDFs
+for OCR, and multi-level (sub-group) consolidation.

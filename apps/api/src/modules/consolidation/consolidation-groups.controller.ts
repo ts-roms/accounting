@@ -7,6 +7,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -25,6 +26,7 @@ import {
   isoDateSchema,
   listConsolidationRunsQuerySchema,
   reopenConsolidationRunSchema,
+  setAccountMappingsSchema,
   settleIntercompanySchema,
   updateConsolidationGroupSchema,
   updateConsolidationMemberSchema,
@@ -52,6 +54,8 @@ class FinalizeDto extends createZodDto(finalizeConsolidationRunSchema) {}
 class ReopenDto extends createZodDto(reopenConsolidationRunSchema) {}
 class ReasonDto extends createZodDto(z.object({ reason: z.string().trim().min(1).max(500) })) {}
 class ReadinessQueryDto extends createZodDto(groupReadinessQuerySchema) {}
+class SetAccountMappingsDto extends createZodDto(setAccountMappingsSchema) {}
+class MappingsQueryDto extends createZodDto(z.object({ companyId: z.string().uuid() })) {}
 class ReconciliationQueryDto extends createZodDto(intercompanyReconciliationQuerySchema) {}
 class AsOfQueryDto extends createZodDto(z.object({ asOf: isoDateSchema.optional() })) {}
 class SettleDto extends createZodDto(settleIntercompanySchema) {}
@@ -159,6 +163,31 @@ export class ConsolidationGroupsController {
     @Body() body: UpdateRuleDto,
   ) {
     return this.groups.updateRule(user.organizationId, user, id, ruleId, body);
+  }
+
+  @Get(':id/account-mappings')
+  @RequirePermissions(P['consolidation.view'])
+  @ApiOperation({
+    summary:
+      "Group chart mappings of one member: mapped accounts, member accounts not in the parent's chart, and the parent codes to map to",
+  })
+  accountMappings(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: MappingsQueryDto,
+  ) {
+    return this.groups.accountMappings(user.organizationId, id, query.companyId);
+  }
+
+  @Put(':id/account-mappings')
+  @RequirePermissions(P['consolidation.manage'])
+  @ApiOperation({ summary: "Replace one member's group chart mappings (audited)" })
+  setAccountMappings(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: SetAccountMappingsDto,
+  ) {
+    return this.groups.setAccountMappings(user.organizationId, user, id, body);
   }
 
   @Get(':id/readiness')

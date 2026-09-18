@@ -66,6 +66,7 @@ import type {
   GroupMember,
 } from '@/lib/api/consolidation-types';
 import { useSession } from '@/lib/auth/session';
+import { ChartMappingsCard } from '@/components/consolidation/chart-mappings';
 import { titleCase } from '@/lib/format';
 import { Can, EmptyState, PageHeader } from '@/components/ui-ext/page';
 import { Amount, today } from '@/components/accounting/primitives';
@@ -466,6 +467,7 @@ export function ConsolidationGroupDetailPage({ id }: { id: string }) {
                 </Table>
               </CardContent>
             </Card>
+            <ChartMappingsCard group={g} />
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm">Group close readiness</CardTitle>

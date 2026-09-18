@@ -365,6 +365,27 @@ export const useReconciliation = (id: string | null) =>
     enabled: Boolean(id),
   });
 
+export interface ParsedStatementFile {
+  format: 'MT940' | 'CAMT053' | 'OFX';
+  accountRef: string | null;
+  currency: string | null;
+  statementDate: string;
+  openingBalance: string;
+  closingBalance: string;
+  lines: Array<{ lineDate: string; description: string; reference?: string; amount: string }>;
+  warnings: string[];
+}
+
+/** Server-side parse of an MT940 / camt.053 / OFX file; nothing is stored. */
+export const useParseStatementFile = () =>
+  useMutation({
+    mutationFn: (file: File) => {
+      const body = new FormData();
+      body.append('file', file);
+      return api.post<ParsedStatementFile>('/bank-statements/parse', body);
+    },
+  });
+
 export const useImportStatement = () => {
   const qc = useQueryClient();
   return useMutation({

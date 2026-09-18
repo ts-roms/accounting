@@ -13,6 +13,7 @@ import { AiAssistantService } from './ai-assistant.service';
 import { AiClassifierService } from './ai-classifier.service';
 import { AiIntakeService } from './ai-intake.service';
 import { AiProviderService } from './ai-provider.service';
+import { OcrService } from './ocr.service';
 import { AiController } from './ai.controller';
 
 /**
@@ -35,6 +36,7 @@ import { AiController } from './ai.controller';
   controllers: [AiController],
   providers: [
     AiProviderService,
+    OcrService,
     AiClassifierService,
     AiIntakeService,
     AiAnomalyService,

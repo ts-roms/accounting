@@ -1,10 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 import type { AccountMappingKey, ConsolidationGroupAccounts } from '@accounting/types';
 import type {
   ConsolidationMemberInput,
   CreateConsolidationGroupInput,
   CreateEliminationRuleInput,
+  SetAccountMappingsInput,
   UpdateConsolidationGroupInput,
   UpdateConsolidationMemberInput,
   UpdateEliminationRuleInput,
@@ -17,6 +18,7 @@ import { DRIZZLE, type Database, type DbExecutor } from '@/database/database.typ
 import {
   accounts,
   companies,
+  consolidationAccountMappings,
   consolidationGroupMembers,
   consolidationGroups,
   consolidationRuns,
@@ -46,6 +48,26 @@ export interface MemberView extends ConsolidationGroupMember {
   companyName: string;
   currency: string;
   isParent: boolean;
+}
+
+export interface AccountMappingView {
+  id: string;
+  accountId: string;
+  accountCode: string;
+  accountName: string;
+  accountType: string;
+  groupAccountCode: string;
+  groupAccountName: string | null;
+  notes: string | null;
+}
+
+export interface AccountMappingsView {
+  companyId: string;
+  mappings: AccountMappingView[];
+  /** Member postable accounts whose code is not in the parent's chart and that are not mapped. */
+  unmatched: Array<{ accountId: string; code: string; name: string; type: string }>;
+  /** Parent chart codes a member account may map to. */
+  targets: Array<{ code: string; name: string; type: string }>;
 }
 
 export interface GroupView extends ConsolidationGroup {
@@ -513,6 +535,214 @@ export class ConsolidationGroupsService {
         { missing },
       );
     return out as ConsolidationGroupAccounts;
+  }
+
+  // ------------------------------------------------------------ chart mappings
+
+  /** Chart mappings of one member: what is mapped, what still needs a target, and the targets. */
+  async accountMappings(
+    organizationId: string,
+    groupId: string,
+    companyId: string,
+  ): Promise<AccountMappingsView> {
+    const group = await this.load(this.db, organizationId, groupId);
+    await this.assertMember(groupId, companyId);
+    const [parentChart, memberChart, rows] = await Promise.all([
+      this.db
+        .select({ code: accounts.code, name: accounts.name, type: accounts.type })
+        .from(accounts)
+        .where(and(eq(accounts.companyId, group.parentCompanyId), eq(accounts.isHeader, false)))
+        .orderBy(asc(accounts.code)),
+      this.db
+        .select({ id: accounts.id, code: accounts.code, name: accounts.name, type: accounts.type })
+        .from(accounts)
+        .where(and(eq(accounts.companyId, companyId), eq(accounts.isHeader, false)))
+        .orderBy(asc(accounts.code)),
+      this.db
+        .select()
+        .from(consolidationAccountMappings)
+        .where(
+          and(
+            eq(consolidationAccountMappings.groupId, groupId),
+            eq(consolidationAccountMappings.companyId, companyId),
+          ),
+        ),
+    ]);
+    const parentByCode = new Map(parentChart.map((a) => [a.code, a]));
+    const memberById = new Map(memberChart.map((a) => [a.id, a]));
+    const mapped = new Set(rows.map((r) => r.accountId));
+    return {
+      companyId,
+      mappings: rows
+        .map((r) => {
+          const a = memberById.get(r.accountId);
+          return {
+            id: r.id,
+            accountId: r.accountId,
+            accountCode: a?.code ?? '?',
+            accountName: a?.name ?? '?',
+            accountType: a?.type ?? '?',
+            groupAccountCode: r.groupAccountCode,
+            groupAccountName: parentByCode.get(r.groupAccountCode)?.name ?? null,
+            notes: r.notes,
+          };
+        })
+        .sort((x, y) => x.accountCode.localeCompare(y.accountCode)),
+      unmatched:
+        companyId === group.parentCompanyId
+          ? []
+          : memberChart
+              .filter((a) => !parentByCode.has(a.code) && !mapped.has(a.id))
+              .map((a) => ({ accountId: a.id, code: a.code, name: a.name, type: a.type })),
+      targets: parentChart,
+    };
+  }
+
+  /**
+   * Replaces the mappings of one member company. Every target must be a
+   * postable account of the parent's chart with the same account type as the
+   * member account (an expense cannot roll into a liability), and the parent
+   * itself is never mapped (its chart is the group chart).
+   */
+  async setAccountMappings(
+    organizationId: string,
+    actor: AuthenticatedUser,
+    groupId: string,
+    input: SetAccountMappingsInput,
+  ): Promise<AccountMappingsView> {
+    const group = await this.load(this.db, organizationId, groupId);
+    await this.assertMember(groupId, input.companyId);
+    if (input.companyId === group.parentCompanyId)
+      throw new BusinessRuleError(
+        ErrorCodes.VALIDATION_FAILED,
+        "The parent's chart is the group chart; map subsidiaries to it, not the parent.",
+      );
+    const ids = [...new Set(input.mappings.map((m) => m.accountId))];
+    if (ids.length !== input.mappings.length)
+      throw new BusinessRuleError(ErrorCodes.VALIDATION_FAILED, 'An account is mapped twice.');
+    await this.db.transaction(async (tx) => {
+      const memberAccounts = ids.length
+        ? await tx
+            .select({
+              id: accounts.id,
+              code: accounts.code,
+              type: accounts.type,
+              isHeader: accounts.isHeader,
+            })
+            .from(accounts)
+            .where(and(eq(accounts.companyId, input.companyId), inArray(accounts.id, ids)))
+        : [];
+      const byId = new Map(memberAccounts.map((a) => [a.id, a]));
+      const codes = [...new Set(input.mappings.map((m) => m.groupAccountCode))];
+      const targets = codes.length
+        ? await tx
+            .select({ code: accounts.code, type: accounts.type, isHeader: accounts.isHeader })
+            .from(accounts)
+            .where(
+              and(eq(accounts.companyId, group.parentCompanyId), inArray(accounts.code, codes)),
+            )
+        : [];
+      const targetByCode = new Map(targets.map((t) => [t.code, t]));
+      for (const m of input.mappings) {
+        const a = byId.get(m.accountId);
+        if (!a || a.isHeader)
+          throw new BusinessRuleError(
+            ErrorCodes.VALIDATION_FAILED,
+            `Account ${m.accountId} is not a postable account of the member company.`,
+          );
+        const t = targetByCode.get(m.groupAccountCode);
+        if (!t || t.isHeader)
+          throw new BusinessRuleError(
+            ErrorCodes.VALIDATION_FAILED,
+            `Group account ${m.groupAccountCode} is not a postable account of the parent's chart.`,
+            { accountCode: a.code, groupAccountCode: m.groupAccountCode },
+          );
+        if (t.type !== a.type)
+          throw new BusinessRuleError(
+            ErrorCodes.VALIDATION_FAILED,
+            `${a.code} (${a.type.toLowerCase()}) cannot consolidate into ${m.groupAccountCode} (${t.type.toLowerCase()}).`,
+            { accountCode: a.code, groupAccountCode: m.groupAccountCode },
+          );
+      }
+      const before = await tx
+        .select({
+          accountId: consolidationAccountMappings.accountId,
+          code: consolidationAccountMappings.groupAccountCode,
+        })
+        .from(consolidationAccountMappings)
+        .where(
+          and(
+            eq(consolidationAccountMappings.groupId, groupId),
+            eq(consolidationAccountMappings.companyId, input.companyId),
+          ),
+        );
+      await tx
+        .delete(consolidationAccountMappings)
+        .where(
+          and(
+            eq(consolidationAccountMappings.groupId, groupId),
+            eq(consolidationAccountMappings.companyId, input.companyId),
+          ),
+        );
+      if (input.mappings.length)
+        await tx.insert(consolidationAccountMappings).values(
+          input.mappings.map((m) => ({
+            groupId,
+            companyId: input.companyId,
+            accountId: m.accountId,
+            groupAccountCode: m.groupAccountCode,
+            notes: m.notes ?? null,
+          })),
+        );
+      await this.audit.record(
+        {
+          action: 'UPDATE',
+          module: 'CONSOLIDATION',
+          entityType: 'ConsolidationAccountMappings',
+          entityId: groupId,
+          previousValue: { mappings: before.length },
+          newValue: { companyId: input.companyId, mappings: input.mappings.length },
+          metadata: { actor: actor.email, reason: 'Group chart mappings replaced' },
+        },
+        tx,
+      );
+    });
+    return this.accountMappings(organizationId, groupId, input.companyId);
+  }
+
+  /** Mappings of every member of a group, keyed by company then member account id -> group code. */
+  async mappingIndex(
+    groupId: string,
+    executor: DbExecutor = this.db,
+  ): Promise<Map<string, Map<string, string>>> {
+    const rows = await executor
+      .select({
+        companyId: consolidationAccountMappings.companyId,
+        accountId: consolidationAccountMappings.accountId,
+        code: consolidationAccountMappings.groupAccountCode,
+      })
+      .from(consolidationAccountMappings)
+      .where(eq(consolidationAccountMappings.groupId, groupId));
+    const out = new Map<string, Map<string, string>>();
+    for (const r of rows) {
+      const m = out.get(r.companyId) ?? new Map<string, string>();
+      m.set(r.accountId, r.code);
+      out.set(r.companyId, m);
+    }
+    return out;
+  }
+
+  private async assertMember(groupId: string, companyId: string): Promise<void> {
+    const [member] = await this.db
+      .select({ id: consolidationGroupMembers.id })
+      .from(consolidationGroupMembers)
+      .where(
+        and(
+          eq(consolidationGroupMembers.groupId, groupId),
+          eq(consolidationGroupMembers.companyId, companyId),
+        ),
+      );
+    if (!member) throw new NotFoundError('Consolidation group member', companyId);
   }
 
   async load(

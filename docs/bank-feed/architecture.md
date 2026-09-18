@@ -92,6 +92,24 @@ explanation per key is what `HISTORY` proposes.
   their ledger candidates for the Bank Reconciliation screen; the feed only
   adds document / rule explanations beside them.
 
+## Statement files: MT940, camt.053, OFX / QFX
+
+Besides CSV, the statement importer accepts the exports most banks provide:
+SWIFT **MT940** (`:60F:` opening, `:61:` lines with `:86:` narratives, `RC` /
+`RD` reversals, `:62F:` closing), ISO 20022 **camt.053** (`OPBD` / `CLBD`
+balances, `<Ntry>` entries with remittance info, `RvslInd`) and **OFX / QFX**
+(SGML 1.x or XML 2.x, `<STMTTRN>`, `<LEDGERBAL>` as closing, opening derived).
+`POST /bank-statements/parse` (multipart, `bank-statement.import`) detects the
+format from the content and returns the import shape - account reference,
+currency, statement date, opening / closing balance, signed lines and
+warnings (a closing balance that disagrees with the lines, entries skipped)
+
+- without storing anything; the import page fills its form from it and the
+  same matching engine runs on `POST /bank-statements`. The parsers are pure
+  (`modules/banking/statement-formats.logic.ts`, fixed-point decimals, no
+  floats) and unit-tested per format. Live API feeds (Plaid) stay connectors in
+  the integration platform; a new bank API is one connector class there.
+
 ## Web (`apps/web`)
 
 `/banking/feed` (review queue: suggestions with accept / adjust / dismiss,

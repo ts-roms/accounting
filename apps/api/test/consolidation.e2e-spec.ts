@@ -650,4 +650,122 @@ describe('Consolidation platform (e2e)', () => {
       .expect(422);
     await expectIntegrity();
   });
+
+  it("explicit group chart mappings roll a subsidiary account that is not in the parent's chart into a group account", async () => {
+    // ACMS opens an account the parent does not have and books an expense to it in the run window.
+    const local = await as(admin, http().post('/api/v1/accounts'), otherCompanyId)
+      .send({ code: '6499', name: 'Local permits', type: 'EXPENSE', subtype: 'OPERATING_EXPENSE' })
+      .expect(201);
+    const acmsChart = await as(admin, http().get('/api/v1/accounts'), otherCompanyId).expect(200);
+    const acmsBank = acmsChart.body.find((a: { code: string }) => a.code === '1110').id;
+    const je = await as(admin, http().post('/api/v1/journal-entries'), otherCompanyId)
+      .send({
+        entryDate: '2026-08-20',
+        description: 'Barangay permit',
+        lines: [
+          { accountId: local.body.id, debit: '500' },
+          { accountId: acmsBank, credit: '500' },
+        ],
+      })
+      .expect(201);
+    await as(
+      admin,
+      http().post(`/api/v1/journal-entries/${je.body.id}/submit`),
+      otherCompanyId,
+    ).expect(201);
+    await as(
+      finance,
+      http().post(`/api/v1/journal-entries/${je.body.id}/approve`),
+      otherCompanyId,
+    ).expect(201);
+    await as(
+      finance,
+      http().post(`/api/v1/journal-entries/${je.body.id}/post`),
+      otherCompanyId,
+    ).expect(201);
+
+    // The account is unmatched, and readiness says so (a warning, not a blocker).
+    const before = await as(
+      admin,
+      http().get(
+        `/api/v1/consolidation/groups/${groupId}/account-mappings?companyId=${otherCompanyId}`,
+      ),
+    ).expect(200);
+    expect(before.body.mappings).toEqual([]);
+    expect(before.body.unmatched.map((u: { code: string }) => u.code)).toEqual(['6499']);
+    expect(before.body.targets.some((t: { code: string }) => t.code === '6400')).toBe(true);
+    const readiness = await as(
+      admin,
+      http().get(
+        `/api/v1/consolidation/groups/${groupId}/readiness?periodStart=2026-01-01&periodEnd=2026-08-31`,
+      ),
+    ).expect(200);
+    const chartItem = readiness.body.items.find((i: { key: string }) => i.key === 'CHART_MAPPED');
+    expect(chartItem.ok).toBe(false);
+    expect(chartItem.blocking).toBe(false);
+    expect(chartItem.detail).toContain('ACMS: 6499');
+
+    // Validation: same account type, postable parent target, never the parent itself.
+    const wrongType = await as(
+      admin,
+      http().put(`/api/v1/consolidation/groups/${groupId}/account-mappings`),
+    )
+      .send({
+        companyId: otherCompanyId,
+        mappings: [{ accountId: local.body.id, groupAccountCode: '2100' }],
+      })
+      .expect(422);
+    expect(wrongType.body.code).toBe('VALIDATION_FAILED');
+    await as(admin, http().put(`/api/v1/consolidation/groups/${groupId}/account-mappings`))
+      .send({
+        companyId: otherCompanyId,
+        mappings: [{ accountId: local.body.id, groupAccountCode: '9999' }],
+      })
+      .expect(422);
+    await as(admin, http().put(`/api/v1/consolidation/groups/${groupId}/account-mappings`))
+      .send({ companyId, mappings: [] })
+      .expect(422);
+    await as(viewer, http().put(`/api/v1/consolidation/groups/${groupId}/account-mappings`))
+      .send({ companyId: otherCompanyId, mappings: [] })
+      .expect(403);
+
+    const mapped = await as(
+      admin,
+      http().put(`/api/v1/consolidation/groups/${groupId}/account-mappings`),
+    )
+      .send({
+        companyId: otherCompanyId,
+        mappings: [
+          { accountId: local.body.id, groupAccountCode: '6400', notes: 'Permits are opex' },
+        ],
+      })
+      .expect(200);
+    expect(mapped.body.mappings).toHaveLength(1);
+    expect(mapped.body.mappings[0].groupAccountName).toBeTruthy();
+    expect(mapped.body.unmatched).toEqual([]);
+    const after = await as(
+      admin,
+      http().get(
+        `/api/v1/consolidation/groups/${groupId}/readiness?periodStart=2026-01-01&periodEnd=2026-08-31`,
+      ),
+    ).expect(200);
+    expect(after.body.items.find((i: { key: string }) => i.key === 'CHART_MAPPED').ok).toBe(true);
+
+    // Preparing the (reopened) September run rolls the 500 into the group's 6400; no row appears for 6499.
+    const runs = await as(
+      admin,
+      http().get(`/api/v1/consolidation/runs?groupId=${groupId}&pageSize=50`),
+    ).expect(200);
+    const sept = runs.body.items.find(
+      (r: { periodEnd: string; status: string }) =>
+        r.periodEnd === '2026-09-30' && r.status === 'DRAFT',
+    );
+    const prepared = await as(
+      finance,
+      http().post(`/api/v1/consolidation/runs/${sept.id}/prepare`),
+    ).expect(201);
+    expect(row(prepared.body, '6499')).toBeUndefined();
+    expect(row(prepared.body, '6400')!.byCompany[otherCompanyId]).toBe('500.0000');
+    await expectIntegrity();
+  });
 });
