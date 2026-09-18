@@ -53,6 +53,16 @@ now opens the request on its own connection, because the caller's transaction
 rolls back with `APPROVAL_REQUIRED` - previously the request opened at
 approve/post time (vendor payments) vanished with the rollback.
 
+Every document family that moves money or creates a counterparty is now
+workflow-gated: journals, sales / purchase orders, invoices, bills, customer
+and vendor payments, refunds, write-offs, payment runs, expense claims, bank
+transfers, petty cash vouchers, payment files, pay runs, consolidation runs and
+vendor onboarding (`VENDOR`: creation with `requireVendorApproval` opens the
+request, `decide APPROVE` asserts it, `REJECT` / `BLOCK` cancels it). The
+contract is the same everywhere: the submitting action calls
+`ApprovalsService.open`, the approving / releasing action calls
+`assertApproved`, and voiding or cancelling calls `cancelFor`.
+
 Delegation of approval authority is being built separately (delegations module)
 and is not part of this phase.
 

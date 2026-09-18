@@ -253,6 +253,13 @@
       "when": 1789733419327,
       "tag": "0035_payroll_currency",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1789736914498,
+      "tag": "0036_payment_file_workflow",
+      "breakpoints": true
     }
   ]
 }

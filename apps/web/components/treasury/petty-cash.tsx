@@ -740,6 +740,24 @@ function VoucherDialog({
               </div>
               <DialogFooter className="flex-wrap gap-2">
                 {v.status === 'DRAFT' ? (
+                  <Can permissions={[P['petty-cash.manage']]}>
+                    <Button
+                      variant="ghost"
+                      disabled={action.isPending}
+                      onClick={async () => {
+                        try {
+                          await action.mutateAsync({ id: v.id, action: 'submit' });
+                          toast.success(`${v.documentNumber} submitted for approval.`);
+                        } catch (err) {
+                          toast.error(describeError(err));
+                        }
+                      }}
+                    >
+                      Submit for approval
+                    </Button>
+                  </Can>
+                ) : null}
+                {v.status === 'DRAFT' ? (
                   <Can permissions={[P['petty-cash.approve']]}>
                     <Button variant="outline" onClick={() => setPending('approve')}>
                       Approve

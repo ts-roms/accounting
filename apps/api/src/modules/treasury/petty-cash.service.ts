@@ -39,6 +39,7 @@ import { AuthorityService } from '@/modules/delegations/authority.service';
 import { OutboxService } from '@/modules/integrations/events/outbox.service';
 import { NotificationsService } from '@/modules/integrations/notifications/notifications.service';
 import { SodService } from '@/modules/rbac/sod.service';
+import { ApprovalsService } from '@/modules/workflows/approvals.service';
 import { TreasuryConfigService } from './treasury-config.service';
 import { pettyCashOnHand, replenishmentDue } from './treasury.logic';
 
@@ -91,6 +92,7 @@ export class PettyCashService {
     private readonly outbox: OutboxService,
     private readonly notifications: NotificationsService,
     private readonly config: TreasuryConfigService,
+    private readonly approvals: ApprovalsService,
   ) {}
 
   // -------------------------------------------------------------------- funds
@@ -423,6 +425,61 @@ export class PettyCashService {
   }
 
   /** Delegable approval; the custodian / creator may not approve above the fund's limit. */
+  /** Submit for approval: opens the workflow (when one is configured for vouchers) and tells approvers. */
+  async submitVoucher(
+    companyId: string,
+    actor: AuthenticatedUser,
+    id: string,
+  ): Promise<PettyCashVoucherDetail> {
+    await this.db.transaction(async (tx) => {
+      const v = await this.lockVoucher(tx, companyId, id);
+      if (v.status !== 'DRAFT')
+        throw new BusinessRuleError(
+          ErrorCodes.DOCUMENT_INVALID_STATE,
+          `${v.documentNumber} is ${v.status}.`,
+        );
+      const fund = await this.lockFund(tx, companyId, v.fundId);
+      const currency = await this.accounts.companyCurrency(companyId, tx);
+      const request = await this.approvals.open(
+        tx,
+        this.voucherRef(companyId, v, fund.branchId, currency, actor.id),
+      );
+      const [company] = await tx
+        .select({ organizationId: companies.organizationId })
+        .from(companies)
+        .where(eq(companies.id, companyId));
+      await this.notifications.notify(
+        {
+          organizationId: company!.organizationId,
+          eventType: 'PETTY_CASH_APPROVAL_REQUIRED',
+          severity: 'INFO',
+          title: `Petty cash voucher ${v.documentNumber} awaits approval`,
+          body: `${currency} ${v.total} from ${fund.code}, submitted by ${actor.email}.`,
+          link: `/treasury/petty-cash`,
+          entityType: 'PettyCashVoucher',
+          entityId: id,
+          permission: 'petty-cash.approve',
+          companyId,
+          dedupeKey: `petty-cash-approval:${id}`,
+        },
+        tx,
+      );
+      await this.audit.record(
+        {
+          action: 'UPDATE',
+          module: MODULE,
+          entityType: 'PettyCashVoucher',
+          entityId: id,
+          newValue: { submitted: true, approvalRequestId: request?.id ?? null },
+          metadata: { reason: 'submitted for approval', documentNumber: v.documentNumber },
+          companyId,
+        },
+        tx,
+      );
+    });
+    return this.getVoucher(companyId, id);
+  }
+
   async approveVoucher(
     companyId: string,
     actor: AuthenticatedUser,
@@ -437,6 +494,11 @@ export class PettyCashService {
         );
       const fund = await this.lockFund(tx, companyId, v.fundId);
       const currency = await this.accounts.companyCurrency(companyId, tx);
+      // A configured workflow must have run its course before anyone approves.
+      await this.approvals.assertApproved(
+        tx,
+        this.voucherRef(companyId, v, fund.branchId, currency, v.createdBy ?? actor.id),
+      );
       const authority = await this.authority.assert(tx, actor, P['petty-cash.approve'], {
         companyId,
         branchId: fund.branchId,
@@ -602,6 +664,25 @@ export class PettyCashService {
       }
     });
     return this.getVoucher(companyId, id);
+  }
+
+  private voucherRef(
+    companyId: string,
+    v: PettyCashVoucher,
+    branchId: string | null,
+    currency: string,
+    requestedBy: string,
+  ) {
+    return {
+      companyId,
+      documentType: 'PETTY_CASH_VOUCHER' as const,
+      documentId: v.id,
+      documentNumber: v.documentNumber,
+      amount: v.total,
+      currency,
+      branchId,
+      requestedBy,
+    };
   }
 
   async voidVoucher(

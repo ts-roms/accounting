@@ -1,0 +1,1 @@
+ALTER TYPE "public"."workflow_document_type" ADD VALUE 'PAYMENT_FILE';
