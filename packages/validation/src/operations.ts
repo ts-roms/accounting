@@ -27,6 +27,13 @@ export const runIntegrityCheckSchema = z.object({
 });
 export type RunIntegrityCheckInput = z.infer<typeof runIntegrityCheckSchema>;
 
+/** Top statements from pg_stat_statements for the operations console. */
+export const statementsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+  orderBy: z.enum(['total', 'mean', 'calls', 'rows']).default('total'),
+});
+export type StatementsQuery = z.infer<typeof statementsQuerySchema>;
+
 export const queueNameSchema = z.enum([
   'maintenance',
   'accounting-schedules',

@@ -99,6 +99,21 @@ waiting`), migrations (`known / applied / pending[]`), Redis latency and key
 prefix, storage directory writability, per-queue counts and whether jobs run
 inline.
 
+## Database statements
+
+Administration -> Operations -> **Statements** lists the top statements of the
+API's database from `pg_stat_statements` (`GET /operations/statements?orderBy=
+total|mean|calls|rows&limit`): calls, total / mean / max time, rows and the
+buffer cache hit ratio, ordered by the chosen column. It is the first stop for
+"which query makes this page slow" - copy the normalised text into
+`EXPLAIN (ANALYZE, BUFFERS)` (`docs/performance.md`). Only the API's own
+database and role are shown, and PostgreSQL normalises the text (`$1`
+placeholders), so no business values leave the database. `POST
+/operations/statements/reset` (`operations.manage`, audited) zeroes the
+counters, e.g. right after a deploy or before a load test. When the extension
+is not installed the console says so with the statement to run; the compose
+file preloads it and migration `0038` creates it where the role may.
+
 ## Metrics
 
 `GET /metrics` exposes Prometheus text (optionally behind `METRICS_TOKEN` as a
@@ -149,6 +164,6 @@ get it.
 - The stale sweep's thresholds (30 min queued, 6 h running) are constants,
   not policies.
 - Metrics are per instance (no aggregation); scrape every instance.
-- Backups and restore drills remain an infrastructure concern
-  (`docs/deployment.md`); the console reports schema currency, not backup
-  age.
+- Backups and restore drills are documented in
+  `docs/operations/backup-restore.md` (scripts under `infrastructure/scripts`);
+  the console reports schema currency, not backup age.

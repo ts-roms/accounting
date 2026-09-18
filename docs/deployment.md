@@ -36,9 +36,24 @@ PostgreSQL on 5432; change `POSTGRES_HOST_PORT` / `DATABASE_URL` if needed.
 docker compose -f infrastructure/docker/docker-compose.yml --profile app up --build
 ```
 
-The API container does not auto-migrate on boot; run migrations as an explicit
-deployment step (`pnpm db:migrate` from CI or a one-off container) so schema
-changes stay deliberate and auditable.
+The API process never migrates on boot. Migrate-on-deploy is the `migrate`
+service in the compose file: the same API image runs the bundled migrations
+(`node dist/database/migrate.js`, also `pnpm --filter @accounting/api
+db:migrate:dist`) and exits, and `api` starts only after it succeeded
+(`depends_on: condition: service_completed_successfully`). A failed migration
+stops the rollout with its log instead of booting an API whose readiness would
+fail. On other platforms run the same command as a pre-deploy job / init
+container; `/health/ready` stays 503 until every bundled migration is applied.
+
+The compose Postgres preloads `pg_stat_statements` (`shared_preload_libraries`)
+and `postgres/init/02-extensions.sql` creates it; migration
+`0038_pg_stat_statements` also tries `CREATE EXTENSION` on every database and
+only notices when it cannot. Administration -> Operations -> **Statements**
+reads it. Recreate a Postgres container created before this change
+(`docker compose up -d postgres`) - the data volume is kept.
+
+Backups: `docs/operations/backup-restore.md` (`infrastructure/scripts/backup.sh`
+/ `restore.sh`, what holds state, the restore drill).
 
 ## Environment
 

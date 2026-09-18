@@ -19,6 +19,7 @@ import {
 } from './operations.controller';
 import { RuntimeStatusService } from './runtime-status.service';
 import { StaleJobsService } from './stale-jobs.service';
+import { StatementsService } from './statements.service';
 
 /**
  * Operations & reliability (hardening H8): job registry views, queue dead
@@ -37,6 +38,7 @@ import { StaleJobsService } from './stale-jobs.service';
     RuntimeStatusService,
     IntegrityScheduleService,
     StaleJobsService,
+    StatementsService,
     MetricsService,
     { provide: APP_INTERCEPTOR, useClass: MetricsInterceptor },
   ],

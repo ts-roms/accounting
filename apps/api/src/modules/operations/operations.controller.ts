@@ -22,6 +22,7 @@ import {
   listJobRunsQuerySchema,
   queueNameSchema,
   runIntegrityCheckSchema,
+  statementsQuerySchema,
 } from '@accounting/validation';
 import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { CompanyScoped } from '@/common/decorators/company-scoped.decorator';
@@ -38,11 +39,13 @@ import { QueueService, type QueueName } from '@/modules/jobs/queue.service';
 import { IntegrityScheduleService } from './integrity-schedule.service';
 import { MetricsService } from './metrics.service';
 import { RuntimeStatusService } from './runtime-status.service';
+import { StatementsService } from './statements.service';
 
 class ListJobRunsQueryDto extends createZodDto(listJobRunsQuerySchema) {}
 class ListIntegrityRunsQueryDto extends createZodDto(listIntegrityRunsQuerySchema) {}
 class RunIntegrityCheckDto extends createZodDto(runIntegrityCheckSchema) {}
 class FailedJobsQueryDto extends createZodDto(failedJobsQuerySchema) {}
+class StatementsQueryDto extends createZodDto(statementsQuerySchema) {}
 
 const parseJob = (name: string): string => {
   const parsed = jobNameSchema.safeParse(name);
@@ -70,6 +73,7 @@ export class OperationsController {
     private readonly queues: QueueService,
     private readonly integrity: IntegrityScheduleService,
     private readonly checks: IntegrityService,
+    private readonly statements: StatementsService,
     private readonly audit: AuditService,
   ) {}
 
@@ -182,6 +186,30 @@ export class OperationsController {
       entityType: 'Queue',
       entityId: name,
       newValue: { jobId: id, removed, by: user.email },
+    });
+  }
+
+  @Get('statements')
+  @RequirePermissions(P['operations.view'])
+  @ApiOperation({
+    summary: 'Top database statements (pg_stat_statements) by total time, mean time, calls or rows',
+  })
+  statementStats(@Query() query: StatementsQueryDto) {
+    return this.statements.top(query);
+  }
+
+  @Post('statements/reset')
+  @RequirePermissions(P['operations.manage'])
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Reset the pg_stat_statements counters (audited)' })
+  async resetStatements(@CurrentUser() user: AuthenticatedUser) {
+    await this.statements.reset();
+    await this.audit.record({
+      action: 'DELETE',
+      module: 'operations',
+      entityType: 'StatementStats',
+      entityId: 'pg_stat_statements',
+      newValue: { reset: true, by: user.email },
     });
   }
 

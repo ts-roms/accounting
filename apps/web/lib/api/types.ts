@@ -2856,6 +2856,25 @@ export interface FailedJobView {
   finishedOn: string | null;
 }
 
+export interface StatementRowView {
+  queryId: string;
+  query: string;
+  calls: number;
+  totalMs: number;
+  meanMs: number;
+  maxMs: number;
+  rows: number;
+  hitPercent: number | null;
+}
+
+export interface StatementsView {
+  available: boolean;
+  reason: string | null;
+  resetAt: string | null;
+  orderBy: 'total' | 'mean' | 'calls' | 'rows';
+  rows: StatementRowView[];
+}
+
 export interface RuntimeStatusView {
   version: string;
   instanceId: string;

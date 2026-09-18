@@ -1,7 +1,11 @@
 'use client';
 /* TanStack Query hooks for the operations console (hardening H8). */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ListIntegrityRunsQuery, ListJobRunsQuery } from '@accounting/validation';
+import type {
+  ListIntegrityRunsQuery,
+  ListJobRunsQuery,
+  StatementsQuery,
+} from '@accounting/validation';
 import { api } from './client';
 import type {
   FailedJobView,
@@ -11,6 +15,7 @@ import type {
   PaginatedResult,
   QueueStatsView,
   RuntimeStatusView,
+  StatementsView,
 } from './types';
 
 const OPS = 'operations';
@@ -89,6 +94,21 @@ export const useIntegrityRuns = (query: Partial<ListIntegrityRunsQuery>) =>
       api.get<PaginatedResult<IntegrityRunView>>('/operations/integrity-runs', { query }),
     placeholderData: (prev) => prev,
   });
+
+export const useStatementStats = (query: Partial<StatementsQuery>) =>
+  useQuery({
+    queryKey: [OPS, 'statements', query],
+    queryFn: () => api.get<StatementsView>('/operations/statements', { query }),
+    placeholderData: (prev) => prev,
+  });
+
+export const useResetStatementStats = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<void>('/operations/statements/reset'),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [OPS, 'statements'] }),
+  });
+};
 
 export const useRunIntegrityCheck = () => {
   const qc = useQueryClient();

@@ -1,6 +1,6 @@
 'use client';
 import * as React from 'react';
-import { Play, RotateCcw, ShieldCheck, Trash2 } from 'lucide-react';
+import { Database, Play, RotateCcw, ShieldCheck, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { P } from '@accounting/types';
 import {
@@ -37,12 +37,14 @@ import {
   useJobRuns,
   useJobs,
   useQueueStats,
+  useResetStatementStats,
   useRetryFailed,
   useRunIntegrityCheck,
   useRunJob,
   useRuntimeStatus,
+  useStatementStats,
 } from '@/lib/api/operations-hooks';
-import type { IntegrityRunView, JobRunView } from '@/lib/api/types';
+import type { IntegrityRunView, JobRunView, StatementsView } from '@/lib/api/types';
 import { useSession } from '@/lib/auth/session';
 import { Can, EmptyState, ErrorState, PageHeader, TableSkeleton } from '@/components/ui-ext/page';
 
@@ -100,6 +102,9 @@ export function OperationsConsole() {
           <TabsTrigger value="integrity" data-testid="ops-tab-integrity">
             Integrity runs
           </TabsTrigger>
+          <TabsTrigger value="statements" data-testid="ops-tab-statements">
+            Statements
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="jobs">
           <JobsPanel />
@@ -112,6 +117,9 @@ export function OperationsConsole() {
         </TabsContent>
         <TabsContent value="integrity">
           <IntegrityPanel />
+        </TabsContent>
+        <TabsContent value="statements">
+          <StatementsPanel />
         </TabsContent>
       </Tabs>
     </>
@@ -554,6 +562,129 @@ function QueuesPanel() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+const ORDER_LABEL: Record<StatementsView['orderBy'], string> = {
+  total: 'Total time',
+  mean: 'Mean time',
+  calls: 'Calls',
+  rows: 'Rows',
+};
+const ms = (n: number) =>
+  n < 1 ? `${n.toFixed(2)} ms` : n < 1000 ? `${n.toFixed(1)} ms` : `${(n / 1000).toFixed(2)} s`;
+
+/**
+ * Top database statements from pg_stat_statements: the first stop when a
+ * page is slow ("which query is it?"). Statement text is normalised by
+ * PostgreSQL, so no business values appear here.
+ */
+function StatementsPanel() {
+  const [orderBy, setOrderBy] = React.useState<StatementsView['orderBy']>('total');
+  const stats = useStatementStats({ orderBy, limit: 25 });
+  const reset = useResetStatementStats();
+  return (
+    <Card>
+      <CardHeader className="flex flex-row flex-wrap items-center gap-3">
+        <CardTitle className="mr-auto flex items-center gap-2">
+          <Database className="size-4 text-subtle-foreground" aria-hidden />
+          Database statements
+          {stats.data?.resetAt ? (
+            <span className="text-xs font-normal text-muted-foreground">
+              since {when(stats.data.resetAt)}
+            </span>
+          ) : null}
+        </CardTitle>
+        <Select value={orderBy} onValueChange={(v) => setOrderBy(v as StatementsView['orderBy'])}>
+          <SelectTrigger className="w-40" data-testid="ops-statements-order">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.keys(ORDER_LABEL) as StatementsView['orderBy'][]).map((k) => (
+              <SelectItem key={k} value={k}>
+                By {ORDER_LABEL[k].toLowerCase()}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Can permissions={[P['operations.manage']]}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!stats.data?.available || reset.isPending}
+            data-testid="ops-statements-reset"
+            onClick={() =>
+              reset.mutate(undefined, {
+                onSuccess: () => toast.success('Statement counters reset.'),
+                onError: (e) => toast.error(describeError(e)),
+              })
+            }
+          >
+            <RotateCcw /> Reset counters
+          </Button>
+        </Can>
+      </CardHeader>
+      <CardContent className="p-0">
+        {stats.isError ? (
+          <ErrorState description={describeError(stats.error)} />
+        ) : !stats.data ? (
+          <TableSkeleton rows={6} />
+        ) : !stats.data.available ? (
+          <EmptyState
+            className="border-0"
+            title="pg_stat_statements is not enabled"
+            description={stats.data.reason ?? undefined}
+          />
+        ) : stats.data.rows.length === 0 ? (
+          <EmptyState
+            className="border-0"
+            title="No statements recorded yet"
+            description="Counters start at the last reset; use the application for a while and refresh."
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <Table data-testid="ops-statements">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Statement</TableHead>
+                  <TableHead className="text-right">Calls</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="text-right">Mean</TableHead>
+                  <TableHead className="text-right">Max</TableHead>
+                  <TableHead className="text-right">Rows</TableHead>
+                  <TableHead className="text-right">Cache hit</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {stats.data.rows.map((r) => (
+                  <TableRow key={r.queryId} data-testid="ops-statement-row">
+                    <TableCell className="max-w-xl">
+                      <code className="block whitespace-pre-wrap break-words font-mono text-xs text-muted-foreground">
+                        {r.query}
+                      </code>
+                    </TableCell>
+                    <TableCell className="tabular text-right text-xs">
+                      {r.calls.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="tabular text-right text-xs">{ms(r.totalMs)}</TableCell>
+                    <TableCell className="tabular text-right text-xs font-medium">
+                      {ms(r.meanMs)}
+                    </TableCell>
+                    <TableCell className="tabular text-right text-xs">{ms(r.maxMs)}</TableCell>
+                    <TableCell className="tabular text-right text-xs">
+                      {r.rows.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="tabular text-right text-xs">
+                      {r.hitPercent === null ? '-' : `${r.hitPercent.toFixed(1)}%`}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
