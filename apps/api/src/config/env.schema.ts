@@ -54,6 +54,18 @@ export const envSchema = z.object({
   AI_MODEL: z.string().trim().min(1).default('claude-sonnet-5'),
   /** Nightly anomaly scan window in days (0 disables the job). */
   AI_ANOMALY_SCAN_DAYS: z.coerce.number().int().min(0).max(365).default(7),
+  /**
+   * OCR for scanned images in AI intake without a model backend: NONE (images
+   * land in review untouched) or TESSERACT (tesseract.js, local WASM engine).
+   */
+  OCR_PROVIDER: z.enum(['NONE', 'TESSERACT']).default('NONE'),
+  /** Tesseract language codes, "+" separated (language data is downloaded once into OCR_CACHE_DIR). */
+  OCR_LANGUAGES: z.string().trim().min(3).default('eng'),
+  /** Where downloaded language data is cached; defaults to <STORAGE_DIR>/ocr-cache. */
+  OCR_CACHE_DIR: z.string().trim().min(1).optional(),
+  /** Directory or URL holding <lang>.traineddata for air-gapped hosts (skips the download). */
+  OCR_LANG_PATH: z.string().trim().min(1).optional(),
+  OCR_TIMEOUT_MS: z.coerce.number().int().min(1000).max(300_000).default(30_000),
 
   /**
    * Nightly accounting schedules (recurring journals, prepayment recognition).

@@ -9,6 +9,7 @@ import type {
   CreateEliminationRuleInput,
   IntercompanyReconciliationQuery,
   ListConsolidationRunsQuery,
+  SetAccountMappingsInput,
   SettleIntercompanyInput,
   UpdateConsolidationGroupInput,
   UpdateConsolidationMemberInput,
@@ -16,6 +17,7 @@ import type {
 } from '@accounting/validation';
 import { api } from './client';
 import type {
+  AccountMappingsView,
   ConsolidatedStatements,
   ConsolidationGroup,
   ConsolidationIntegrityReport,
@@ -109,6 +111,26 @@ export const useRemoveGroupMember = () => {
     onSuccess: () => invalidateAll(qc),
   });
 };
+// --------------------------------------------------------- chart mappings
+
+export const useAccountMappings = (groupId: string | null, companyId: string | null) =>
+  useQuery({
+    queryKey: key('group', groupId, 'account-mappings', companyId),
+    queryFn: () =>
+      api.get<AccountMappingsView>(`/consolidation/groups/${groupId}/account-mappings`, {
+        query: { companyId },
+      }),
+    enabled: Boolean(groupId && companyId),
+  });
+export const useSetAccountMappings = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ groupId, ...input }: SetAccountMappingsInput & { groupId: string }) =>
+      api.put<AccountMappingsView>(`/consolidation/groups/${groupId}/account-mappings`, input),
+    onSuccess: () => invalidateAll(qc),
+  });
+};
+
 export const useCreateEliminationRule = () => {
   const qc = useQueryClient();
   return useMutation({

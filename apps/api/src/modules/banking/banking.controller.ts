@@ -10,7 +10,10 @@ import {
   Post,
   Put,
   Query,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
@@ -33,8 +36,14 @@ import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { CompanyScoped } from '@/common/decorators/company-scoped.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
+import { BusinessRuleError } from '@/common/errors/app-error';
+import { ErrorCodes } from '@/common/errors/error-codes';
 import { BankingService } from './banking.service';
+import { parseStatementFile, StatementFormatError } from './statement-formats.logic';
 import { StatementsService } from './statements.service';
+
+/** Statement files are small text; 10 MB covers a year of camt.053. */
+const STATEMENT_FILE_MAX_BYTES = 10 * 1024 * 1024;
 
 class CreateBankAccountDto extends createZodDto(createBankAccountSchema) {}
 class UpdateBankAccountDto extends createZodDto(updateBankAccountSchema) {}
@@ -208,6 +217,27 @@ export class BankStatementsController {
   @ApiOperation({ summary: 'Import a statement and run the matching engine' })
   import(@CurrentUser() user: AuthenticatedUser, @Body() body: ImportStatementDto) {
     return this.statements.import(user.companyId!, user, body);
+  }
+
+  @Post('parse')
+  @RequirePermissions(P['bank-statement.import'])
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: STATEMENT_FILE_MAX_BYTES, files: 1 } }),
+  )
+  @ApiOperation({
+    summary:
+      'Parse a bank statement file (MT940, camt.053, OFX / QFX) into the import shape; nothing is stored',
+  })
+  parse(@UploadedFile() file: { buffer: Buffer; originalname?: string } | undefined) {
+    if (!file)
+      throw new BusinessRuleError(ErrorCodes.VALIDATION_FAILED, 'A statement file is required.');
+    try {
+      return parseStatementFile(file.buffer.toString('utf8'));
+    } catch (err) {
+      if (err instanceof StatementFormatError)
+        throw new BusinessRuleError(ErrorCodes.VALIDATION_FAILED, err.message);
+      throw err;
+    }
   }
 
   @Post(':id/rematch')

@@ -1,5 +1,7 @@
 import { type INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { Pool } from 'pg';
 import request from 'supertest';
 import { AppModule } from '@/app.module';
@@ -7,6 +9,8 @@ import { configureApp } from '@/app.setup';
 import { runMigrations } from '@/database/migrate';
 import { runSeed } from '@/database/seed/seed';
 
+// Scanned images are read locally by tesseract.js (language data is cached under STORAGE_DIR).
+process.env.OCR_PROVIDER = 'TESSERACT';
 const DB_URL = process.env.DATABASE_URL!;
 const ADMIN = { email: 'admin@acme.local', password: 'P@ssw0rd123' };
 const FINANCE = { email: 'finance@acme.local', password: 'P@ssw0rd123' };
@@ -109,7 +113,12 @@ describe('AI assistance (e2e)', () => {
 
   it('reports the provider and that everything is advisory', async () => {
     const res = await as(http().get('/api/v1/ai/status')).expect(200);
-    expect(res.body).toEqual({ provider: 'HEURISTIC', model: null, advisoryOnly: true });
+    expect(res.body).toEqual({
+      provider: 'HEURISTIC',
+      model: null,
+      ocr: 'TESSERACT',
+      advisoryOnly: true,
+    });
     // Viewers may look (ai.view) but not use.
     await as(http().get('/api/v1/ai/status'), viewer).expect(200);
     await as(http().post('/api/v1/ai/ask'), viewer).send({ question: 'revenue' }).expect(403);
@@ -168,6 +177,23 @@ describe('AI assistance (e2e)', () => {
       .send({ kind: 'BILL' })
       .expect(422);
   });
+
+  it('a scanned image is read by OCR and extracted like a text upload (no model needed)', async () => {
+    const png = readFileSync(path.join(__dirname, 'fixtures', 'scanned-invoice.png'));
+    const up = await as(http().post('/api/v1/ai/intake'))
+      .attach('file', png, { filename: 'scan.png', contentType: 'image/png' })
+      .expect(201);
+    expect(up.body.status).toBe('EXTRACTED');
+    expect(up.body.kind).toBe('BILL');
+    expect(up.body.provider).toBe('HEURISTIC');
+    expect(up.body.vendorId).toBe(vendorId); // matched by the TIN read off the image
+    expect(up.body.extracted.reference).toBe('MWD-2026-0100');
+    expect(up.body.extracted.total).toBe('12208.0000');
+    expect(up.body.extracted.lines.length).toBeGreaterThanOrEqual(2);
+    const detail = await as(http().get(`/api/v1/ai/intake/${up.body.id}`)).expect(200);
+    expect(detail.body.sourceText).toContain('Metro Wholesale Distributors');
+    expect(detail.body.error).toBeNull();
+  }, 120_000);
 
   it('unreadable uploads land in NEEDS_REVIEW, can be corrected and dismissed', async () => {
     const up = await as(http().post('/api/v1/ai/intake'))

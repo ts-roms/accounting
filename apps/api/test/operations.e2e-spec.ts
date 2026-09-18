@@ -307,11 +307,20 @@ describe('Operations (e2e)', () => {
   // ------------------------------------------------------------- permissions
 
   it('lists the top database statements from pg_stat_statements and resets the counters (audited)', async () => {
-    // Migration 0038 created the extension in this database (the test role is the owner).
+    // Migration 0038 created the extension in this database (the test role is the owner);
+    // whether it can be read depends on the server preloading the library (the compose
+    // Postgres does, a stock service container does not) - both must be handled cleanly.
     const stats = await as(
       http().get('/api/v1/operations/statements?orderBy=calls&limit=5'),
     ).expect(200);
-    expect(stats.body.available).toBe(true);
+    if (!stats.body.available) {
+      expect(stats.body.reason).toMatch(/shared_preload_libraries/);
+      expect(stats.body.rows).toEqual([]);
+      const refused = await as(http().post('/api/v1/operations/statements/reset')).expect(422);
+      expect(refused.body.code).toBe('VALIDATION_FAILED');
+      await as(http().post('/api/v1/operations/statements/reset'), auditor).expect(403);
+      return;
+    }
     expect(stats.body.orderBy).toBe('calls');
     expect(stats.body.rows.length).toBeGreaterThan(0);
     expect(stats.body.rows.length).toBeLessThanOrEqual(5);

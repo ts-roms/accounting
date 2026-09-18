@@ -34,6 +34,7 @@ import {
   useBankAccounts,
   useBankStatements,
   useImportStatement,
+  useParseStatementFile,
 } from '@/lib/api/assets-banking-hooks';
 import type { BankStatement } from '@/lib/api/types';
 import { DataTable, useTableState } from '@/components/ui-ext/data-table';
@@ -246,6 +247,8 @@ export function parseStatementText(text: string): {
   return { lines, errors };
 }
 
+const csvCell = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+
 export function ImportStatementPage() {
   const router = useAppRouter();
   const params = useSearchParams();
@@ -277,10 +280,41 @@ export function ImportStatementPage() {
       ? expectedClosing.equals(Money.parse(closingBalance.trim(), currency))
       : null;
 
+  const parseFile = useParseStatementFile();
+  const [fileInfo, setFileInfo] = React.useState<string | null>(null);
   const onFile = async (file: File | undefined) => {
     if (!file) return;
     setFileName(file.name);
-    setText(await file.text());
+    setFileInfo(null);
+    const content = await file.text();
+    // Bank exports (MT940, camt.053, OFX / QFX) are parsed by the API into the
+    // same lines a CSV gives, plus the balances and date the file carries.
+    if (
+      /^:20:|:60F:|<Document|<BkToCstmrStmt|<OFX>|OFXHEADER|<STMTTRN>/m.test(content.slice(0, 4000))
+    ) {
+      try {
+        const parsed = await parseFile.mutateAsync(file);
+        setStatementDate(parsed.statementDate);
+        setOpeningBalance(parsed.openingBalance);
+        setClosingBalance(parsed.closingBalance);
+        setText(
+          [
+            'date,description,reference,amount',
+            ...parsed.lines.map((l) =>
+              [l.lineDate, csvCell(l.description), csvCell(l.reference ?? ''), l.amount].join(','),
+            ),
+          ].join('\n'),
+        );
+        setFileInfo(
+          `${parsed.format}${parsed.accountRef ? ` · account ${parsed.accountRef}` : ''}${parsed.currency ? ` · ${parsed.currency}` : ''}${parsed.warnings.length ? ` · ${parsed.warnings.join(' ')}` : ''}`,
+        );
+        return;
+      } catch (err) {
+        toast.error(describeError(err));
+        return;
+      }
+    }
+    setText(content);
   };
 
   const submit = async () => {
@@ -376,12 +410,18 @@ export function ImportStatementPage() {
               </p>
             ) : null}
             <div className="space-y-1">
-              <Label>File (CSV / TSV)</Label>
+              <Label>File (CSV / TSV, MT940, camt.053, OFX / QFX)</Label>
               <Input
                 type="file"
-                accept=".csv,.txt,.tsv"
+                accept=".csv,.txt,.tsv,.mt940,.sta,.940,.xml,.ofx,.qfx"
                 onChange={(e) => void onFile(e.target.files?.[0])}
+                data-testid="stm-file"
               />
+              {fileInfo ? (
+                <p className="text-xs text-muted-foreground" data-testid="stm-file-info">
+                  {fileInfo}
+                </p>
+              ) : null}
             </div>
             <Button
               className="w-full"

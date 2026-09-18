@@ -185,6 +185,21 @@ export const createConsolidationRunSchema = z
   });
 export type CreateConsolidationRunInput = z.infer<typeof createConsolidationRunSchema>;
 
+/** Replaces the chart mappings of one member company in a group. */
+export const setAccountMappingsSchema = z.object({
+  companyId: uuidSchema,
+  mappings: z
+    .array(
+      z.object({
+        accountId: uuidSchema,
+        groupAccountCode: z.string().trim().min(1).max(30),
+        notes: optionalText(300),
+      }),
+    )
+    .max(2000),
+});
+export type SetAccountMappingsInput = z.infer<typeof setAccountMappingsSchema>;
+
 export const listConsolidationRunsQuerySchema = paginationQuerySchema.extend({
   groupId: uuidSchema.optional(),
   status: z.enum(CONSOLIDATION_RUN_STATUSES).optional(),

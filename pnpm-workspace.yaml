@@ -11,3 +11,5 @@ allowBuilds:
   sharp: true
   unrs-resolver: true
   '@scarf/scarf': false
+  # opencollective banner only
+  tesseract.js: false

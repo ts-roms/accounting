@@ -89,6 +89,15 @@ integrity checks.
   `AuthorityService.assert(consolidation.approve)`, SoD
   `consolidation.run` vs `consolidation.approve` against the preparer
   (WARN by default).
+- Group chart mappings (`consolidation_account_mappings`): a subsidiary
+  whose chart differs from the parent's maps each foreign account to a code
+  in the parent's chart (`GET / PUT /consolidation/groups/:id/account-mappings`,
+  `consolidation.manage`, audited; the target must be postable and of the same
+  account type; the parent is never mapped). Accounts that share the parent's
+  code need nothing. `prepare` reads member figures through the mapping and
+  sums several member accounts into one group code; readiness item
+  `CHART_MAPPED` (warning) lists unmapped foreign accounts that carry a
+  balance. Finalized snapshots already hold the mapped codes.
 - Structure changes never rewrite history: adding / removing members while
   a finalized run covers the date is refused; member edits apply to the
   next preparation only.

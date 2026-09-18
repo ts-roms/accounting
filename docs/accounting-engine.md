@@ -349,6 +349,17 @@ by unit tests; the services around them only gather inputs and store results.
 | Assistant      | Answers built only from report services, with cited sources                                         | Reads; the assistant refuses advice and unknown asks  |
 | Forecast       | Trend + band from monthly posted activity                                                           | Plans; nothing is booked                              |
 
+Scanned images without a model backend: with `OCR_PROVIDER=TESSERACT` the
+intake reads photos and scans locally (`OcrService`, tesseract.js - a WASM
+engine, no system binary, no network at recognition time; language data is
+fetched once into `OCR_CACHE_DIR`, or read from `OCR_LANG_PATH` on air-gapped
+hosts) and hands the text to the same heuristic extractor a text upload gets,
+so a receipt photo still lands as an EXTRACTED draft with the vendor matched
+by TIN. The OCR text is stored as `sourceText` for the reviewer; `provider`
+stays `HEURISTIC` (`GET /ai/status` reports `ocr`). With a model backend the
+model reads the image itself and OCR is skipped. Scanned PDFs (no text layer)
+are not rasterised - upload the page as an image.
+
 Guarantees enforced in code: drafts require the same create permission as a
 manual document and inherit numbering, tax, approval and posting rules;
 answers are permission-filtered (`reports.view`, `invoice.view`, `bill.view`,

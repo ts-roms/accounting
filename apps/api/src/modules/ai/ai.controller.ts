@@ -39,6 +39,7 @@ import { AiAssistantService } from './ai-assistant.service';
 import { AiClassifierService } from './ai-classifier.service';
 import { AiIntakeService } from './ai-intake.service';
 import { AiProviderService } from './ai-provider.service';
+import { OcrService } from './ocr.service';
 
 class IntakeMetaDto extends createZodDto(aiIntakeMetaSchema) {}
 class ListDocumentsDto extends createZodDto(listAiDocumentsQuerySchema) {}
@@ -67,12 +68,18 @@ export class AiController {
     private readonly anomalies: AiAnomalyService,
     private readonly assistant: AiAssistantService,
     private readonly provider: AiProviderService,
+    private readonly ocr: OcrService,
   ) {}
 
   @Get('status')
   @RequirePermissions(P['ai.view'])
   status() {
-    return { provider: this.provider.name, model: this.provider.model, advisoryOnly: true };
+    return {
+      provider: this.provider.name,
+      model: this.provider.model,
+      ocr: this.ocr.name,
+      advisoryOnly: true,
+    };
   }
 
   // -------------------------------------------------------------------- intake

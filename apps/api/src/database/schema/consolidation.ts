@@ -26,7 +26,7 @@ import {
   type EliminationRuleConfig,
 } from '@accounting/types';
 import { primaryId, timestamps } from './_shared';
-import { money } from './accounting';
+import { accounts, money } from './accounting';
 import { rate } from './enterprise';
 import { companies, organizations } from './organizations';
 import { users } from './users';
@@ -120,6 +120,38 @@ export const consolidationGroupMembers = pgTable(
       'consolidation_group_members_percent_chk',
       sql`${t.ownershipPercent} >= 0 and ${t.ownershipPercent} <= 100`,
     ),
+  ],
+);
+
+// ----------------------------------------------------------- chart mappings
+
+/**
+ * Explicit group chart mapping: a member account that does not share the
+ * parent's code (a subsidiary with its own chart) rolls up to a parent
+ * account code in the group figures. Members without mappings keep matching
+ * by code, so identical charts need nothing here.
+ */
+export const consolidationAccountMappings = pgTable(
+  'consolidation_account_mappings',
+  {
+    id: primaryId(),
+    groupId: uuid('group_id')
+      .notNull()
+      .references(() => consolidationGroups.id, { onDelete: 'cascade' }),
+    companyId: uuid('company_id')
+      .notNull()
+      .references(() => companies.id, { onDelete: 'restrict' }),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    /** Code in the parent's chart the member account consolidates into. */
+    groupAccountCode: text('group_account_code').notNull(),
+    notes: text('notes'),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('consolidation_account_mappings_uq').on(t.groupId, t.accountId),
+    index('consolidation_account_mappings_company_idx').on(t.groupId, t.companyId),
   ],
 );
 
@@ -263,6 +295,7 @@ export const consolidationAdjustmentLines = pgTable(
 
 export type ConsolidationGroup = typeof consolidationGroups.$inferSelect;
 export type ConsolidationGroupMember = typeof consolidationGroupMembers.$inferSelect;
+export type ConsolidationAccountMapping = typeof consolidationAccountMappings.$inferSelect;
 export type EliminationRule = typeof eliminationRules.$inferSelect;
 export type ConsolidationRun = typeof consolidationRuns.$inferSelect;
 export type ConsolidationAdjustment = typeof consolidationAdjustments.$inferSelect;
