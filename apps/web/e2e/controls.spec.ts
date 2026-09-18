@@ -96,7 +96,7 @@ test.describe('accounting controls', () => {
     await login(page);
     await page.goto('/accounting/integrity');
     await expect(page.getByTestId('integrity-status')).toBeVisible();
-    await expect(page.getByTestId('integrity-check')).toHaveCount(22);
+    await expect(page.getByTestId('integrity-check')).toHaveCount(23);
     await expect(page.getByText('Posted journals balance')).toBeVisible();
     await expect(page.getByRole('row').filter({ hasText: 'UNBALANCED_JOURNAL' })).toContainText(
       'PASS',
