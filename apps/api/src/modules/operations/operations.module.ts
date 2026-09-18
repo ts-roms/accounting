@@ -12,6 +12,7 @@ import { IntegrityScheduleService } from './integrity-schedule.service';
 import { MetricsInterceptor } from './metrics.interceptor';
 import { MetricsService } from './metrics.service';
 import {
+  IntegrityRunsController,
   MetricsController,
   OperationsController,
   ReadinessController,
@@ -26,7 +27,12 @@ import { StaleJobsService } from './stale-jobs.service';
  */
 @Module({
   imports: [JobsModule, IntegrityModule],
-  controllers: [OperationsController, ReadinessController, MetricsController],
+  controllers: [
+    OperationsController,
+    IntegrityRunsController,
+    ReadinessController,
+    MetricsController,
+  ],
   providers: [
     RuntimeStatusService,
     IntegrityScheduleService,

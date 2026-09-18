@@ -24,6 +24,7 @@ import {
   runIntegrityCheckSchema,
 } from '@accounting/validation';
 import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
+import { CompanyScoped } from '@/common/decorators/company-scoped.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { Public } from '@/common/decorators/public.decorator';
 import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
@@ -193,6 +194,34 @@ export class OperationsController {
   @ApiOperation({ summary: 'Run the integrity check for one company now and store the outcome' })
   runIntegrity(@CurrentUser() user: AuthenticatedUser, @Body() body: RunIntegrityCheckDto) {
     return this.integrity.runCompany(body.companyId, user);
+  }
+}
+
+/**
+ * Company-level view of the stored integrity runs for holders of `integrity.check`:
+ * the dashboard reads the latest outcome instead of re-running every check on
+ * each visit (`GET /integrity` stays the live, on-demand audit).
+ */
+@ApiTags('Integrity')
+@Controller('integrity/runs')
+@CompanyScoped()
+export class IntegrityRunsController {
+  constructor(private readonly integrity: IntegrityScheduleService) {}
+
+  @Get('latest')
+  @RequirePermissions(P['integrity.check'])
+  @ApiOperation({ summary: 'Latest stored integrity run of the active company (null when none)' })
+  latest(@CurrentUser() user: AuthenticatedUser) {
+    return this.integrity.latest(user.companyId!);
+  }
+
+  @Post()
+  @RequirePermissions(P['integrity.check'])
+  @ApiOperation({
+    summary: 'Run the integrity checks for the active company now and store the outcome',
+  })
+  run(@CurrentUser() user: AuthenticatedUser) {
+    return this.integrity.runCompany(user.companyId!, user);
   }
 }
 

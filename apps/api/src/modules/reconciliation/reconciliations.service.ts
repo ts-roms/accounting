@@ -241,40 +241,49 @@ export class ReconciliationsService {
     areas: AreaSummary[];
     banks: BankAccountSummary[];
   }> {
-    const policy = await this.policy(companyId);
-    const currency = await this.balances.currency(companyId);
+    const [policy, currency] = await Promise.all([
+      this.policy(companyId),
+      this.balances.currency(companyId),
+    ]);
     const materiality = Money.of(policy.reconciliationMateriality, currency);
     const staleBefore = new Date(Date.now() - policy.reconciliationStaleDays * 86_400_000);
-    const areas: AreaSummary[] = [];
-    for (const area of RECONCILIATION_AREAS) {
-      const [latestRow] = await this.viewQuery()
-        .where(and(eq(reconciliations.companyId, companyId), eq(reconciliations.area, area)))
-        .orderBy(desc(reconciliations.asOf), desc(reconciliations.computedAt))
-        .limit(1);
+    // Each area is a handful of independent reads; run them side by side (the summary is on
+    // the dashboard, where its wall time is the sum of its round trips otherwise).
+    const summariseArea = async (area: ReconciliationArea): Promise<AreaSummary> => {
+      const [[latestRow], live] = await Promise.all([
+        this.viewQuery()
+          .where(and(eq(reconciliations.companyId, companyId), eq(reconciliations.area, area)))
+          .orderBy(desc(reconciliations.asOf), desc(reconciliations.computedAt))
+          .limit(1),
+        this.balances.compute(companyId, area, asOf).then(
+          (b): AreaSummary['live'] => ({
+            expected: b.expected,
+            actual: b.actual,
+            variance: b.variance,
+            withinMateriality: !Money.of(b.variance, currency).abs().greaterThan(materiality),
+          }),
+          (): AreaSummary['live'] => ({
+            expected: '0',
+            actual: '0',
+            variance: '0',
+            withinMateriality: true,
+          }),
+        ),
+      ]);
       const latest = latestRow ? toView(latestRow) : null;
-      let live: AreaSummary['live'];
-      try {
-        const b = await this.balances.compute(companyId, area, asOf);
-        live = {
-          expected: b.expected,
-          actual: b.actual,
-          variance: b.variance,
-          withinMateriality: !Money.of(b.variance, currency).abs().greaterThan(materiality),
-        };
-      } catch {
-        live = { expected: '0', actual: '0', variance: '0', withinMateriality: true };
-      }
-      areas.push({ area, latest, live, stale: !latest || latest.computedAt < staleBefore });
-    }
-    const banks = await this.bankSummary(companyId);
+      return { area, latest, live, stale: !latest || latest.computedAt < staleBefore };
+    };
+    const [areas, banks] = await Promise.all([
+      Promise.all(RECONCILIATION_AREAS.map(summariseArea)),
+      this.bankSummary(companyId),
+    ]);
     return { asOf, materiality: materiality.toString(), areas, banks };
   }
 
   /** Bank accounts: ledger balance plus the state of the latest statement's reconciliation. */
   private async bankSummary(companyId: string): Promise<BankAccountSummary[]> {
     const accountsList = await this.banking.listAccounts(companyId);
-    const out: BankAccountSummary[] = [];
-    for (const a of accountsList) {
+    const summariseAccount = async (a: (typeof accountsList)[number]) => {
       const statements = await this.statements.list(companyId, {
         bankAccountId: a.id,
         page: 1,
@@ -290,7 +299,7 @@ export class ReconciliationsService {
           .where(eq(bankReconciliations.statementId, latest.id));
         reconciliationStatus = rec?.status ?? 'IN_PROGRESS';
       }
-      out.push({
+      return {
         bankAccountId: a.id,
         code: a.code,
         name: a.name,
@@ -302,9 +311,9 @@ export class ReconciliationsService {
         unmatched: latest?.unmatchedCount ?? 0,
         possible: latest?.possibleCount ?? 0,
         exceptions: latest?.exceptionCount ?? 0,
-      });
-    }
-    return out;
+      } satisfies BankAccountSummary;
+    };
+    return Promise.all(accountsList.map(summariseAccount));
   }
 
   // --------------------------------------------------------------- commands

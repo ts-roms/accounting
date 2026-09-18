@@ -145,6 +145,18 @@ export class IntegrityScheduleService implements OnModuleInit {
         .where(eq(integrityRuns.id, run.id));
   }
 
+  /** The most recent stored run of one company (what the dashboard health card shows). */
+  async latest(companyId: string): Promise<(IntegrityRun & { companyCode: string }) | null> {
+    const [row] = await this.db
+      .select({ run: integrityRuns, companyCode: companies.code })
+      .from(integrityRuns)
+      .innerJoin(companies, eq(companies.id, integrityRuns.companyId))
+      .where(eq(integrityRuns.companyId, companyId))
+      .orderBy(desc(integrityRuns.ranAt))
+      .limit(1);
+    return row ? { ...row.run, companyCode: row.companyCode } : null;
+  }
+
   async list(query: {
     companyId?: string;
     page: number;

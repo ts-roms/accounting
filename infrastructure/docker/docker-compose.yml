@@ -5,6 +5,10 @@ services:
     image: postgres:16-alpine
     container_name: accounting-postgres
     restart: unless-stopped
+    # Parallel query workers and hash aggregates use dynamic shared memory; Docker's
+    # 64 MB default runs out under ~20 concurrent report queries ("could not resize
+    # shared memory segment ... No space left on device" -> 500s). See docs/performance.md.
+    shm_size: 256m
     environment:
       POSTGRES_USER: accounting
       POSTGRES_PASSWORD: accounting

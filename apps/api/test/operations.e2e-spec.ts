@@ -256,6 +256,16 @@ describe('Operations (e2e)', () => {
       [job.body.id],
     );
     expect(linked.rows[0].n).toBeGreaterThanOrEqual(1);
+
+    // Company-level view for the dashboard: the latest stored run, and "Run now" for integrity.check holders.
+    const latest = await as(http().get('/api/v1/integrity/runs/latest')).expect(200);
+    expect(latest.body.companyCode).toBe('ACME');
+    expect(latest.body.jobRunId).toBe(job.body.id);
+    const now = await as(http().post('/api/v1/integrity/runs')).send({}).expect(201);
+    expect(now.body.companyId).toBe(companyId);
+    expect(now.body.status).toBe(run.body.status);
+    const after = await as(http().get('/api/v1/integrity/runs/latest')).expect(200);
+    expect(after.body.id).toBe(now.body.id);
   });
 
   // ------------------------------------------------------------------ queues

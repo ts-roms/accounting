@@ -24,6 +24,15 @@ ledger grows. Every report still derives from posted journal lines (see
   restrictions) resolve the covered accounts first and let the database find
   offending lines; they never stream every posted line into Node. Foreign
   amounts are found through the partial index `journal_lines_foreign_idx`.
+- **The dashboard reads the stored integrity run.** The health card shows the
+  latest `integrity_runs` row (nightly job or "Run now" ->
+  `POST /integrity/runs`) with its timestamp; `GET /integrity` remains the
+  live audit for the integrity page. Running all 22 checks on every dashboard
+  visit was the single largest share of database CPU under load.
+- **Fan out independent reads inside a request.** The reconciliation summary
+  evaluates its five areas and every bank account with `Promise.all`; under
+  load each round trip also waits for a pool connection, so sequential
+  `await`s multiply.
 - **Cache authorization, not figures.** `AuthorizationCacheService` caches who
   may do what for a short TTL; ledger figures are never cached.
 
@@ -42,6 +51,48 @@ To see the SQL behind one endpoint, enable statement timing on that database
 (`ALTER DATABASE accounting_ci SET log_min_duration_statement = 0`) and read
 `docker logs accounting-postgres` while the request runs. Query plans:
 `EXPLAIN (ANALYZE, BUFFERS)` on the logged statement.
+
+## Load test
+
+`infrastructure/scripts/load-test.mjs` replays the dashboard (16 calls, six at
+a time like a browser) or a mixed navigation session with N closed-loop users
+against a running API and prints throughput, page-load percentiles, per-endpoint
+percentiles and the API's Postgres connection usage:
+
+```bash
+node infrastructure/scripts/load-test.mjs http://127.0.0.1:3001/api/v1 10 30 dashboard
+node infrastructure/scripts/load-test.mjs http://127.0.0.1:3001/api/v1 10 30 mixed
+```
+
+Raise `AUTH_LOGIN_RATE_LIMIT` / `RATE_LIMIT_MAX` on the API under test.
+`infrastructure/scripts/perf-volume.sql` loads the 40k-journal volume into a
+throwaway database (it credits the AR / AP control accounts directly, so
+reconciliations show variance afterwards).
+
+### Findings (2026-09, 40k journals, 16-core workstation, Postgres in Docker)
+
+| Dashboard users | Before: pages/s · p50 | After: pages/s · p50 |
+| --------------- | --------------------- | -------------------- |
+| 1               | 3.6 · 249 ms          | 4.5 · 177 ms         |
+| 10              | 4.6 · 2.15 s          | 7.2 · 1.36 s         |
+| 20              | 3.7 · 5.2 s           | 6.6 · 3.0 s          |
+
+- The limit is **Postgres CPU**, not the API process or the pool: at ten users
+  Postgres ran at 600-1000 % of a core while the Node process used ~20 % of
+  one, and a pool of 20 or 40 gave the same throughput as the default 10 (the
+  default stays). Every whole-ledger aggregate on the page (two balance sheets,
+  the trend, the aging reports, the integrity audit) competes for the same
+  cores; requests that need only a few milliseconds queue behind them.
+- A pool of 40 also ran Postgres out of dynamic shared memory (Docker's 64 MB
+  `/dev/shm`) and returned 500s - hence `shm_size: 256m` in the compose file.
+- Reads that issue many small statements (the reconciliation summary: 60) are
+  latency-bound alone and pool-bound under load; they were serialised per area
+  and per bank account.
+
+Scaling beyond this means either more database cores or fewer whole-ledger
+aggregates per page (for example a period-balance read model - a deliberate
+design decision, not a tuning change, because the ledger must stay the only
+source of truth).
 
 ## Audit baseline (2026-09, 40k journals, production build)
 
