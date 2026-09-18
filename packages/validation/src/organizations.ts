@@ -8,7 +8,7 @@ import {
   nameSchema,
   optionalText,
   uuidSchema,
-} from './primitives';
+} from './primitives.js';
 
 export const updateOrganizationSchema = z.object({
   name: nameSchema.optional(),

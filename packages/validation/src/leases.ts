@@ -6,16 +6,16 @@ import {
   LEASE_RUN_STATUSES,
   LEASE_STATUSES,
 } from '@accounting/types';
-import { amountSchema, isoDateSchema } from './accounting';
-import { dimensionRefsSchema } from './dimensions';
-import { exchangeRateValueSchema } from './enterprise';
+import { amountSchema, isoDateSchema } from './accounting.js';
+import { dimensionRefsSchema } from './dimensions.js';
+import { exchangeRateValueSchema } from './enterprise.js';
 import {
   nameSchema,
   optionalCurrencyCodeSchema,
   optionalText,
   paginationQuerySchema,
   uuidSchema,
-} from './primitives';
+} from './primitives.js';
 
 /*
  * Prompt #13 - lease accounting (lessee). Contracts are data; the schedule

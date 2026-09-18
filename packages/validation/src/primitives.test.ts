@@ -5,7 +5,7 @@ import {
   paginationQuerySchema,
   currencyCodeSchema,
   queryBooleanSchema,
-} from './primitives';
+} from './primitives.js';
 
 describe('validation primitives', () => {
   it('accepts well-formed codes and rejects lowercase', () => {

@@ -6,6 +6,7 @@
     "base.json",
     "nestjs.json",
     "nextjs.json",
-    "library.json"
+    "library.json",
+    "esm-marker.mjs"
   ]
 }

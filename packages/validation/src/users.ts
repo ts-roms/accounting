@@ -6,7 +6,7 @@ import {
   passwordSchema,
   paginationQuerySchema,
   uuidSchema,
-} from './primitives';
+} from './primitives.js';
 
 export const createUserSchema = z.object({
   email: emailSchema,

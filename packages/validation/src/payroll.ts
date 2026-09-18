@@ -9,9 +9,9 @@ import {
   PAY_ITEM_TYPES,
   PAY_RUN_STATUSES,
 } from '@accounting/types';
-import { amountSchema, isoDateSchema } from './accounting';
-import { exchangeRateValueSchema } from './enterprise';
-import { dimensionRefsSchema } from './dimensions';
+import { amountSchema, isoDateSchema } from './accounting.js';
+import { exchangeRateValueSchema } from './enterprise.js';
+import { dimensionRefsSchema } from './dimensions.js';
 import {
   codeSchema,
   nameSchema,
@@ -19,8 +19,8 @@ import {
   optionalText,
   paginationQuerySchema,
   uuidSchema,
-} from './primitives';
-import { percentSchema } from './subledger';
+} from './primitives.js';
+import { percentSchema } from './subledger.js';
 
 // ---------------------------------------------------------------- employees
 

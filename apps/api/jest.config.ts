@@ -2,6 +2,8 @@ import type { Config } from 'jest';
 
 const moduleNameMapper = {
   '^@/(.*)$': '<rootDir>/src/$1',
+  // Workspace package sources import each other with .js extensions (ESM build); resolve them to .ts here.
+  '^(\\.{1,2}/.*)\\.js$': '$1',
   '^@accounting/types$': '<rootDir>/../../packages/types/src/index.ts',
   '^@accounting/validation$': '<rootDir>/../../packages/validation/src/index.ts',
   '^@accounting/config$': '<rootDir>/../../packages/config/src/index.ts',

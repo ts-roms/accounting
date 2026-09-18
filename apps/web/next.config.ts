@@ -20,6 +20,13 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // Source-level workspace packages compiled by Next.
   transpilePackages: ['@accounting/ui'],
+  experimental: {
+    // Every screen is a client component that fetches its own data with React
+    // Query, so the server payload of a route is a static shell: keep visited
+    // routes in the client router cache instead of re-requesting the shell on
+    // every navigation (Next's default for dynamic routes is 0 s).
+    staleTimes: { dynamic: 300, static: 300 },
+  },
   async rewrites() {
     // The browser talks to Next.js only; /api/* is proxied server-side to the
     // NestJS API so auth cookies stay first-party and no secrets reach the client.

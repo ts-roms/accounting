@@ -3,7 +3,7 @@
  * webhooks, sync engine, mapping, logs and health. Everything here is a data
  * enum shared by the API, the validation schemas and the web client.
  */
-import type { PermissionKey } from './permissions';
+import type { PermissionKey } from './permissions.js';
 
 // ----------------------------------------------------------------- registry
 

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { dimensionRefsSchema } from './dimensions';
+import { dimensionRefsSchema } from './dimensions.js';
 import {
   ACCOUNT_MAPPING_KEYS,
   ACCOUNT_SUBTYPES,
@@ -18,7 +18,7 @@ import {
   paginationQuerySchema,
   queryBooleanSchema,
   uuidSchema,
-} from './primitives';
+} from './primitives.js';
 
 /** Non-negative decimal string with up to 4 fractional digits ("1250.5", "0.0000"). */
 export const amountSchema = z

@@ -13,9 +13,9 @@ import {
   RECURRING_JOURNAL_MODES,
   RECURRING_JOURNAL_STATUSES,
 } from '@accounting/types';
-import { amountSchema, isoDateSchema, journalLineSchema } from './accounting';
-import { dimensionRefsSchema } from './dimensions';
-import { nameSchema, optionalText, paginationQuerySchema, uuidSchema } from './primitives';
+import { amountSchema, isoDateSchema, journalLineSchema } from './accounting.js';
+import { dimensionRefsSchema } from './dimensions.js';
+import { nameSchema, optionalText, paginationQuerySchema, uuidSchema } from './primitives.js';
 
 /*
  * Accounting core extensions: opening balances, recurring journals, prepayments,

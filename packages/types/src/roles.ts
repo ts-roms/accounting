@@ -1,4 +1,4 @@
-import { P, PERMISSION_KEYS, type PermissionKey } from './permissions';
+import { P, PERMISSION_KEYS, type PermissionKey } from './permissions.js';
 
 /**
  * System roles are seeded for every organization. They are templates that an

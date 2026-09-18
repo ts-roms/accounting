@@ -12,9 +12,9 @@ import {
   PETTY_CASH_FUND_STATUSES,
   PETTY_CASH_VOUCHER_STATUSES,
 } from '@accounting/types';
-import { amountSchema, isoDateSchema } from './accounting';
-import { dimensionRefsSchema } from './dimensions';
-import { exchangeRateValueSchema } from './enterprise';
+import { amountSchema, isoDateSchema } from './accounting.js';
+import { dimensionRefsSchema } from './dimensions.js';
+import { exchangeRateValueSchema } from './enterprise.js';
 import {
   codeSchema,
   nameSchema,
@@ -23,8 +23,8 @@ import {
   paginationQuerySchema,
   queryBooleanSchema,
   uuidSchema,
-} from './primitives';
-import { percentSchema } from './subledger';
+} from './primitives.js';
+import { percentSchema } from './subledger.js';
 
 const positiveAmount = amountSchema.refine((v) => Number(v) > 0, 'Amount must be positive');
 

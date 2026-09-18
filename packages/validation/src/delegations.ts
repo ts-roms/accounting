@@ -6,8 +6,8 @@ import {
   DELEGATION_DECISIONS,
   DELEGATION_STATUSES,
 } from '@accounting/types';
-import { amountSchema } from './accounting';
-import { optionalCurrencyCodeSchema, paginationQuerySchema, uuidSchema } from './primitives';
+import { amountSchema } from './accounting.js';
+import { optionalCurrencyCodeSchema, paginationQuerySchema, uuidSchema } from './primitives.js';
 
 const isoDateTime = z.iso.datetime({ offset: true });
 

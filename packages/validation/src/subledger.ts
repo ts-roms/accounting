@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { dimensionRefsSchema, lineTaxSchema } from './dimensions';
-import { exchangeRateValueSchema } from './enterprise';
+import { dimensionRefsSchema, lineTaxSchema } from './dimensions.js';
+import { exchangeRateValueSchema } from './enterprise.js';
 import {
   CUSTOMER_TYPES,
   ENTITY_STATUSES,
@@ -11,7 +11,7 @@ import {
   SUBLEDGER_DOCUMENT_STATUSES,
   SUBLEDGER_DOCUMENT_TYPES,
 } from '@accounting/types';
-import { amountSchema, isoDateSchema } from './accounting';
+import { amountSchema, isoDateSchema } from './accounting.js';
 import {
   addressSchema,
   codeSchema,
@@ -22,7 +22,7 @@ import {
   paginationQuerySchema,
   queryBooleanSchema,
   uuidSchema,
-} from './primitives';
+} from './primitives.js';
 
 // ------------------------------------------------------------------- parties
 

@@ -11,7 +11,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { Money } from '@accounting/money';
-import { AGING_BUCKETS, P } from '@accounting/types';
+import { P } from '@accounting/types';
 import {
   Button,
   Card,
@@ -533,11 +533,12 @@ function AgingCard({
         ) : (
           <DonutChart
             ariaLabel={title}
-            segments={AGING_BUCKETS.map((b, i) => ({
+            // Buckets are configurable per company: read them from the report, not a fixed list.
+            segments={report.buckets.map((b, i) => ({
               key: b.key,
               label: b.key === 'current' ? 'Current' : `${b.label} days`,
-              value: Number(report.totals[b.key]),
-              color: tones[i]!,
+              value: Number(report.totals[b.key] ?? 0),
+              color: tones[Math.min(i, tones.length - 1)]!,
             }))}
             formatValue={(v) =>
               new Intl.NumberFormat('en-PH', {

@@ -7,7 +7,7 @@ import {
   STOCK_DOCUMENT_STATUSES,
   TRACKING_MODES,
 } from '@accounting/types';
-import { amountSchema, isoDateSchema } from './accounting';
+import { amountSchema, isoDateSchema } from './accounting.js';
 import {
   codeSchema,
   nameSchema,
@@ -15,8 +15,8 @@ import {
   paginationQuerySchema,
   queryBooleanSchema,
   uuidSchema,
-} from './primitives';
-import { quantitySchema } from './subledger';
+} from './primitives.js';
+import { quantitySchema } from './subledger.js';
 
 // ------------------------------------------------------------------ products
 

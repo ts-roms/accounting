@@ -7,8 +7,8 @@ import {
   IMPORT_TYPES,
   OPENING_BALANCE_AREAS,
 } from '@accounting/types';
-import { amountSchema, isoDateSchema } from './accounting';
-import { optionalText, paginationQuerySchema, uuidSchema } from './primitives';
+import { amountSchema, isoDateSchema } from './accounting.js';
+import { optionalText, paginationQuerySchema, uuidSchema } from './primitives.js';
 
 // ------------------------------------------------------------------ numbering
 

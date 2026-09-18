@@ -11,16 +11,16 @@ import {
   TAX_SIDES,
   TAX_SOURCE_TYPES,
 } from '@accounting/types';
-import { amountSchema, isoDateSchema, signedAmountSchema } from './accounting';
+import { amountSchema, isoDateSchema, signedAmountSchema } from './accounting.js';
 import {
   codeSchema,
   nameSchema,
   optionalText,
   paginationQuerySchema,
   uuidSchema,
-} from './primitives';
-import { dimensionRefsSchema, lineTaxSchema } from './dimensions';
-import { percentSchema } from './subledger';
+} from './primitives.js';
+import { dimensionRefsSchema, lineTaxSchema } from './dimensions.js';
+import { percentSchema } from './subledger.js';
 
 // ------------------------------------------------------------- dimensions
 

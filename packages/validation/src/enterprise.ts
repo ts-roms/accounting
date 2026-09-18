@@ -12,7 +12,7 @@ import {
   CLOSE_STATUSES,
   CLOSE_TYPES,
 } from '@accounting/types';
-import { amountSchema, isoDateSchema } from './accounting';
+import { amountSchema, isoDateSchema } from './accounting.js';
 import {
   currencyCodeSchema,
   optionalCurrencyCodeSchema,
@@ -20,7 +20,7 @@ import {
   optionalText,
   paginationQuerySchema,
   uuidSchema,
-} from './primitives';
+} from './primitives.js';
 
 // ------------------------------------------------------------- multi-currency
 

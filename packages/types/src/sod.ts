@@ -1,4 +1,4 @@
-import { P, type PermissionKey } from './permissions';
+import { P, type PermissionKey } from './permissions.js';
 
 export const SOD_ENFORCEMENTS = ['BLOCK', 'WARN'] as const;
 export type SodEnforcement = (typeof SOD_ENFORCEMENTS)[number];

@@ -5,14 +5,14 @@ import {
   REVENUE_RUN_STATUSES,
   REVENUE_SCHEDULE_STATUSES,
 } from '@accounting/types';
-import { isoDateSchema } from './accounting';
+import { isoDateSchema } from './accounting.js';
 import {
   codeSchema,
   nameSchema,
   optionalText,
   paginationQuerySchema,
   uuidSchema,
-} from './primitives';
+} from './primitives.js';
 
 // ----------------------------------------------------------------- policies
 

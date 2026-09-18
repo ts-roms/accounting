@@ -115,6 +115,10 @@ export function SessionProvider({
       </div>
     );
   if (isLoading || !value) return <>{fallback}</>;
+  // A fresh browser has no stored company yet: the effect above picks the first
+  // one on the next tick. Mounting pages before that fires every company-scoped
+  // query without the `x-company-id` header (403s on the first load).
+  if (!value.activeCompany && me!.companies.length > 0) return <>{fallback}</>;
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 

@@ -1,4 +1,4 @@
-import type { Money } from './money';
+import type { Money } from './money.js';
 
 /**
  * Display formatting for the UI. Accounting convention: negatives in parentheses

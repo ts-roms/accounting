@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { JOB_RUN_STATUSES } from '@accounting/types';
-import { paginationQuerySchema, uuidSchema } from './primitives';
+import { paginationQuerySchema, uuidSchema } from './primitives.js';
 
 // ----------------------------------------------------------- operations (H8)
 

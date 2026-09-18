@@ -8,6 +8,7 @@ const config: Config = {
   transform: { '^.+\.ts$': ['ts-jest', { tsconfig: 'tsconfig.spec.json' }] },
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    '^(\\.{1,2}/.*)\\.js$': '$1',
     '^@accounting/types$': '<rootDir>/../../packages/types/src/index.ts',
     '^@accounting/validation$': '<rootDir>/../../packages/validation/src/index.ts',
     '^@accounting/config$': '<rootDir>/../../packages/config/src/index.ts',

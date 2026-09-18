@@ -15,8 +15,8 @@ import {
   VENDOR_STATUSES,
   VENDOR_TYPES,
 } from '@accounting/types';
-import { amountSchema, isoDateSchema } from './accounting';
-import { dimensionRefsSchema } from './dimensions';
+import { amountSchema, isoDateSchema } from './accounting.js';
+import { dimensionRefsSchema } from './dimensions.js';
 import {
   addressSchema,
   codeSchema,
@@ -27,8 +27,8 @@ import {
   paginationQuerySchema,
   queryBooleanSchema,
   uuidSchema,
-} from './primitives';
-import { agingBucketSchema } from './receivables';
+} from './primitives.js';
+import { agingBucketSchema } from './receivables.js';
 
 // -------------------------------------------------------------- vendor groups
 

@@ -7,9 +7,9 @@ import {
   BANK_SUGGESTION_STATUSES,
   BANK_TRANSACTION_TYPES,
 } from '@accounting/types';
-import { amountSchema, isoDateSchema } from './accounting';
-import { dimensionRefsSchema } from './dimensions';
-import { nameSchema, optionalText, paginationQuerySchema, uuidSchema } from './primitives';
+import { amountSchema, isoDateSchema } from './accounting.js';
+import { dimensionRefsSchema } from './dimensions.js';
+import { nameSchema, optionalText, paginationQuerySchema, uuidSchema } from './primitives.js';
 
 const patternSchema = z.string().trim().min(1).max(200);
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { CurrencyMismatchError, InvalidAmountError, Money } from './money';
-import { formatMoney } from './format';
+import { CurrencyMismatchError, InvalidAmountError, Money } from './money.js';
+import { formatMoney } from './format.js';
 
 describe('Money', () => {
   it('avoids floating point drift', () => {

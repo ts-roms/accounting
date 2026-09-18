@@ -8,8 +8,8 @@ import {
   AI_SEVERITIES,
   AI_SUGGESTION_STATUSES,
 } from '@accounting/types';
-import { amountSchema, isoDateSchema } from './accounting';
-import { optionalText, paginationQuerySchema, uuidSchema } from './primitives';
+import { amountSchema, isoDateSchema } from './accounting.js';
+import { optionalText, paginationQuerySchema, uuidSchema } from './primitives.js';
 
 // --------------------------------------------------------------------- intake
 
