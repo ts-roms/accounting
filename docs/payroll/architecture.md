@@ -92,6 +92,21 @@ claim hooks `postedClaimsForUsers` / `settleThroughPayroll`) and
   run's bank payment is a separate document and stays. Reversed runs free
   their period for a new run (periods may not otherwise overlap per
   frequency).
+- **Foreign-currency pay.** An employee has a pay currency (`currency`,
+  default the base); a pay run has one too and takes only employees paid in
+  it (periods may not overlap per frequency _and_ currency). Base salary,
+  assignment amounts and run inputs are in the pay currency; pay items are
+  company policy written in base - fixed amounts, contribution caps and
+  bracket tables convert at the run's rate (the period-end rate, override
+  allowed), brackets being read on the base-converted taxable pay and the tax
+  converted back. Every payslip line carries `baseAmount`; payslip and run
+  base figures are sums of those, so the payroll journal (base) ties to the
+  run's `netTotalBase` exactly. Payment: cash at the payment rate from a bank
+  in the pay currency (foreign amount on the bank line) or in base; the
+  payable is relieved at the run's base and the difference is realized FX
+  (`paidBase` records what left). Foreign-currency runs do not reimburse
+  expense claims (claims are base documents). Reports, the forecast and the
+  `EMPLOYEE_PAYABLE` integrity check read the base figures.
 - **Views are restricted.** `employee.view` and `payroll.view` are not in
   the viewer bundle (like `audit.view`); accounting, finance and audit roles
   hold them explicitly.

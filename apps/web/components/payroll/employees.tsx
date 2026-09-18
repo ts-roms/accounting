@@ -403,6 +403,7 @@ function EmployeeDialog({
     jobTitle: '',
     employmentType: 'FULL_TIME' as EmploymentType,
     payFrequency: 'MONTHLY' as PayFrequency,
+    currency: '',
     baseSalary: '',
     hireDate: today(),
     terminationDate: '',
@@ -422,6 +423,7 @@ function EmployeeDialog({
       jobTitle: existing?.jobTitle ?? '',
       employmentType: existing?.employmentType ?? 'FULL_TIME',
       payFrequency: existing?.payFrequency ?? 'MONTHLY',
+      currency: existing?.currency ?? '',
       baseSalary: existing ? String(Number(existing.baseSalary)) : '',
       hireDate: existing?.hireDate ?? today(),
       terminationDate: existing?.terminationDate ?? '',
@@ -444,6 +446,7 @@ function EmployeeDialog({
       jobTitle: form.jobTitle || undefined,
       employmentType: form.employmentType,
       payFrequency: form.payFrequency,
+      currency: form.currency.trim() ? form.currency.trim().toUpperCase() : undefined,
       baseSalary: form.baseSalary,
       hireDate: form.hireDate,
       terminationDate: form.terminationDate || null,
@@ -538,6 +541,16 @@ function EmployeeDialog({
               value={form.baseSalary}
               onChange={set('baseSalary')}
               data-testid="employee-salary"
+            />
+          </Field>
+          <Field label="Pay currency">
+            <Input
+              placeholder="Company base"
+              maxLength={3}
+              className="font-mono uppercase"
+              value={form.currency}
+              onChange={set('currency')}
+              data-testid="employee-currency"
             />
           </Field>
           <Field label="Department">

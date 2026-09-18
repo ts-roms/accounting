@@ -86,6 +86,18 @@ balance is the ledger like any other account. Nothing is stored twice.
   lease checks subtract it so the register can be compared with the ledger
   on the revaluation date itself.
 
+## Foreign-currency payroll
+
+Employees and pay runs have a pay currency; a run takes the employees paid in
+it. Company pay items are base-currency policy (fixed amounts, contribution
+caps, bracket tables) converted at the run's period-end rate - brackets are
+read on the base-converted taxable pay - while per-employee assignments and
+run inputs are entered in the pay currency. Payslip lines carry a base
+amount; the payroll journal is the sum of those, so it ties to the run's base
+net exactly. Payment settles the payable at the run's base and books the
+difference to the cash (at the payment rate) as realized FX. See
+`docs/payroll/architecture.md`.
+
 ## Foreign-currency leases
 
 A lease has a contract `currency`; its schedule and register carrying figures

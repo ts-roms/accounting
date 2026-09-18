@@ -25,6 +25,8 @@ export interface Employee {
   jobTitle: string | null;
   employmentType: EmploymentType;
   payFrequency: PayFrequency;
+  /** Pay currency; base salary, assignments and inputs are in it. */
+  currency: string;
   baseSalary: string;
   hireDate: string;
   terminationDate: string | null;
@@ -99,7 +101,10 @@ export interface PayRun {
   payDate: string;
   description: string | null;
   status: PayRunStatus;
+  /** Pay currency of the run (employees paid in it take part). */
   currency: string;
+  /** 1 unit of the pay currency = exchangeRate base units on the period end (1 for base runs). */
+  exchangeRate: string;
   employeeCount: number;
   grossTotal: string;
   taxableTotal: string;
@@ -108,6 +113,16 @@ export interface PayRun {
   employerTotal: string;
   reimbursementTotal: string;
   netTotal: string;
+  /** The same totals in the company base currency - what the journal carries. */
+  grossTotalBase: string;
+  taxableTotalBase: string;
+  withholdingTotalBase: string;
+  deductionTotalBase: string;
+  employerTotalBase: string;
+  reimbursementTotalBase: string;
+  netTotalBase: string;
+  /** Base value of the net actually paid (at the payment rate); null until paid. */
+  paidBase: string | null;
   bankAccountId: string | null;
   bankAccountCode: string | null;
   journalEntryId: string | null;
@@ -138,6 +153,8 @@ export interface PayslipLine {
   code: string;
   description: string;
   amount: string;
+  /** amount in the company base currency at the run's rate. */
+  baseAmount: string;
   taxable: boolean;
   source: string;
 }
@@ -157,6 +174,13 @@ export interface Payslip {
   employerContributions: string;
   reimbursements: string;
   net: string;
+  grossBase: string;
+  taxableBase: string;
+  withholdingBase: string;
+  deductionsBase: string;
+  employerContributionsBase: string;
+  reimbursementsBase: string;
+  netBase: string;
   paymentMethod: EmployeePaymentMethod;
   bankName: string | null;
   bankAccountNumber: string | null;

@@ -113,7 +113,7 @@ export class PayrollReportsService {
             code: payslipLines.code,
             description: payslipLines.description,
             type: payslipLines.type,
-            amount: sql<string>`sum(${payslipLines.amount})`,
+            amount: sql<string>`sum(${payslipLines.baseAmount})`,
           })
           .from(payslipLines)
           .where(
@@ -155,8 +155,8 @@ export class PayrollReportsService {
           }),
         );
       d.employees.add(r.s.employeeId);
-      d.gross = d.gross.add(Money.of(r.s.gross, currency));
-      d.employer = d.employer.add(Money.of(r.s.employerContributions, currency));
+      d.gross = d.gross.add(Money.of(r.s.grossBase, currency));
+      d.employer = d.employer.add(Money.of(r.s.employerContributionsBase, currency));
     }
     const byMonth = new Map<
       string,
@@ -171,13 +171,13 @@ export class PayrollReportsService {
         net: Money.zero(currency),
       };
       m.runs += 1;
-      m.gross = m.gross.add(Money.of(r.grossTotal, currency));
-      m.withholding = m.withholding.add(Money.of(r.withholdingTotal, currency));
-      m.net = m.net.add(Money.of(r.netTotal, currency));
+      m.gross = m.gross.add(Money.of(r.grossTotalBase, currency));
+      m.withholding = m.withholding.add(Money.of(r.withholdingTotalBase, currency));
+      m.net = m.net.add(Money.of(r.netTotalBase, currency));
       byMonth.set(key, m);
     }
-    const gross = sum((s) => s.gross);
-    const employer = sum((s) => s.employerContributions);
+    const gross = sum((s) => s.grossBase);
+    const employer = sum((s) => s.employerContributionsBase);
     return {
       from: query.from,
       to: query.to,
@@ -185,11 +185,11 @@ export class PayrollReportsService {
       runs: runs.length,
       employees: new Set(slips.map((s) => s.s.employeeId)).size,
       gross: gross.toString(),
-      withholding: sum((s) => s.withholding).toString(),
-      deductions: sum((s) => s.deductions).toString(),
+      withholding: sum((s) => s.withholdingBase).toString(),
+      deductions: sum((s) => s.deductionsBase).toString(),
       employerContributions: employer.toString(),
-      reimbursements: sum((s) => s.reimbursements).toString(),
-      net: sum((s) => s.net).toString(),
+      reimbursements: sum((s) => s.reimbursementsBase).toString(),
+      net: sum((s) => s.netBase).toString(),
       employerCost: gross.add(employer).toString(),
       byDepartment: [...byDept.values()]
         .map((d) => ({
@@ -250,8 +250,8 @@ export class PayrollReportsService {
         runs: [],
       };
       m.employees += r.employeeCount;
-      m.taxable = m.taxable.add(Money.of(r.taxableTotal, currency));
-      m.withholding = m.withholding.add(Money.of(r.withholdingTotal, currency));
+      m.taxable = m.taxable.add(Money.of(r.taxableTotalBase, currency));
+      m.withholding = m.withholding.add(Money.of(r.withholdingTotalBase, currency));
       m.runs.push(r.documentNumber);
       byMonth.set(key, m);
     }
@@ -301,7 +301,7 @@ export class PayrollReportsService {
           .select({
             code: payslipLines.code,
             type: payslipLines.type,
-            amount: sql<string>`sum(${payslipLines.amount})`,
+            amount: sql<string>`sum(${payslipLines.baseAmount})`,
           })
           .from(payslipLines)
           .where(
@@ -323,12 +323,12 @@ export class PayrollReportsService {
       year,
       currency,
       payslips: rows.length,
-      gross: sum((s) => s.gross),
-      taxable: sum((s) => s.taxable),
-      withholding: sum((s) => s.withholding),
-      deductions: sum((s) => s.deductions),
-      employerContributions: sum((s) => s.employerContributions),
-      net: sum((s) => s.net),
+      gross: sum((s) => s.grossBase),
+      taxable: sum((s) => s.taxableBase),
+      withholding: sum((s) => s.withholdingBase),
+      deductions: sum((s) => s.deductionsBase),
+      employerContributions: sum((s) => s.employerContributionsBase),
+      net: sum((s) => s.netBase),
       byItem: items.map((i) => ({
         code: i.code,
         type: i.type,
@@ -388,8 +388,8 @@ export class PayrollReportsService {
     // Runs posted by asOf and not paid by asOf owe net - reimbursements (the claims carry their own liability).
     const runs = await this.db
       .select({
-        net: payRuns.netTotal,
-        reimbursements: payRuns.reimbursementTotal,
+        net: payRuns.netTotalBase,
+        reimbursements: payRuns.reimbursementTotalBase,
         documentNumber: payRuns.documentNumber,
       })
       .from(payRuns)
@@ -524,7 +524,7 @@ export class PayrollReportsService {
       .select({
         documentNumber: payRuns.documentNumber,
         payDate: payRuns.payDate,
-        net: payRuns.netTotal,
+        net: payRuns.netTotalBase,
         status: payRuns.status,
       })
       .from(payRuns)

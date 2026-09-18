@@ -22,6 +22,7 @@ import {
   type Employee,
   type EmployeePayItem,
 } from '@/database/schema';
+import { AccountsService } from '@/modules/accounting/accounts/accounts.service';
 import { DimensionsService } from '@/modules/accounting/dimensions/dimensions.service';
 import { DocumentNumberingService } from '@/modules/accounting/numbering/document-numbering.service';
 import { AuditService } from '@/modules/audit/audit.service';
@@ -57,6 +58,7 @@ export class EmployeesService {
     private readonly audit: AuditService,
     private readonly numbering: DocumentNumberingService,
     private readonly dimensions: DimensionsService,
+    private readonly accounts: AccountsService,
   ) {}
 
   async list(companyId: string, query: ListEmployeesQuery): Promise<PaginatedResult<EmployeeView>> {
@@ -167,6 +169,7 @@ export class EmployeesService {
           jobTitle: input.jobTitle ?? null,
           employmentType: input.employmentType,
           payFrequency: input.payFrequency,
+          currency: input.currency ?? (await this.accounts.companyCurrency(companyId, tx)),
           baseSalary: input.baseSalary,
           hireDate: input.hireDate,
           terminationDate: input.terminationDate ?? null,

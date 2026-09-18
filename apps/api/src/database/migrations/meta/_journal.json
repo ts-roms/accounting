@@ -246,6 +246,13 @@
       "when": 1789728194155,
       "tag": "0034_multi_currency_depth",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1789733419327,
+      "tag": "0035_payroll_currency",
+      "breakpoints": true
     }
   ]
 }

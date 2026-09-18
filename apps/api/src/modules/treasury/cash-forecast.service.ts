@@ -538,7 +538,8 @@ export class CashForecastService {
       date: r.payDate < asOf ? asOf : r.payDate,
       source: 'PAYROLL' as const,
       direction: 'OUTFLOW' as const,
-      amount: Money.of(r.netTotal, currency).toString(),
+      // Base value of the net at the run rate (foreign runs settle at the payment rate).
+      amount: Money.of(r.netTotalBase, currency).toString(),
       bankAccountId: r.bankAccountId ?? settings?.bankAccountId ?? null,
       reference: r.documentNumber,
       label: `Payroll ${r.documentNumber} (${r.status.toLowerCase()})`,

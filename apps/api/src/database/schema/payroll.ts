@@ -1,10 +1,12 @@
 import { sql } from 'drizzle-orm';
 import {
   boolean,
+  char,
   check,
   date,
   index,
   integer,
+  numeric,
   jsonb,
   pgEnum,
   pgTable,
@@ -74,7 +76,9 @@ export const employees = pgTable(
     jobTitle: text('job_title'),
     employmentType: employmentTypeEnum('employment_type').notNull().default('FULL_TIME'),
     payFrequency: payFrequencyEnum('pay_frequency').notNull().default('MONTHLY'),
-    /** Base pay per pay period, company base currency. */
+    /** Currency the employee is paid in; base salary, fixed items and inputs are in it. */
+    currency: char('currency', { length: 3 }).notNull(),
+    /** Base pay per pay period, in `currency`. */
     baseSalary: money('base_salary').notNull(),
     hireDate: date('hire_date').notNull(),
     terminationDate: date('termination_date'),
@@ -185,7 +189,10 @@ export const payRuns = pgTable(
     payDate: date('pay_date').notNull(),
     description: text('description'),
     status: payRunStatusEnum('status').notNull().default('DRAFT'),
+    /** Pay currency of the run: only employees paid in it take part. */
     currency: text('currency').notNull(),
+    /** 1 unit of `currency` = `exchangeRate` base units on the period end (1 for base runs); resolved at calculation. */
+    exchangeRate: numeric('exchange_rate', { precision: 19, scale: 8 }).notNull().default('1'),
     employeeCount: integer('employee_count').notNull().default(0),
     grossTotal: money('gross_total').notNull().default('0'),
     taxableTotal: money('taxable_total').notNull().default('0'),
@@ -194,6 +201,16 @@ export const payRuns = pgTable(
     employerTotal: money('employer_total').notNull().default('0'),
     reimbursementTotal: money('reimbursement_total').notNull().default('0'),
     netTotal: money('net_total').notNull().default('0'),
+    /** The same totals in the company base currency - what the payroll journal carries. */
+    grossTotalBase: money('gross_total_base').notNull().default('0'),
+    taxableTotalBase: money('taxable_total_base').notNull().default('0'),
+    withholdingTotalBase: money('withholding_total_base').notNull().default('0'),
+    deductionTotalBase: money('deduction_total_base').notNull().default('0'),
+    employerTotalBase: money('employer_total_base').notNull().default('0'),
+    reimbursementTotalBase: money('reimbursement_total_base').notNull().default('0'),
+    netTotalBase: money('net_total_base').notNull().default('0'),
+    /** Base value of the net paid (at the payment rate); the difference to net_total_base is realized FX. */
+    paidBase: money('paid_base'),
     bankAccountId: uuid('bank_account_id').references((): AnyPgColumn => bankAccounts.id, {
       onDelete: 'restrict',
     }),
@@ -275,6 +292,14 @@ export const payslips = pgTable(
     employerContributions: money('employer_contributions').notNull().default('0'),
     reimbursements: money('reimbursements').notNull().default('0'),
     net: money('net').notNull().default('0'),
+    /** Base-currency figures: sums of the lines' base amounts (so the journal ties exactly). */
+    grossBase: money('gross_base').notNull().default('0'),
+    taxableBase: money('taxable_base').notNull().default('0'),
+    withholdingBase: money('withholding_base').notNull().default('0'),
+    deductionsBase: money('deductions_base').notNull().default('0'),
+    employerContributionsBase: money('employer_contributions_base').notNull().default('0'),
+    reimbursementsBase: money('reimbursements_base').notNull().default('0'),
+    netBase: money('net_base').notNull().default('0'),
     paymentMethod: employeePaymentMethodEnum('payment_method').notNull().default('BANK'),
     bankName: text('bank_name'),
     bankAccountNumber: text('bank_account_number'),
@@ -305,6 +330,8 @@ export const payslipLines = pgTable(
     code: text('code').notNull(),
     description: text('description').notNull(),
     amount: money('amount').notNull(),
+    /** `amount` in the company base currency at the run's rate. */
+    baseAmount: money('base_amount').notNull().default('0'),
     taxable: boolean('taxable').notNull().default(false),
     /** Account the line posts to, resolved at calculation from the item or the mapping: expense for earnings / employer contributions, liability for deductions / withholding. */
     accountId: uuid('account_id')

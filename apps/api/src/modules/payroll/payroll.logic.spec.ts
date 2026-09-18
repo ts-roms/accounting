@@ -165,4 +165,74 @@ describe('payroll.logic', () => {
     expect(activeOn('2026-01-01', '2026-04-30', '2026-05-01', '2026-05-31')).toBe(false);
     expect(activeOn('2026-01-01', '2026-05-01', '2026-05-01', '2026-05-31')).toBe(true);
   });
+
+  it('foreign-currency payslips convert base policy amounts and read brackets in base', () => {
+    // USD pay at 60.00: a PHP 1,200 fixed allowance is USD 20 (base stays exactly 1,200), the
+    // 5% contribution is capped at PHP 30,000 = USD 500, and the bracket is read on PHP.
+    const applied: AppliedItem[] = [
+      {
+        item: item({ code: 'BASIC', type: 'EARNING', calculation: 'BASE_SALARY' }),
+        source: 'BASE',
+      },
+      {
+        item: item({ code: 'ALLOW', type: 'EARNING', calculation: 'FIXED', amount: '1200' }),
+        source: 'COMPANY',
+      },
+      {
+        item: item({
+          code: 'SSS',
+          type: 'DEDUCTION',
+          calculation: 'PERCENT_OF_GROSS',
+          rate: '5',
+          maxBase: '30000',
+        }),
+        source: 'COMPANY',
+      },
+      {
+        item: item({
+          code: 'WTAX',
+          type: 'WITHHOLDING_TAX',
+          calculation: 'BRACKET',
+          brackets: BRACKETS,
+        }),
+        source: 'COMPANY',
+      },
+      // A per-employee assignment is entered in the pay currency as it is.
+      {
+        item: item({ code: 'LOAN', type: 'DEDUCTION', calculation: 'FIXED', amount: '99999' }),
+        source: 'ASSIGNMENT',
+        amount: '10',
+      },
+    ];
+    const slip = buildPayslip({
+      currency: 'USD',
+      baseSalary: '1000',
+      applied,
+      base: { currency: 'PHP', rate: '60' },
+    });
+    const line = (code: string) => slip.lines.find((l) => l.code === code)!;
+    expect(line('ALLOW').amount).toBe('20.0000');
+    expect(line('ALLOW').baseAmount).toBe('1200.0000');
+    expect(slip.gross).toBe('1020.0000');
+    expect(line('SSS').amount).toBe('25.0000'); // 5% of the USD 500 cap
+    expect(line('LOAN').amount).toBe('10.0000');
+    expect(line('LOAN').baseAmount).toBe('600.0000');
+    // Taxable less pre-tax = USD 995 = PHP 59,700 -> read on the PHP brackets, tax back in USD.
+    const taxInBase = bracketTax(Money.of('59700', 'PHP'), BRACKETS, 'PHP');
+    expect(line('WTAX').amount).toBe(
+      Money.of(Money.of(taxInBase.toString(), 'USD', 20).divide('60').toString(), 'USD').toString(),
+    );
+    // Base figures are sums of the line conversions and the journal identity holds.
+    const sum = (t: string) =>
+      slip.lines
+        .filter((l) => l.type === t)
+        .reduce((a, l) => a.add(Money.of(l.baseAmount, 'PHP')), Money.zero('PHP'));
+    expect(slip.base.gross).toBe(sum('EARNING').toString());
+    expect(slip.base.net).toBe(
+      sum('EARNING').subtract(sum('DEDUCTION')).subtract(sum('WITHHOLDING_TAX')).toString(),
+    );
+    // Without a base context nothing converts and base equals the pay figures.
+    const home = buildPayslip({ currency: 'PHP', baseSalary: '60000', applied });
+    expect(home.base.net).toBe(home.net);
+  });
 });
