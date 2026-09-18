@@ -31,6 +31,7 @@ import { RequirePermissions } from '@/common/decorators/require-permissions.deco
 import { AppError, ForbiddenError } from '@/common/errors/app-error';
 import { ErrorCodes } from '@/common/errors/error-codes';
 import { AppConfigService } from '@/config/app-config.service';
+import { IntegrityService } from '@/modules/accounting/integrity/integrity.service';
 import { AuditService } from '@/modules/audit/audit.service';
 import { JobRegistryService } from '@/modules/jobs/job-registry.service';
 import { QueueService, type QueueName } from '@/modules/jobs/queue.service';
@@ -68,6 +69,7 @@ export class OperationsController {
     private readonly registry: JobRegistryService,
     private readonly queues: QueueService,
     private readonly integrity: IntegrityScheduleService,
+    private readonly checks: IntegrityService,
     private readonly audit: AuditService,
   ) {}
 
@@ -194,6 +196,26 @@ export class OperationsController {
   @ApiOperation({ summary: 'Run the integrity check for one company now and store the outcome' })
   runIntegrity(@CurrentUser() user: AuthenticatedUser, @Body() body: RunIntegrityCheckDto) {
     return this.integrity.runCompany(body.companyId, user);
+  }
+
+  @Post('period-balances/rebuild')
+  @RequirePermissions(P['operations.manage'])
+  @ApiOperation({
+    summary: 'Recompute the account period-balance read model of one company from its ledger lines',
+  })
+  async rebuildPeriodBalances(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: RunIntegrityCheckDto,
+  ) {
+    const result = await this.checks.rebuildPeriodBalances(body.companyId);
+    await this.audit.record({
+      action: 'REBUILD',
+      module: 'operations',
+      entityType: 'AccountPeriodBalances',
+      entityId: body.companyId,
+      newValue: { rows: result.rows, by: user.email },
+    });
+    return result;
   }
 }
 

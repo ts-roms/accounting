@@ -86,6 +86,8 @@ test suites after every scenario:
 - Nothing is posted after its period closed, except the closing routine [CRITICAL]
 - Ledger lines reference postable accounts of the company [CRITICAL]
 - No orphan lines [CRITICAL]
+- The period-balance read model equals the posted lines for every
+  (account, month, journal type, dimension set) key [CRITICAL]
 - Required account mappings resolve to postable accounts [CRITICAL]
 - AR subledger = AR control; AP subledger = AP control [CRITICAL]
 - Tax register = document-driven movements on tax accounts [CRITICAL]

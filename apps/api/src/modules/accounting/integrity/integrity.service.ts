@@ -97,6 +97,7 @@ export class IntegrityService {
       this.dimensionRuleViolations(companyId),
       this.accountBranchViolations(companyId),
       this.duplicateSources(companyId),
+      this.periodBalances(companyId),
       this.statementsBalance(companyId, asOf, currency),
       this.missingMappings(companyId),
       this.subledger('AR', companyId, asOf, currency),
@@ -548,6 +549,65 @@ export class IntegrityService {
       .having(gt(sql`count(*)`, 1))
       .limit(20);
     return finding('DUPLICATE_SOURCE', 'CRITICAL', 'No source document is posted twice', rows);
+  }
+
+  /**
+   * The period-balance read model equals the lines it summarises: one capped
+   * query joins the stored (account, month, journal type, dimension set) rows to
+   * the same aggregation computed from the ledger and reports every key whose
+   * debit, credit or line count differ, or that exists on one side only.
+   */
+  private async periodBalances(companyId: string): Promise<IntegrityFinding> {
+    const rows = await this.db.execute<Record<string, unknown>>(sql`
+      with ledger as (
+        select l.account_id, date_trunc('month', e.entry_date)::date as period_start,
+               e.journal_type, l.branch_id, l.department_id, l.cost_center_id, l.project_id,
+               sum(l.debit) as debit, sum(l.credit) as credit, count(*)::int as line_count
+          from journal_lines l join journal_entries e on e.id = l.journal_entry_id
+         where e.company_id = ${companyId} and e.status in ('POSTED', 'LOCKED', 'REVERSED')
+         group by 1, 2, 3, 4, 5, 6, 7
+      ),
+      stored as (
+        select account_id, period_start, journal_type, branch_id, department_id, cost_center_id,
+               project_id, debit, credit, line_count
+          from account_period_balances where company_id = ${companyId}
+      )
+      select coalesce(s.account_id, l.account_id) as "accountId",
+             coalesce(s.period_start, l.period_start)::text as "periodStart",
+             coalesce(s.journal_type, l.journal_type)::text as "journalType",
+             s.debit::text as "storedDebit", l.debit::text as "ledgerDebit",
+             s.credit::text as "storedCredit", l.credit::text as "ledgerCredit",
+             s.line_count as "storedLines", l.line_count as "ledgerLines"
+        from stored s
+        full outer join ledger l
+          on l.account_id = s.account_id and l.period_start = s.period_start
+         and l.journal_type = s.journal_type
+         and l.branch_id is not distinct from s.branch_id
+         and l.department_id is not distinct from s.department_id
+         and l.cost_center_id is not distinct from s.cost_center_id
+         and l.project_id is not distinct from s.project_id
+       where s.debit is distinct from l.debit or s.credit is distinct from l.credit
+          or s.line_count is distinct from l.line_count
+       limit 20`);
+    return finding(
+      'PERIOD_BALANCES_VS_LEDGER',
+      'CRITICAL',
+      'Period balances equal the posted lines',
+      rows.rows,
+      'Rebuild with POST /operations/period-balances/rebuild when this fails.',
+    );
+  }
+
+  /**
+   * Recompute the period-balance read model of one company from its ledger
+   * lines (`rebuild_account_period_balances`). Only needed after a repair that
+   * bypassed the triggers; returns the number of rows written.
+   */
+  async rebuildPeriodBalances(companyId: string): Promise<{ rows: number }> {
+    const result = await this.db.execute<{ rows: number }>(
+      sql`select rebuild_account_period_balances(${companyId}) as rows`,
+    );
+    return { rows: Number(result.rows[0]?.rows ?? 0) };
   }
 
   /** Trial balance and balance sheet tie as of the report date. */
