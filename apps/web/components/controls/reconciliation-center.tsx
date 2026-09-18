@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import type { ColumnDef } from '@tanstack/react-table';
 import { AlertTriangle, CheckCircle2, Clock, Play, Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -79,7 +79,7 @@ export function ReconciliationStatusBadge({ status }: { status: SubledgerReconci
 }
 
 export function ReconciliationCenterPage() {
-  const router = useRouter();
+  const router = useAppRouter();
   const { hasPermission } = useSession();
   const [asOf, setAsOf] = React.useState(today());
   const summary = useReconciliationSummary(asOf);

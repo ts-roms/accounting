@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Plus, Search } from 'lucide-react';
 import { toast } from 'sonner';
@@ -50,7 +50,7 @@ import { ASSETS_PATH, AssetStatusBadge, methodLabel } from './shared';
 type AssetFormInput = z.input<typeof createAssetSchema>;
 
 export function FixedAssetsPage() {
-  const router = useRouter();
+  const router = useAppRouter();
   const table = useTableState({ sortBy: 'assetNumber', sortDir: 'desc' });
   const [status, setStatus] = React.useState('ALL');
   const [categoryId, setCategoryId] = React.useState('ALL');

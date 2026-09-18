@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import type { ColumnDef } from '@tanstack/react-table';
 import { AlertTriangle, ArrowLeft, Check, FileMinus, Search, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -51,7 +51,7 @@ import { trimAmount } from '@/components/subledger/document-detail';
 import { ReturnStatusBadge } from './badges';
 
 export function ReturnsPage({ cfg }: { cfg: ReturnsConfig }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const table = useTableState({ sortBy: 'returnDate', sortDir: 'desc' });
   const [status, setStatus] = React.useState('ALL');
   const returns = useReturns(cfg, {
@@ -189,7 +189,7 @@ export function ReturnsPage({ cfg }: { cfg: ReturnsConfig }) {
 }
 
 export function ReturnDetailPage({ cfg, id }: { cfg: ReturnsConfig; id: string }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const { hasPermission } = useSession();
   const ret = useReturn(cfg, id);
   const action = useReturnAction(cfg);

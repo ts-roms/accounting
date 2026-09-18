@@ -1,6 +1,6 @@
 'use client';
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import {
   Dialog,
   DialogContent,
@@ -33,7 +33,7 @@ export function useGlobalShortcuts({
   onToggleSidebar: () => void;
   onShowShortcuts: () => void;
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const pendingG = React.useRef<number | null>(null);
 
   React.useEffect(() => {

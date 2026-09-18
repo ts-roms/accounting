@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Plus, Search } from 'lucide-react';
 import { PAYMENT_STATUSES, type PaymentStatus } from '@accounting/types';
@@ -25,7 +25,7 @@ import { PaymentStatusBadge } from './badges';
 import { partyOf } from './documents';
 
 export function PaymentsPage({ cfg }: { cfg: SubledgerConfig }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const table = useTableState({ sortBy: 'paymentDate', sortDir: 'desc' });
   const [status, setStatus] = React.useState('ALL');
   const payments = usePayments(cfg, {

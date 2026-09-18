@@ -11,7 +11,7 @@ import path from 'node:path';
  */
 
 export const DEFAULT_TEST_DATABASE_URL =
-  'postgres://accounting:accounting@localhost:5433/accounting_test';
+  'postgres://accounting:accounting@127.0.0.1:5433/accounting_test';
 
 /** Monorepo root of this checkout (apps/api/test -> ../../..). */
 export function repoRoot(): string {

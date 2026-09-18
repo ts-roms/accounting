@@ -1,6 +1,6 @@
 'use client';
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import { useQueryClient } from '@tanstack/react-query';
 import type { DelegatedGrant, PermissionKey } from '@accounting/types';
 import { api, getActiveCompanyId, setActiveCompanyId } from '../api/client';
@@ -34,7 +34,7 @@ export function SessionProvider({
   children: React.ReactNode;
   fallback: React.ReactNode;
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const queryClient = useQueryClient();
   const [companyId, setCompanyId] = React.useState<string | null>(() => getActiveCompanyId());
   const { data: me, isLoading, isError } = useMe();

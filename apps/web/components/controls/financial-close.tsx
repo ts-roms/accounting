@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import type { ColumnDef } from '@tanstack/react-table';
 import {
   AlertTriangle,
@@ -99,7 +99,7 @@ export function CloseStatusBadge({ status }: { status: CloseStatus }) {
 }
 
 export function FinancialClosePage() {
-  const router = useRouter();
+  const router = useAppRouter();
   const table = useTableState({ pageSize: 25 });
   const closes = useCloses(table.query);
   const [starting, setStarting] = React.useState(false);
@@ -210,7 +210,7 @@ function StartCloseDialog({
   open: boolean;
   onOpenChange: (o: boolean) => void;
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const years = useFiscalYears();
   const start = useStartClose();
   const [periodId, setPeriodId] = React.useState('');

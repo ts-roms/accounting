@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import type { ColumnDef } from '@tanstack/react-table';
 import { ArrowLeft, Pencil, Plus, Search, Trash2, Users } from 'lucide-react';
 import { toast } from 'sonner';
@@ -67,7 +67,7 @@ export const FREQUENCY_LABEL: Record<PayFrequency, string> = {
 };
 
 export function EmployeesPage() {
-  const router = useRouter();
+  const router = useAppRouter();
   const table = useTableState();
   const [status, setStatus] = React.useState('ACTIVE');
   const [creating, setCreating] = React.useState(false);

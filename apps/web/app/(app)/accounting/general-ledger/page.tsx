@@ -1,7 +1,8 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import {
   Badge,
   Button,
@@ -38,7 +39,7 @@ export default function GeneralLedgerPage() {
 
 function GeneralLedgerContent() {
   const params = useSearchParams();
-  const router = useRouter();
+  const router = useAppRouter();
   const [accountId, setAccountId] = React.useState<string | null>(params.get('accountId'));
   const [range, setRange] = React.useState({
     from: params.get('from') ?? startOfYear(),

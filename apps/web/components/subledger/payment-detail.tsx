@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import { AlertTriangle, ArrowLeft, Ban, Pencil, RotateCcw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Money } from '@accounting/money';
@@ -55,7 +55,7 @@ import { AllocationEditor, safeMoney } from './document-detail';
 import { partyOf } from './documents';
 
 export function PaymentDetailPage({ cfg, id }: { cfg: SubledgerConfig; id: string }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const { hasPermission } = useSession();
   const payment = usePayment(cfg, id);
   const post = usePostPayment(cfg);

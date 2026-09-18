@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Search } from 'lucide-react';
 import { JOURNAL_STATUSES, type JournalStatus } from '@accounting/types';
@@ -48,7 +48,7 @@ const ALL = 'ALL';
  * never re-totalled here.
  */
 export function JournalControlPage() {
-  const router = useRouter();
+  const router = useAppRouter();
   const { activeCompany } = useSession();
   const table = useTableState({ sortBy: 'entryDate', sortDir: 'desc' });
   const [range, setRange] = React.useState({ from: startOfMonth(), to: today() });

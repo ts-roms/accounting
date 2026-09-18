@@ -1,7 +1,8 @@
 'use client';
 /* New / edit screens for documents and payments. Route files under /sales and /purchasing are thin wrappers around these. */
 import * as React from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import { Skeleton } from '@accounting/ui';
 import { toast } from 'sonner';
 import { describeError } from '@/lib/api/client';
@@ -26,7 +27,7 @@ function useCurrency() {
 }
 
 export function NewDocumentScreen({ cfg }: { cfg: SubledgerConfig }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const params = useSearchParams();
   const currency = useCurrency();
   const create = useCreateDocument(cfg);
@@ -62,7 +63,7 @@ export function NewDocumentScreen({ cfg }: { cfg: SubledgerConfig }) {
 }
 
 export function EditDocumentScreen({ cfg, id }: { cfg: SubledgerConfig; id: string }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const currency = useCurrency();
   const document = useDocument(cfg, id);
   const update = useUpdateDocument(cfg);
@@ -100,7 +101,7 @@ export function EditDocumentScreen({ cfg, id }: { cfg: SubledgerConfig; id: stri
 }
 
 export function NewPaymentScreen({ cfg }: { cfg: SubledgerConfig }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const params = useSearchParams();
   const currency = useCurrency();
   const create = useCreatePayment(cfg);
@@ -136,7 +137,7 @@ export function NewPaymentScreen({ cfg }: { cfg: SubledgerConfig }) {
 }
 
 export function EditPaymentScreen({ cfg, id }: { cfg: SubledgerConfig; id: string }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const currency = useCurrency();
   const payment = usePayment(cfg, id);
   const update = useUpdatePayment(cfg);

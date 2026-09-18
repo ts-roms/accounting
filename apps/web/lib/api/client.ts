@@ -116,7 +116,19 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   if (response.status === 204) return undefined as T;
 
   const text = await response.text();
-  const data = text ? (JSON.parse(text) as unknown) : undefined;
+  let data: unknown;
+  try {
+    data = text ? (JSON.parse(text) as unknown) : undefined;
+  } catch {
+    // Not the API's JSON envelope: the dev proxy answers with a bare
+    // "Internal Server Error" / 502 while the API is down or still starting.
+    throw new ApiError(response.status, {
+      code: 'API_UNAVAILABLE',
+      message: response.ok
+        ? 'The API returned an unexpected response.'
+        : 'The API is not reachable - it may still be starting. Retry in a moment.',
+    });
+  }
   if (!response.ok) {
     const errorBody = (data as ApiErrorBody | undefined) ?? {
       code: 'HTTP_ERROR',

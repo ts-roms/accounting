@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -79,7 +79,7 @@ export const PRODUCTS_PATH = '/inventory/products';
 const qty = (v: string | null | undefined) => (v === null || v === undefined ? '-' : trimAmount(v));
 
 export function ProductsPage() {
-  const router = useRouter();
+  const router = useAppRouter();
   const { hasPermission } = useSession();
   const table = useTableState({ sortBy: 'sku', sortDir: 'asc' });
   const [status, setStatus] = React.useState('ACTIVE');

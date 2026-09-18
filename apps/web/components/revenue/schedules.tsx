@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import type { ColumnDef } from '@tanstack/react-table';
 import { ArrowLeft, CheckCircle2, Hourglass } from 'lucide-react';
 import { toast } from 'sonner';
@@ -50,7 +50,7 @@ import { METHOD_LABEL } from './policies';
 
 /** Every deferred invoice line with its remaining balance and the date it next falls due. */
 export function RevenueSchedulesPage() {
-  const router = useRouter();
+  const router = useAppRouter();
   const table = useTableState();
   const [status, setStatus] = React.useState('ACTIVE');
   const [method, setMethod] = React.useState('ALL');

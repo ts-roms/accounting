@@ -1,5 +1,6 @@
 'use client';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import { JOURNAL_TYPES, type JournalType } from '@accounting/types';
 import { toast } from 'sonner';
 import { describeError } from '@/lib/api/client';
@@ -9,7 +10,7 @@ import { PageHeader } from '@/components/ui-ext/page';
 import { JournalEntryForm } from '@/components/accounting/journal-entry-form';
 
 export default function NewJournalEntryPage() {
-  const router = useRouter();
+  const router = useAppRouter();
   const { activeCompany } = useSession();
   const create = useCreateJournalEntry();
   const currency = activeCompany?.baseCurrency ?? 'PHP';

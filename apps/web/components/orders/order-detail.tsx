@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation/progress';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -79,7 +79,7 @@ import {
 import { SalesOrderArPanel } from '@/components/receivables/order-panel';
 
 export function OrderDetailPage({ cfg, id }: { cfg: OrderConfig; id: string }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const { hasPermission } = useSession();
   const order = useOrder(cfg, id);
   const action = useOrderAction(cfg);
@@ -798,7 +798,7 @@ function ConvertDialog({
   open: boolean;
   onOpenChange: (o: boolean) => void;
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const convert = useConvertOrder(cfg);
   const [vendorId, setVendorId] = React.useState<string | null>(order.vendorId);
   const [orderDate, setOrderDate] = React.useState(today());
@@ -875,7 +875,7 @@ function FulfilDialog({
   open: boolean;
   onOpenChange: (o: boolean) => void;
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const fulfil = useFulfilOrder(cfg);
   const isBill = cfg.type === 'PURCHASE_ORDER';
   const [documentDate, setDocumentDate] = React.useState(today());
@@ -971,7 +971,7 @@ function ReceiveDialog({
   open: boolean;
   onOpenChange: (o: boolean) => void;
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const create = useCreateGoodsReceipt();
   const [receiptDate, setReceiptDate] = React.useState(today());
   const [reference, setReference] = React.useState('');
@@ -1057,7 +1057,7 @@ function ReturnDialog({
   open: boolean;
   onOpenChange: (o: boolean) => void;
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const returnsCfg = cfg.type === 'SALES_ORDER' ? SALES_RETURNS_CONFIG : PURCHASE_RETURNS_CONFIG;
   const create = useCreateReturn(returnsCfg);
   const [returnDate, setReturnDate] = React.useState(today());

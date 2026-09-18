@@ -29,7 +29,7 @@ Prerequisites: Node 22+, pnpm 9+, Docker.
 ```bash
 cp .env.example .env
 pnpm install
-pnpm infra:up              # PostgreSQL on localhost:5433, Redis on 6379
+pnpm infra:up              # PostgreSQL on 127.0.0.1:5433, Redis on 6379 (use 127.0.0.1, not localhost, on Windows)
 pnpm build:packages
 pnpm db:migrate
 pnpm db:seed
@@ -55,14 +55,14 @@ docs                Architecture, accounting engine, database, API, security, pe
 
 ## Scripts
 
-| Command                                                    | Description                                                             |
-| ---------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `pnpm dev` / `pnpm build`                                  | Run / build everything through Turborepo                                |
-| `pnpm lint` / `pnpm typecheck` / `pnpm test`               | Quality gates across the workspace                                      |
+| Command                                                    | Description                                                                                                                                        |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm dev` / `pnpm build`                                  | Run / build everything through Turborepo                                                                                                           |
+| `pnpm lint` / `pnpm typecheck` / `pnpm test`               | Quality gates across the workspace                                                                                                                 |
 | `pnpm --filter @accounting/api test:e2e`                   | API integration tests against `accounting_test` (needs `pnpm infra:up`); worktrees use `accounting_test_<worktree>`, or set `TEST_DATABASE_SUFFIX` |
-| `pnpm --filter @accounting/web test:e2e`                   | Playwright against a running stack                                      |
-| `pnpm db:generate` / `db:migrate` / `db:seed` / `db:reset` | Drizzle migrations and seed                                             |
-| `pnpm infra:up` / `infra:down` / `infra:logs`              | Docker infrastructure                                                   |
+| `pnpm --filter @accounting/web test:e2e`                   | Playwright against a running stack                                                                                                                 |
+| `pnpm db:generate` / `db:migrate` / `db:seed` / `db:reset` | Drizzle migrations and seed                                                                                                                        |
+| `pnpm infra:up` / `infra:down` / `infra:logs`              | Docker infrastructure                                                                                                                              |
 
 ## Documentation
 
