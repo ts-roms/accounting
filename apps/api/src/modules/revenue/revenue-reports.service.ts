@@ -527,7 +527,11 @@ export class RevenueReportsService {
         and(eq(accountMappings.companyId, companyId), eq(accountMappings.key, 'DEFERRED_REVENUE')),
       );
     if (!mapping) return null;
-    const activity = await this.ledger.activity({ companyId, to: asOf });
+    const activity = await this.ledger.activity({
+      companyId,
+      to: asOf,
+      accountIds: [mapping.accountId],
+    });
     const row = activity.find((a) => a.accountId === mapping.accountId);
     if (!row) return Money.zero(currency);
     return Money.of(row.credit, currency).subtract(Money.of(row.debit, currency));

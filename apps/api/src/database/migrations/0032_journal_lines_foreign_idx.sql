@@ -1,0 +1,1 @@
+CREATE INDEX "journal_lines_foreign_idx" ON "journal_lines" USING btree ("company_id","journal_entry_id") WHERE "journal_lines"."foreign_debit" IS NOT NULL OR "journal_lines"."foreign_credit" IS NOT NULL;

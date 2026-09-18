@@ -8,6 +8,7 @@ import type {
   CreateJournalEntryInput,
   GeneralLedgerQuery,
   IncomeStatementQuery,
+  IncomeStatementTrendQuery,
   ListAccountsQuery,
   ListJournalEntriesQuery,
   RejectJournalEntryInput,
@@ -27,6 +28,7 @@ import type {
   FiscalPeriod,
   FiscalYear,
   IncomeStatementReport,
+  IncomeStatementTrend,
   IntegrityReport,
   JournalCorrectionResult,
   JournalEntryDetail,
@@ -49,6 +51,8 @@ export const accountingKeys = {
   trialBalance: (query: Partial<TrialBalanceQuery>) => ['trial-balance', company(), query] as const,
   incomeStatement: (query: Partial<IncomeStatementQuery>) =>
     ['income-statement', company(), query] as const,
+  incomeStatementTrend: (query: Partial<IncomeStatementTrendQuery>) =>
+    ['income-statement-trend', company(), query] as const,
   balanceSheet: (query: Partial<BalanceSheetQuery>) => ['balance-sheet', company(), query] as const,
 };
 
@@ -59,6 +63,7 @@ const invalidateLedgerViews = (qc: ReturnType<typeof useQueryClient>) => {
     'general-ledger',
     'trial-balance',
     'income-statement',
+    'income-statement-trend',
     'balance-sheet',
     'fiscal-years',
   ]) {
@@ -260,6 +265,16 @@ export const useIncomeStatement = (query: IncomeStatementQuery, enabled = true) 
     queryKey: accountingKeys.incomeStatement(query),
     queryFn: () => api.get<IncomeStatementReport>('/reports/income-statement', { query }),
     enabled,
+    placeholderData: (p) => p,
+  });
+
+/** Monthly section totals in one request (the dashboard trend and MTD tiles). */
+export const useIncomeStatementTrend = (query: IncomeStatementTrendQuery, enabled = true) =>
+  useQuery({
+    queryKey: accountingKeys.incomeStatementTrend(query),
+    queryFn: () => api.get<IncomeStatementTrend>('/reports/income-statement/trend', { query }),
+    enabled,
+    staleTime: 60_000,
     placeholderData: (p) => p,
   });
 

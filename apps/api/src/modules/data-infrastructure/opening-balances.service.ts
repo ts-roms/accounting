@@ -294,7 +294,7 @@ export class OpeningBalancesService {
       });
     }
     const equity = await this.accounts.resolveMapped(companyId, 'OPENING_BALANCE_EQUITY');
-    const activity = await this.ledger.activity({ companyId, to: asOf });
+    const activity = await this.ledger.activity({ companyId, to: asOf, accountIds: [equity.id] });
     const eqRow = activity.find((a) => a.accountId === equity.id);
     const equityBalance = Money.of(eqRow?.credit ?? '0', currency).subtract(
       Money.of(eqRow?.debit ?? '0', currency),

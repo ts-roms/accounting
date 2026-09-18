@@ -416,6 +416,25 @@ export interface IncomeStatementReport {
   comparative?: Omit<IncomeStatementReport, 'comparative'>;
 }
 
+/** Section totals of one month (`/reports/income-statement/trend`). */
+export interface IncomeStatementTrendPoint {
+  from: string;
+  to: string;
+  revenue: string;
+  costOfSales: string;
+  grossProfit: string;
+  expenses: string;
+  operatingIncome: string;
+  otherIncome: string;
+  otherExpenses: string;
+  netIncome: string;
+}
+
+export interface IncomeStatementTrend {
+  currency: string;
+  months: IncomeStatementTrendPoint[];
+}
+
 export interface BalanceSheetReport {
   asOf: string;
   currency: string;

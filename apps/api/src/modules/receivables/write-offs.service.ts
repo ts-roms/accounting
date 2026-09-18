@@ -729,7 +729,10 @@ export class WriteOffsService {
         'ALLOWANCE_FOR_DOUBTFUL_ACCOUNTS',
         tx,
       );
-      const activity = await this.ledger.activity({ companyId, to: input.asOf }, tx);
+      const activity = await this.ledger.activity(
+        { companyId, to: input.asOf, accountIds: [allowance.id] },
+        tx,
+      );
       const row = activity.find((a) => a.accountId === allowance.id);
       // The allowance is a contra-asset (credit-normal): its signed balance is the provision on the books.
       const existing = signedBalance(

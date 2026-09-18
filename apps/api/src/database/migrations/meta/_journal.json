@@ -225,6 +225,13 @@
       "when": 1789634186583,
       "tag": "0031_lease_accounting",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1789705755304,
+      "tag": "0032_journal_lines_foreign_idx",
+      "breakpoints": true
     }
   ]
 }

@@ -349,6 +349,10 @@ export const journalLines = pgTable(
     index('journal_lines_project_idx').on(t.companyId, t.projectId),
     index('journal_lines_account_idx').on(t.companyId, t.accountId),
     index('journal_lines_entry_idx').on(t.journalEntryId),
+    // Foreign-amount lines are rare: the integrity currency check walks this partial index.
+    index('journal_lines_foreign_idx')
+      .on(t.companyId, t.journalEntryId)
+      .where(sql`${t.foreignDebit} IS NOT NULL OR ${t.foreignCredit} IS NOT NULL`),
     check('journal_lines_non_negative_chk', sql`${t.debit} >= 0 AND ${t.credit} >= 0`),
     check('journal_lines_one_side_chk', sql`${t.debit} = 0 OR ${t.credit} = 0`),
     check('journal_lines_not_empty_chk', sql`${t.debit} > 0 OR ${t.credit} > 0`),

@@ -376,7 +376,11 @@ export class PayrollReportsService {
         [],
         'No EMPLOYEE_PAYABLE mapping yet.',
       );
-    const activity = await this.ledger.activity({ companyId, to: asOf });
+    const activity = await this.ledger.activity({
+      companyId,
+      to: asOf,
+      accountIds: [mapping.accountId],
+    });
     const row = activity.find((a) => a.accountId === mapping.accountId);
     const ledger = row
       ? Money.of(row.credit, currency).subtract(Money.of(row.debit, currency))

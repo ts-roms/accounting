@@ -78,4 +78,5 @@ docs                Architecture, accounting engine, database, API, security, pe
 - [Financial reporting](docs/financial-reporting.md)
 - [Tax](docs/tax.md)
 - [Deployment](docs/deployment.md)
+- [Performance notes](docs/performance.md) - ledger read rules, how to measure, audit baseline
 - [Development roadmap](docs/development-roadmap.md)
