@@ -15,6 +15,8 @@ import { OutboundWebhooksService } from '@/modules/integrations/webhooks/outboun
 import { verifySignature } from '@/modules/integrations/webhooks/webhook-signature';
 
 const DB_URL = process.env.DATABASE_URL!;
+/** The API builds OAuth return URLs from WEB_BASE_URL (env or the schema default). */
+const WEB_BASE_URL = (process.env.WEB_BASE_URL ?? 'http://localhost:3006').replace(/\/$/, '');
 const ADMIN = { email: 'admin@acme.local', password: 'P@ssw0rd123' };
 const FINANCE = { email: 'finance@acme.local', password: 'P@ssw0rd123' };
 const VIEWER = { email: 'viewer@acme.local', password: 'P@ssw0rd123' };
@@ -1586,9 +1588,7 @@ describe('Integration platform (e2e)', () => {
         `/api/v1/integrations/oauth/callback?state=${encodeURIComponent(state)}&code=demo-code-1`,
       )
       .expect(302);
-    expect(callback.headers.location).toBe(
-      'http://localhost:3000/admin/integrations/x?oauth=success',
-    );
+    expect(callback.headers.location).toBe(`${WEB_BASE_URL}/admin/integrations/x?oauth=success`);
     // State is single use.
     await server()
       .get(
