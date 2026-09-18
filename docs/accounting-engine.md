@@ -102,6 +102,11 @@ resolvePeriod(tx, companyId, entryDate, opts?) // period lookup + open check
 - Every statement row carries a `drill` descriptor (`accountId`, `from`, `to`)
   the UI turns into a general-ledger query; ledger rows link to the journal
   entry, which links to its source document.
+- Every figure starts from `GeneralLedgerService.activity()`. Whole calendar
+  months come from the trigger-maintained `account_period_balances` read
+  model, partial edge months from the lines; `lineActivity()` is the pure
+  line scan the model is proven against (`PERIOD_BALANCES_VS_LEDGER`). See
+  `docs/performance.md`.
 
 ## Subledgers (Phase 3)
 

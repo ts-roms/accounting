@@ -534,9 +534,10 @@ New error codes: `IMPORT_FILE_INVALID`, `IMPORT_INVALID_ROWS`, `OPENING_BALANCE_
 | GET           | `/operations/queues` (counts + schedulers per queue, `null` without Redis), `/operations/queues/:queue/failed?limit` (dead letter)             | `operations.view`   |
 | POST / DELETE | `/operations/queues/:queue/failed/retry`, `/operations/queues/:queue/failed/:id/retry`, `/operations/queues/:queue/failed/:id` (audited)       | `operations.manage` |
 | GET / POST    | `/operations/integrity-runs?companyId`, `/operations/integrity-runs { companyId }` (run now, stores the outcome)                               | view / manage       |
+| POST          | `/operations/period-balances/rebuild { companyId }` - recompute the period-balance read model from the ledger lines; audited `REBUILD`         | `operations.manage` |
 | GET           | `/health/ready` - 200 when schema current and not draining, else 503 with `reasons`; `/metrics` - Prometheus text (bearer `METRICS_TOKEN`)     | public              |
 
-New error codes: `JOB_ALREADY_RUNNING` (422), `QUEUE_UNAVAILABLE`. New audit actions: `JOB_RUN`, `QUEUE_RETRY`, `QUEUE_DISCARD`.
+New error codes: `JOB_ALREADY_RUNNING` (422), `QUEUE_UNAVAILABLE`. New audit actions: `JOB_RUN`, `QUEUE_RETRY`, `QUEUE_DISCARD`, `REBUILD`.
 
 ### Audit & health
 

@@ -17,7 +17,14 @@ import { LEDGER_STATUSES, type AccountType, type JournalType } from '@accounting
 import type { GeneralLedgerQuery } from '@accounting/validation';
 import { NotFoundError } from '@/common/errors/app-error';
 import { DRIZZLE, type Database, type DbExecutor } from '@/database/database.types';
-import { accounts, companies, journalEntries, journalLines, type Account } from '@/database/schema';
+import {
+  accountPeriodBalances,
+  accounts,
+  companies,
+  journalEntries,
+  journalLines,
+  type Account,
+} from '@/database/schema';
 
 export interface LedgerLine {
   journalEntryId: string;
@@ -90,6 +97,45 @@ export interface BalanceFilter {
   excludeJournalTypes?: readonly JournalType[];
 }
 
+/**
+ * Splits [from, to] into the whole calendar months it contains (served by the
+ * period-balance read model) and the leftover days at either end (served by the
+ * lines). `from` omitted = all history up to `to`.
+ */
+export function splitWindow(
+  from: string | undefined,
+  to: string,
+): { months: { from: string; to: string } | null; days: Array<{ from?: string; to: string }> } {
+  // Month arithmetic on (year * 12 + month) indices: no Date objects, so a
+  // window ending on 9999-12-31 (the "all history" sentinel) cannot overflow.
+  const index = (iso: string) => {
+    const [y, m] = iso.split('-').map(Number) as [number, number];
+    return y * 12 + (m - 1);
+  };
+  const pad = (n: number, width: number) => String(n).padStart(width, '0');
+  const first = (i: number) => `${pad(Math.floor(i / 12), 4)}-${pad((i % 12) + 1, 2)}-01`;
+  const daysIn = (i: number) =>
+    new Date(Date.UTC(Math.floor(i / 12), (i % 12) + 1, 0)).getUTCDate();
+  const last = (i: number) => first(i).slice(0, 8) + pad(daysIn(i), 2);
+  const day = (iso: string) => Number(iso.slice(8, 10));
+
+  // First whole month: the month of `from` when `from` is its first day, else the next month.
+  const firstWhole = !from ? index('0001-01-01') : day(from) === 1 ? index(from) : index(from) + 1;
+  // Last whole month: the month of `to` when `to` is its last day, else the previous month.
+  const lastWhole = day(to) === daysIn(index(to)) ? index(to) : index(to) - 1;
+  if (firstWhole > lastWhole) {
+    // Fewer than one whole month: everything from the lines.
+    return { months: null, days: [{ from, to }] };
+  }
+  const days: Array<{ from?: string; to: string }> = [];
+  if (from && index(from) < firstWhole) days.push({ from, to: last(index(from)) });
+  if (index(to) > lastWhole) days.push({ from: first(index(to)), to });
+  return { months: { from: first(firstWhole), to: first(lastWhole) }, days };
+}
+
+/** ISO 4217 "no currency": activity totals are raw ledger decimals, the caller knows the company currency. */
+const NO_CURRENCY = 'XXX';
+
 /** Sign a (debit - credit) net amount according to the account's normal side. */
 export function signedBalance(net: Money, normalBalance: Account['normalBalance']): Money {
   return normalBalance === 'DEBIT' ? net : net.negate();
@@ -138,8 +184,88 @@ export class GeneralLedgerService {
     return conditions;
   }
 
-  /** Debit/credit totals per account for the filter window, from posted lines only. */
+  /** The same filter against the period-balance read model (full calendar months only). */
+  private balanceConditions(
+    filter: BalanceFilter,
+    months: { from: string; to: string },
+  ): SQL[] | null {
+    const conditions: SQL[] = [
+      eq(accountPeriodBalances.companyId, filter.companyId),
+      gte(accountPeriodBalances.periodStart, months.from),
+      lte(accountPeriodBalances.periodStart, months.to),
+    ];
+    if (filter.accountIds) {
+      if (filter.accountIds.length === 0) return null;
+      conditions.push(inArray(accountPeriodBalances.accountId, [...filter.accountIds]));
+    }
+    if (filter.branchId) conditions.push(eq(accountPeriodBalances.branchId, filter.branchId));
+    if (filter.departmentId)
+      conditions.push(eq(accountPeriodBalances.departmentId, filter.departmentId));
+    if (filter.costCenterId)
+      conditions.push(eq(accountPeriodBalances.costCenterId, filter.costCenterId));
+    if (filter.projectId) conditions.push(eq(accountPeriodBalances.projectId, filter.projectId));
+    if (filter.accountTypes) conditions.push(inArray(accounts.type, [...filter.accountTypes]));
+    if (filter.excludeJournalTypes?.length)
+      conditions.push(
+        notInArray(accountPeriodBalances.journalType, [...filter.excludeJournalTypes]),
+      );
+    return conditions;
+  }
+
+  /**
+   * Debit/credit totals per account for the filter window, from posted lines only.
+   *
+   * Whole calendar months inside the window come from `account_period_balances`
+   * (the trigger-maintained read model, one row per account / month / dimension
+   * set); the days of a partial first or last month come from the lines. The
+   * union is exactly what a scan of every line would return - the integrity check
+   * PERIOD_BALANCES_VS_LEDGER proves it - at a fraction of the cost on a large
+   * ledger.
+   */
   async activity(
+    filter: BalanceFilter,
+    executor: DbExecutor = this.db,
+  ): Promise<AccountActivity[]> {
+    const parts = splitWindow(filter.from, filter.to);
+    const totals = new Map<string, { debit: Money; credit: Money }>();
+    const add = (rows: AccountActivity[]) => {
+      for (const r of rows) {
+        const t = totals.get(r.accountId) ?? {
+          debit: Money.zero(NO_CURRENCY),
+          credit: Money.zero(NO_CURRENCY),
+        };
+        totals.set(r.accountId, {
+          debit: t.debit.add(Money.of(r.debit, NO_CURRENCY)),
+          credit: t.credit.add(Money.of(r.credit, NO_CURRENCY)),
+        });
+      }
+    };
+    if (parts.months) {
+      const conditions = this.balanceConditions(filter, parts.months);
+      if (conditions)
+        add(
+          await executor
+            .select({
+              accountId: accountPeriodBalances.accountId,
+              debit: sql<string>`coalesce(sum(${accountPeriodBalances.debit}), 0)`,
+              credit: sql<string>`coalesce(sum(${accountPeriodBalances.credit}), 0)`,
+            })
+            .from(accountPeriodBalances)
+            .innerJoin(accounts, eq(accounts.id, accountPeriodBalances.accountId))
+            .where(and(...conditions))
+            .groupBy(accountPeriodBalances.accountId),
+        );
+    }
+    for (const edge of parts.days) add(await this.lineActivity({ ...filter, ...edge }, executor));
+    return [...totals.entries()].map(([accountId, t]) => ({
+      accountId,
+      debit: t.debit.toString(),
+      credit: t.credit.toString(),
+    }));
+  }
+
+  /** `activity()` straight from the lines - the reference the read model is proven against. */
+  async lineActivity(
     filter: BalanceFilter,
     executor: DbExecutor = this.db,
   ): Promise<AccountActivity[]> {
@@ -193,22 +319,69 @@ export class GeneralLedgerService {
     filter: BalanceFilter,
     executor: DbExecutor = this.db,
   ): Promise<MonthlyAccountActivity[]> {
-    const conditions = this.conditions(filter);
-    if (!conditions) return [];
-    const month = sql<string>`to_char(date_trunc('month', ${journalEntries.entryDate}), 'YYYY-MM-DD')`;
-    const rows = await executor
-      .select({
-        month,
-        accountId: journalLines.accountId,
-        debit: sql<string>`coalesce(sum(${journalLines.debit}), 0)`,
-        credit: sql<string>`coalesce(sum(${journalLines.credit}), 0)`,
-      })
-      .from(journalLines)
-      .innerJoin(journalEntries, eq(journalEntries.id, journalLines.journalEntryId))
-      .innerJoin(accounts, eq(accounts.id, journalLines.accountId))
-      .where(and(...conditions))
-      .groupBy(month, journalLines.accountId);
-    return rows;
+    const parts = splitWindow(filter.from, filter.to);
+    const out = new Map<
+      string,
+      { month: string; accountId: string; debit: Money; credit: Money }
+    >();
+    const add = (rows: MonthlyAccountActivity[]) => {
+      for (const r of rows) {
+        const key = `${r.month}|${r.accountId}`;
+        const t = out.get(key) ?? {
+          month: r.month,
+          accountId: r.accountId,
+          debit: Money.zero(NO_CURRENCY),
+          credit: Money.zero(NO_CURRENCY),
+        };
+        out.set(key, {
+          ...t,
+          debit: t.debit.add(Money.of(r.debit, NO_CURRENCY)),
+          credit: t.credit.add(Money.of(r.credit, NO_CURRENCY)),
+        });
+      }
+    };
+    if (parts.months) {
+      const conditions = this.balanceConditions(filter, parts.months);
+      if (conditions)
+        add(
+          await executor
+            .select({
+              month: sql<string>`to_char(${accountPeriodBalances.periodStart}, 'YYYY-MM-DD')`,
+              accountId: accountPeriodBalances.accountId,
+              debit: sql<string>`coalesce(sum(${accountPeriodBalances.debit}), 0)`,
+              credit: sql<string>`coalesce(sum(${accountPeriodBalances.credit}), 0)`,
+            })
+            .from(accountPeriodBalances)
+            .innerJoin(accounts, eq(accounts.id, accountPeriodBalances.accountId))
+            .where(and(...conditions))
+            .groupBy(accountPeriodBalances.periodStart, accountPeriodBalances.accountId),
+        );
+    }
+    for (const edge of parts.days) {
+      const conditions = this.conditions({ ...filter, ...edge });
+      if (!conditions) continue;
+      const month = sql<string>`to_char(date_trunc('month', ${journalEntries.entryDate}), 'YYYY-MM-DD')`;
+      add(
+        await executor
+          .select({
+            month,
+            accountId: journalLines.accountId,
+            debit: sql<string>`coalesce(sum(${journalLines.debit}), 0)`,
+            credit: sql<string>`coalesce(sum(${journalLines.credit}), 0)`,
+          })
+          .from(journalLines)
+          .innerJoin(journalEntries, eq(journalEntries.id, journalLines.journalEntryId))
+          .innerJoin(accounts, eq(accounts.id, journalLines.accountId))
+          .where(and(...conditions))
+          .groupBy(month, journalLines.accountId),
+      );
+    }
+    return [...out.values()].map((t) => ({
+      month: t.month,
+      accountId: t.accountId,
+      debit: t.debit.toString(),
+      credit: t.credit.toString(),
+    }));
   }
 
   async ledger(companyId: string, query: GeneralLedgerQuery): Promise<LedgerResult> {
