@@ -52,6 +52,11 @@ organization; custom roles can be created freely.
 - Organization-wide (`companyId = null`): applies to all companies.
 - Company-scoped: only effective while that company is active
   (`X-Company-Id`). Effective permissions = union of both.
+- Granting is bounded by the grantor's own `role.assign`: an organization-wide
+  assignment needs it organization-wide, a company-scoped one needs it in that
+  company. A company-scoped administrator therefore cannot create
+  organization-wide roles or reach other companies, and `user.create` alone
+  cannot attach roles to a new user.
 
 ## Segregation of duties
 

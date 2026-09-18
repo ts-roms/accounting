@@ -7,6 +7,7 @@ import type {
   SetUserStatusInput,
   UpdateUserInput,
 } from '@accounting/validation';
+import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { AuditService } from '@/modules/audit/audit.service';
 import { AuthorizationCacheService } from '@/modules/rbac/authorization-cache.service';
 import { RoleAssignmentService } from '@/modules/rbac/role-assignment.service';
@@ -113,7 +114,8 @@ export class UsersService {
     return user;
   }
 
-  async create(organizationId: string, input: CreateUserInput): Promise<UserView> {
+  async create(actor: AuthenticatedUser, input: CreateUserInput): Promise<UserView> {
+    const organizationId = actor.organizationId;
     const passwordHash = await this.passwords.hash(input.password);
     return this.db.transaction(async (tx) => {
       let created: User | undefined;
@@ -146,7 +148,7 @@ export class UsersService {
         tx,
       );
       for (const roleId of input.roleIds) {
-        await this.assignments.assignWithin(tx, organizationId, created.id, {
+        await this.assignments.assignWithin(tx, actor, organizationId, created.id, {
           roleId,
           companyId: null,
         });

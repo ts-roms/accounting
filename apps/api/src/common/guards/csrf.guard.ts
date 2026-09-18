@@ -21,7 +21,23 @@ export class CsrfGuard implements CanActivate {
 
     const usesCookieAuth =
       Boolean(req.cookies?.[COOKIES.ACCESS_TOKEN]) || Boolean(req.cookies?.[COOKIES.REFRESH_TOKEN]);
-    if (!usesCookieAuth) return true;
+    if (!usesCookieAuth) {
+      // No ambient credential to forge with - but a cross-site <form> can still reach a public
+      // state-changing route such as /auth/login and log the victim into the attacker's
+      // account (login CSRF). Forms can only send urlencoded / multipart / text bodies
+      // without a preflight, so a JSON body, the custom header or a Bearer credential is
+      // proof of a script-initiated request; webhooks and API clients send JSON.
+      if (
+        req.header('authorization') ||
+        req.is('application/json') ||
+        req.header(HEADERS.REQUESTED_WITH) === REQUESTED_WITH_VALUE
+      )
+        return true;
+      throw new ForbiddenError(
+        `State-changing requests must send JSON or include the ${HEADERS.REQUESTED_WITH} header.`,
+        ErrorCodes.CSRF_HEADER_MISSING,
+      );
+    }
 
     if (req.header(HEADERS.REQUESTED_WITH) !== REQUESTED_WITH_VALUE) {
       throw new ForbiddenError(

@@ -57,7 +57,7 @@ export class UsersController {
   @RequirePermissions(P['user.create'])
   @ApiOperation({ summary: 'Create a user and optionally assign roles' })
   create(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateUserDto) {
-    return this.usersService.create(user.organizationId, body);
+    return this.usersService.create(user, body);
   }
 
   @Patch(':id')
@@ -95,7 +95,7 @@ export class UsersController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: AssignUserRoleDto,
   ) {
-    return this.assignments.assign(user.organizationId, id, body);
+    return this.assignments.assign(user, user.organizationId, id, body);
   }
 
   @Delete(':id/roles/:assignmentId')

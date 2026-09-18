@@ -30,6 +30,15 @@
   `@RequirePermissions()`); the frontend mirrors permissions for UX only.
 - Company scoping: `X-Company-Id` must reference a company the user can access
   (organization-wide role, or a role scoped to that company).
+- Role assignment is bounded by the assigner: `RoleAssignmentService.assignWithin`
+  requires the actor to hold `role.assign` in the scope being granted
+  (organization-wide for `companyId = null`, in that company otherwise). The
+  route guard only proves the permission in the active company, and user
+  creation (`user.create`) may pass `roleIds` - neither alone hands out roles.
+- Integration scopes follow the API-key rule: whoever sets them (create or
+  update) can only grant scopes covered by their own permissions
+  (`SCOPE_NOT_GRANTABLE`), because syncs and inbound webhooks act as the
+  integration's creator narrowed to its scopes.
 - Segregation of duties is a configurable policy (`sod_policies`), evaluated on
   every role assignment (`BLOCK` rejects, `WARN` audits).
 - Invariant: an organization always keeps at least one active `SUPER_ADMIN`.
@@ -38,7 +47,14 @@
 
 - CSRF: cookie-authenticated state-changing requests must carry
   `X-Requested-With: XMLHttpRequest` (cross-site forms cannot set custom headers)
-  on top of `SameSite=Lax`.
+  on top of `SameSite=Lax`. Unauthenticated state-changing requests (sign-in)
+  must be script-initiated too - a JSON body, the custom header or a Bearer
+  credential - so a cross-site form cannot log a victim into an attacker's
+  account (login CSRF). Webhooks and API clients send JSON and are unaffected.
+- CSV exports neutralise spreadsheet formulas: any text cell starting with
+  `=`, `+`, `-`, `@`, tab or CR is prefixed with an apostrophe (names and
+  descriptions are written by lower-privileged users and opened by finance
+  staff in Excel).
 - `helmet` security headers on the API; Next.js sends `X-Frame-Options: DENY`,
   `nosniff`, referrer and permissions policies.
 - The browser never calls the API origin directly; Next.js proxies `/api/*`

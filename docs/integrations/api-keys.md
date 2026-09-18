@@ -32,7 +32,10 @@ effective permissions = permissions(scopes) ∩ owner's permissions in the selec
 ```
 
 - The creator can only grant scopes whose permissions they hold
-  (`422 SCOPE_NOT_GRANTABLE` otherwise).
+  (`422 SCOPE_NOT_GRANTABLE` otherwise). The same rule applies to an
+  integration's scopes on create **and** update: syncs and inbound webhooks act
+  as the integration's creator ∩ scopes, so the person setting the scopes must
+  hold them.
 - If the owner later loses a permission (or is deactivated), the key loses it too.
 - No scope maps to approval or posting authority unless it is an explicit
   `:post` scope (`invoices:post`, `bills:post`, `payments:post`). `journals:create` only

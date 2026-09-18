@@ -10,10 +10,18 @@ export interface CsvColumn<T> {
   value: (row: T) => CsvCell;
 }
 
+/** Leading characters spreadsheets interpret as a formula (Excel, LibreOffice, Sheets). */
+const FORMULA_START = /^[=+\-@\t\r]/;
+
 function escapeCell(value: CsvCell): string {
   if (value === null || value === undefined) return '';
-  const text = String(value);
-  return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+  let text = String(value);
+  // Free text (names, descriptions, references) is written by lower-privileged users and
+  // opened by finance staff in a spreadsheet, where a cell such as =HYPERLINK(...) would
+  // execute. Numbers are formatted by the caller; any other text that starts like a
+  // formula is prefixed with an apostrophe, which spreadsheets show as literal text.
+  if (typeof value === 'string' && FORMULA_START.test(text)) text = `'${text}`;
+  return /[",\r\n']/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
 /** Serialises rows to CSV text with a header line and CRLF line ends. */

@@ -66,7 +66,9 @@ permission) streams a CSV with a `Content-Disposition` file name and
 `JOURNAL_ENTRIES`, `CHART_OF_ACCOUNTS`, `CUSTOMERS`, `VENDORS`, `AR_AGING`,
 `AP_AGING`, `AUDIT_LOGS`; filters `from`, `to`, `asOf`, `status`, `search`.
 Every export is read through the service that owns the report (nothing is
-re-derived) and audited (`EXPORT`, with the filters and row count). Export
+re-derived) and audited (`EXPORT`, with the filters and row count). Text cells
+that a spreadsheet would evaluate (`=`, `+`, `-`, `@`, tab, CR) are prefixed
+with an apostrophe so a name such as `=HYPERLINK(...)` opens as literal text. Export
 buttons sit on the trial balance, general ledger, journal list and audit log
 screens.
 
