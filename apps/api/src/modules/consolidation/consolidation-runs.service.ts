@@ -332,21 +332,19 @@ export class ConsolidationRunsService {
             createdBy: actor.id,
           })
           .returning({ id: consolidationAdjustments.id });
-        await tx
-          .insert(consolidationAdjustmentLines)
-          .values(
-            a.lines.map((l, i) => ({
-              adjustmentId: adj!.id,
-              lineNumber: i + 1,
-              companyId: l.companyId,
-              accountCode: l.accountCode,
-              accountName: l.accountName,
-              accountType: l.accountType,
-              debit: l.debit,
-              credit: l.credit,
-              description: l.description,
-            })),
-          );
+        await tx.insert(consolidationAdjustmentLines).values(
+          a.lines.map((l, i) => ({
+            adjustmentId: adj!.id,
+            lineNumber: i + 1,
+            companyId: l.companyId,
+            accountCode: l.accountCode,
+            accountName: l.accountName,
+            accountType: l.accountType,
+            debit: l.debit,
+            credit: l.credit,
+            description: l.description,
+          })),
+        );
       }
       await tx
         .update(consolidationRuns)

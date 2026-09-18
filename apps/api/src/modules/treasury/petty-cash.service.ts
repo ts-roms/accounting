@@ -389,19 +389,17 @@ export class PettyCashService {
           input.voucherDate ?? v.voucherDate,
         );
         await tx.delete(pettyCashVoucherLines).where(eq(pettyCashVoucherLines.voucherId, id));
-        await tx
-          .insert(pettyCashVoucherLines)
-          .values(
-            input.lines.map((l, i) => ({
-              voucherId: id,
-              lineNumber: i + 1,
-              description: l.description,
-              accountId: l.accountId,
-              amount: Money.parse(l.amount, currency).toString(),
-              taxCodeId: l.taxCodeId ?? null,
-              ...l.dimensions,
-            })),
-          );
+        await tx.insert(pettyCashVoucherLines).values(
+          input.lines.map((l, i) => ({
+            voucherId: id,
+            lineNumber: i + 1,
+            description: l.description,
+            accountId: l.accountId,
+            amount: Money.parse(l.amount, currency).toString(),
+            taxCodeId: l.taxCodeId ?? null,
+            ...l.dimensions,
+          })),
+        );
         patch.total = input.lines
           .reduce((m, l) => m.add(Money.parse(l.amount, currency)), Money.zero(currency))
           .toString();

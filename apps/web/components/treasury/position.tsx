@@ -72,8 +72,8 @@ export function CashPositionPage() {
               <CardHeader>
                 <CardTitle className="text-sm">Bank accounts</CardTitle>
                 <CardDescription>
-                  Amounts in each account&apos;s currency; the base column converts at the {p.asOf} rate.
-                  Edit limits and payment details under{' '}
+                  Amounts in each account&apos;s currency; the base column converts at the {p.asOf}{' '}
+                  rate. Edit limits and payment details under{' '}
                   <Link href="/treasury/settings" className="underline">
                     Treasury Settings
                   </Link>

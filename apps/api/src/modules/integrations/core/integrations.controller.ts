@@ -85,12 +85,7 @@ export class IntegrationsController {
   @Get('record-links')
   @ApiOperation({ summary: 'External references and push targets of one internal record' })
   recordLinks(@CurrentUser() user: AuthenticatedUser, @Query() query: RecordLinksDto) {
-    return this.links.forRecord(
-      user,
-      user.companyId ?? '',
-      query.entityType,
-      query.internalId,
-    );
+    return this.links.forRecord(user, user.companyId ?? '', query.entityType, query.internalId);
   }
 
   // -------------------------------------------------------------- catalogue

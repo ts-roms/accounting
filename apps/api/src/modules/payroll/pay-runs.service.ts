@@ -292,17 +292,15 @@ export class PayRunsService {
       }
       await tx.delete(payRunInputs).where(eq(payRunInputs.payRunId, id));
       if (input.inputs.length)
-        await tx
-          .insert(payRunInputs)
-          .values(
-            input.inputs.map((i) => ({
-              payRunId: id,
-              employeeId: i.employeeId,
-              payItemId: i.payItemId,
-              amount: i.amount,
-              note: i.note ?? null,
-            })),
-          );
+        await tx.insert(payRunInputs).values(
+          input.inputs.map((i) => ({
+            payRunId: id,
+            employeeId: i.employeeId,
+            payItemId: i.payItemId,
+            amount: i.amount,
+            note: i.note ?? null,
+          })),
+        );
       if (run.status === 'CALCULATED') {
         await tx
           .update(payRuns)

@@ -382,15 +382,13 @@ export async function seedPayroll(
       .returning({ id: schema.payRuns.id });
     for (const inp of r.inputs) {
       const e = active.find((x) => x.lastName === inp.emp)!;
-      await tx
-        .insert(schema.payRunInputs)
-        .values({
-          payRunId: run!.id,
-          employeeId: e.id,
-          payItemId: items.get(inp.item)!.dbId,
-          amount: inp.amount,
-          note: inp.note,
-        });
+      await tx.insert(schema.payRunInputs).values({
+        payRunId: run!.id,
+        employeeId: e.id,
+        payItemId: items.get(inp.item)!.dbId,
+        amount: inp.amount,
+        note: inp.note,
+      });
     }
     const totals = {
       gross: Money.zero(currency),

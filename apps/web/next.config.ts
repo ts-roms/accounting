@@ -1,3 +1,4 @@
+import path from 'node:path';
 import type { NextConfig } from 'next';
 
 const API_INTERNAL_URL = process.env.API_INTERNAL_URL ?? 'http://127.0.0.1:3001';
@@ -12,6 +13,8 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: 'standalone',
+  // Monorepo: trace files from the workspace root so the standalone server carries the workspace packages.
+  outputFileTracingRoot: path.join(__dirname, '..', '..'),
   // A second dev instance (e.g. a verification stack on other ports) must not share .next.
   ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
   poweredByHeader: false,

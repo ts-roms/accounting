@@ -38,7 +38,9 @@ test.describe('revenue recognition', () => {
     await expect(page.getByText('Rollforward by method')).toBeVisible({ timeout: 45_000 });
     await expect(page.getByTestId('rollforward-row')).toHaveCount(2);
     await expect(page.getByText('Ledger difference')).toBeVisible();
-    await expect(page.getByText('Waterfall - when the deferred balance becomes revenue')).toBeVisible();
+    await expect(
+      page.getByText('Waterfall - when the deferred balance becomes revenue'),
+    ).toBeVisible();
     await expect(page.getByTestId('waterfall-row').first()).toBeVisible({ timeout: 45_000 });
     await expect(page.getByTestId('backlog-row').first()).toBeVisible({ timeout: 45_000 });
     await expect(page.getByTestId('integrity-row')).toHaveCount(4, { timeout: 45_000 });

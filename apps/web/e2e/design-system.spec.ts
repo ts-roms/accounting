@@ -114,7 +114,8 @@ test.describe('design system', () => {
         s.getPropertyValue('--motion-data').trim(),
       ];
     });
-    expect(durations).toEqual(['0ms', '0ms']);
+    // The production CSS minifier writes 0ms as 0s; both mean no motion.
+    expect(durations.map((d) => d.replace(/^0m?s$/, '0'))).toEqual(['0', '0']);
     await context.close();
   });
 

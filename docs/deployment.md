@@ -72,11 +72,30 @@ See `.env.example`. Production requirements:
   the nightly integrity outcomes.
 - Error tracking (e.g. Sentry) remains a planned logger transport.
 
-## CI (recommended pipeline)
+## CI (`.github/workflows/ci.yml`)
 
-1. `pnpm install --frozen-lockfile`
-2. `pnpm build` (packages first via turbo)
-3. `pnpm lint && pnpm typecheck && pnpm test`
-4. Start PostgreSQL/Redis services, `pnpm --filter @accounting/api test:e2e`
-5. Build images, run Playwright against the composed stack
-   (`pnpm --filter @accounting/web test:e2e`)
+Runs on every pull request and on pushes to `main`; the whole run is the
+same set of commands you run locally.
+
+| Job       | What it does                                                                                                                                                                                                                                                                                                               |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `quality` | `pnpm install --frozen-lockfile`, `pnpm build` (packages, API, web), `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `pnpm test`; uploads `apps/api/dist` and the web standalone build as artifacts.                                                                                                                   |
+| `api-e2e` | PostgreSQL 16 + Redis 7 service containers; `pnpm --filter @accounting/api test:e2e` (every suite drops and reseeds `accounting_test`).                                                                                                                                                                                    |
+| `web-e2e` | Service containers, `pnpm db:migrate && pnpm db:seed` into `accounting_ci`, the API from `dist/main.js` on 3001, the web standalone server on 3000 (static assets copied beside it), `playwright install --with-deps chromium`, `playwright test`. The HTML report, traces and both server logs are uploaded on every run. |
+
+Test-only secrets (`JWT_ACCESS_SECRET`, `INTEGRATION_ENCRYPTION_KEY`) are
+literals in the workflow; the seeded password is `P@ssw0rd123`. Services are
+addressed as `127.0.0.1` - see the note in `.env.example`.
+
+Running the same pipeline locally:
+
+```bash
+pnpm install --frozen-lockfile && pnpm build
+pnpm lint && pnpm typecheck && pnpm format:check && pnpm test
+pnpm --filter @accounting/api test:e2e          # needs Docker infra; per-worktree test database
+pnpm --filter @accounting/web test:e2e          # against a running, seeded stack (PLAYWRIGHT_BASE_URL)
+```
+
+On Windows the standalone server refuses to start from a pnpm workspace
+(`EPERM` on the symlinked `node_modules`); use `next start` (or `next dev`)
+for a local Playwright run - the standalone path is exercised on Linux in CI.

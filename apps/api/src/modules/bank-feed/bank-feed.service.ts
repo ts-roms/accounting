@@ -840,14 +840,12 @@ export class BankFeedService {
             ErrorCodes.BANK_SUGGESTION_INVALID,
             'The posted document has no line on this bank account.',
           );
-        await tx
-          .insert(bankLineMatches)
-          .values({
-            statementLineId: lineId,
-            journalLineId: bankLine.id,
-            kind: 'RULE',
-            matchedBy: actor.id,
-          });
+        await tx.insert(bankLineMatches).values({
+          statementLineId: lineId,
+          journalLineId: bankLine.id,
+          kind: 'RULE',
+          matchedBy: actor.id,
+        });
         await tx
           .update(bankStatementLines)
           .set({ status: 'MATCHED', matchNote: noteLabel })

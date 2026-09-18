@@ -90,7 +90,11 @@ export const PERMISSION_DEFINITIONS = [
   define('employee.view', 'PAYROLL', 'View employees'),
   define('employee.manage', 'PAYROLL', 'Create and update employees and their pay assignments'),
   define('payroll.view', 'PAYROLL', 'View pay items, pay runs, payslips and payroll reports'),
-  define('payroll.manage', 'PAYROLL', 'Maintain pay items and settings; create, calculate and submit pay runs'),
+  define(
+    'payroll.manage',
+    'PAYROLL',
+    'Maintain pay items and settings; create, calculate and submit pay runs',
+  ),
   define('payroll.approve', 'PAYROLL', 'Approve pay runs'),
   define('payroll.post', 'PAYROLL', 'Post, pay and reverse pay runs'),
   define('posting-rule.view', 'ACCOUNTING', 'View posting rules'),

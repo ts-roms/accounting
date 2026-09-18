@@ -5,3 +5,11 @@ dist
 coverage
 pnpm-lock.yaml
 apps/api/src/database/migrations/meta
+apps/web/e2e/.auth
+storage
+storage-test
+playwright-report
+test-results
+# Rewritten by next build / next dev (include list), in Next's own style.
+apps/web/tsconfig.json
+apps/web/next-env.d.ts

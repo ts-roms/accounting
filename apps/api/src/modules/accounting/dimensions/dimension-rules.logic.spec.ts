@@ -53,11 +53,7 @@ describe('dimension rules', () => {
   it('reports every missing dimension per line and rule', () => {
     const violations = findDimensionRuleViolations(
       rules,
-      [
-        { accountId: 'sal' },
-        { accountId: 'rev', projectId: 'p1' },
-        { accountId: 'cash' },
-      ],
+      [{ accountId: 'sal' }, { accountId: 'rev', projectId: 'p1' }, { accountId: 'cash' }],
       accounts,
     );
     expect(violations).toEqual([
@@ -69,10 +65,7 @@ describe('dimension rules', () => {
   it('passes when the required dimensions are present and ignores inactive rules', () => {
     const violations = findDimensionRuleViolations(
       rules,
-      [
-        { accountId: 'sal', departmentId: 'd', costCenterId: 'c' },
-        { accountId: 'cash' },
-      ],
+      [{ accountId: 'sal', departmentId: 'd', costCenterId: 'c' }, { accountId: 'cash' }],
       accounts,
     );
     expect(violations).toEqual([]);

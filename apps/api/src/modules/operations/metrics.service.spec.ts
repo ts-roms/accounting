@@ -16,10 +16,18 @@ describe('MetricsService', () => {
     expect(text).toContain('http_requests_total{method="GET",route="/a",status="2xx"} 2');
     expect(text).toContain('http_requests_total{method="POST",route="/b",status="5xx"} 1');
     // Cumulative buckets: 0.02 falls in le=0.025 and above; 3 only in le=5, 10 and +Inf.
-    expect(text).toContain('http_request_duration_seconds_bucket{method="GET",route="/a",le="0.01"} 0');
-    expect(text).toContain('http_request_duration_seconds_bucket{method="GET",route="/a",le="0.025"} 1');
-    expect(text).toContain('http_request_duration_seconds_bucket{method="GET",route="/a",le="5"} 2');
-    expect(text).toContain('http_request_duration_seconds_bucket{method="GET",route="/a",le="+Inf"} 2');
+    expect(text).toContain(
+      'http_request_duration_seconds_bucket{method="GET",route="/a",le="0.01"} 0',
+    );
+    expect(text).toContain(
+      'http_request_duration_seconds_bucket{method="GET",route="/a",le="0.025"} 1',
+    );
+    expect(text).toContain(
+      'http_request_duration_seconds_bucket{method="GET",route="/a",le="5"} 2',
+    );
+    expect(text).toContain(
+      'http_request_duration_seconds_bucket{method="GET",route="/a",le="+Inf"} 2',
+    );
     expect(text).toContain('http_request_duration_seconds_count{method="GET",route="/a"} 2');
     expect(text).toContain('http_request_duration_seconds_sum{method="GET",route="/a"} 3.020000');
     expect(text).toContain('queue_jobs{queue="maintenance",state="failed"} 4');

@@ -41,7 +41,11 @@ export const envSchema = z.object({
     .transform((v) => (v && v.length > 0 ? v : undefined)),
 
   RATE_LIMIT_TTL_SECONDS: z.coerce.number().int().min(1).default(60),
-  RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(120),
+  /** Requests per IP per route per window. Users behind one NAT share an IP and a dashboard fires ~20 requests per load, so keep this generous; sign-in has its own tight limit. */
+  RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(600),
+  /** Sign-in attempts per IP per minute (brute-force guard); e2e runs raise it. */
+  AUTH_LOGIN_RATE_LIMIT: z.coerce.number().int().min(1).default(10),
+  AUTH_REFRESH_RATE_LIMIT: z.coerce.number().int().min(1).default(30),
   /** Directory for uploaded attachments (Phase 8); created on first upload. */
   STORAGE_DIR: z.string().trim().min(1).default('./storage'),
   /** AI assistance (Phase 9). HEURISTIC needs no key and is deterministic; ANTHROPIC uses the Messages API. */

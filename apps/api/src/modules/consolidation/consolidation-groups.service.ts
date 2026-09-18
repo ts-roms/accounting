@@ -115,15 +115,13 @@ export class ConsolidationGroupsService {
         throw err;
       }
       // The parent is always a fully consolidated, 100% member.
-      await tx
-        .insert(consolidationGroupMembers)
-        .values({
-          groupId: row!.id,
-          companyId: parent.id,
-          method: 'FULL',
-          ownershipPercent: '100',
-          sortOrder: 0,
-        });
+      await tx.insert(consolidationGroupMembers).values({
+        groupId: row!.id,
+        companyId: parent.id,
+        method: 'FULL',
+        ownershipPercent: '100',
+        sortOrder: 0,
+      });
       await this.audit.record(
         {
           action: 'CREATE',
