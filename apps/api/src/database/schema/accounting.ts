@@ -334,9 +334,16 @@ export const journalLines = pgTable(
     debit: money('debit').notNull().default('0'),
     credit: money('credit').notNull().default('0'),
     branchId: uuid('branch_id').references(() => branches.id, { onDelete: 'restrict' }),
-    /** Foreign-currency journals: amount as entered, in the header's transaction currency. */
+    /**
+     * Foreign amount beside the base amount, in `foreignCurrency`. Manual foreign
+     * journals set it on every line (the header's transaction currency); document
+     * postings set it on the lines that hit a currency-bound account (a USD bank
+     * account, a USD lease liability), so an account's foreign balance is always
+     * the sum of its foreign amounts.
+     */
     foreignDebit: money('foreign_debit'),
     foreignCredit: money('foreign_credit'),
+    foreignCurrency: char('foreign_currency', { length: 3 }),
     exchangeRate: numeric('exchange_rate', { precision: 19, scale: 8 }),
     /** Cost-accounting dimensions (Phase 7). */
     ...dimensionColumns(),
@@ -360,6 +367,14 @@ export const journalLines = pgTable(
       'journal_lines_foreign_chk',
       sql`(${t.foreignDebit} IS NULL AND ${t.foreignCredit} IS NULL) OR (${t.foreignDebit} >= 0 AND ${t.foreignCredit} >= 0 AND (${t.foreignDebit} = 0 OR ${t.foreignCredit} = 0))`,
     ),
+    check(
+      'journal_lines_foreign_currency_chk',
+      sql`(${t.foreignCurrency} IS NULL) = (${t.foreignDebit} IS NULL AND ${t.foreignCredit} IS NULL)`,
+    ),
+    // Foreign balance of a currency-bound account: sum of its foreign amounts.
+    index('journal_lines_foreign_currency_idx')
+      .on(t.companyId, t.accountId, t.foreignCurrency)
+      .where(sql`${t.foreignCurrency} IS NOT NULL`),
   ],
 );
 

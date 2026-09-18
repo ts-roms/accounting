@@ -228,7 +228,8 @@ function NewTransferDialog({
               <SelectContent>
                 {(banks.data ?? []).map((b) => (
                   <SelectItem key={b.id} value={b.id}>
-                    {b.code} - {b.currency} {formatMoney(b.ledgerBalance, b.currency)}
+                    {b.code} - {b.currency}{' '}
+                    {formatMoney(b.foreignBalance ?? b.ledgerBalance, b.currency)}
                   </SelectItem>
                 ))}
               </SelectContent>

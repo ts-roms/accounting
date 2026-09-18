@@ -8,7 +8,14 @@ import {
 } from '@accounting/types';
 import { amountSchema, isoDateSchema } from './accounting';
 import { dimensionRefsSchema } from './dimensions';
-import { nameSchema, optionalText, paginationQuerySchema, uuidSchema } from './primitives';
+import { exchangeRateValueSchema } from './enterprise';
+import {
+  nameSchema,
+  optionalCurrencyCodeSchema,
+  optionalText,
+  paginationQuerySchema,
+  uuidSchema,
+} from './primitives';
 
 /*
  * Prompt #13 - lease accounting (lessee). Contracts are data; the schedule
@@ -47,6 +54,8 @@ const leaseFields = dimensionRefsSchema.extend({
   commencementDate: isoDateSchema,
   termMonths: z.coerce.number().int().min(1).max(600),
   paymentAmount: positiveAmount,
+  /** Contract currency; omitted = the company base currency. Fixed once the lease has commenced. */
+  currency: optionalCurrencyCodeSchema,
   paymentFrequency: z.enum(LEASE_PAYMENT_FREQUENCIES).default('MONTHLY'),
   paymentTiming: z.enum(LEASE_PAYMENT_TIMINGS).default('IN_ADVANCE'),
   /** Annual rate; falls back to the company default when omitted. */
@@ -98,6 +107,8 @@ export const commenceLeaseSchema = z.object({
   postingDate: isoDateSchema.optional(),
   /** Account credited for initial direct costs / debited for incentives (defaults to the clearing account). */
   clearingAccountId: uuidSchema.optional(),
+  /** Foreign-currency leases: commencement rate override (1 unit = rate base units); the rate table otherwise. */
+  exchangeRate: exchangeRateValueSchema.optional(),
 });
 export type CommenceLeaseInput = z.infer<typeof commenceLeaseSchema>;
 
@@ -106,6 +117,8 @@ export const payLeaseLineSchema = z.object({
   lineId: uuidSchema,
   bankAccountId: uuidSchema,
   paymentDate: isoDateSchema,
+  /** Foreign-currency leases: rate of the payment (1 unit = rate base units); the rate table otherwise. */
+  exchangeRate: exchangeRateValueSchema.optional(),
   reference: optionalText(100),
   memo: optionalText(500),
 });

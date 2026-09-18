@@ -15,6 +15,7 @@ import { countWhere, offsetFor, toPaginatedResult } from '@/common/pagination/pa
 import { DRIZZLE, type Database, type DbExecutor } from '@/database/database.types';
 import { bankAccounts, bankTransfers, companies, type BankTransfer } from '@/database/schema';
 import { AccountsService } from '@/modules/accounting/accounts/accounts.service';
+import { foreignLineFields } from '@/modules/accounting/journals/foreign-line';
 import { AccountingPostingService } from '@/modules/accounting/journals/posting.service';
 import { DocumentNumberingService } from '@/modules/accounting/numbering/document-numbering.service';
 import { AuditService } from '@/modules/audit/audit.service';
@@ -323,6 +324,20 @@ export class BankTransfersService {
       const base = await this.accounts.companyCurrency(companyId, tx);
       const baseAmount = Money.of(t.baseAmount, base);
       const feeBase = Money.of(t.feeAmount, t.fromCurrency).convert(base, t.exchangeRate);
+      const [fromGl] = await this.accounts.findByIds(companyId, [from.glAccountId], tx);
+      // A foreign-currency source account's line carries amount + fee in its own currency.
+      const fromForeign = foreignLineFields(
+        fromGl!,
+        base,
+        {
+          currency: t.fromCurrency,
+          amount: Money.of(t.amount, t.fromCurrency)
+            .add(Money.of(t.feeAmount, t.fromCurrency))
+            .toString(),
+          exchangeRate: t.exchangeRate,
+        },
+        'credit',
+      );
       const lines = [
         {
           accountId: transit.id,
@@ -335,6 +350,7 @@ export class BankTransfersService {
           debit: '0',
           credit: baseAmount.add(feeBase).toString(),
           description: `${t.documentNumber} transfer out`,
+          ...fromForeign,
         },
       ];
       if (feeBase.isPositive()) {
@@ -418,6 +434,13 @@ export class BankTransfersService {
       );
       const receivedBase = received.convert(base, rate);
       const transitBase = Money.of(t.baseAmount, base);
+      const [toGl] = await this.accounts.findByIds(companyId, [to.glAccountId], tx);
+      const toForeign = foreignLineFields(
+        toGl!,
+        base,
+        { currency: t.toCurrency, amount: received.toString(), exchangeRate: rate },
+        'debit',
+      );
       // Gain when the destination is worth more in base than what left the source.
       const gain = receivedBase.subtract(transitBase);
       const fxLines = await this.fx.realizedLines(tx, companyId, gain);
@@ -437,6 +460,7 @@ export class BankTransfersService {
               debit: receivedBase.toString(),
               credit: '0',
               description: `${t.documentNumber} transfer in`,
+              ...toForeign,
             },
             {
               accountId: transit.id,

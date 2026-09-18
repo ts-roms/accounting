@@ -59,6 +59,7 @@ export function convertForeignLines(
       credit: fc.convert(baseCurrency, rate).toString(),
       foreignDebit: fd.toString(),
       foreignCredit: fc.toString(),
+      foreignCurrency: transactionCurrency,
       exchangeRate: rate,
     };
   });

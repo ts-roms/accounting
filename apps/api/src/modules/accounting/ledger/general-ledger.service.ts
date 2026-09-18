@@ -1,5 +1,17 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq, gte, inArray, lt, lte, notInArray, sql, type SQL } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  lt,
+  lte,
+  notInArray,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import { Money } from '@accounting/money';
 import { LEDGER_STATUSES, type AccountType, type JournalType } from '@accounting/types';
 import type { GeneralLedgerQuery } from '@accounting/validation';
@@ -42,6 +54,14 @@ export interface AccountActivity {
   accountId: string;
   debit: string;
   credit: string;
+}
+
+/** Foreign-amount totals of one account in one currency (currency-bound accounts). */
+export interface ForeignAccountActivity {
+  accountId: string;
+  currency: string;
+  foreignDebit: string;
+  foreignCredit: string;
 }
 
 export interface MonthlyAccountActivity extends AccountActivity {
@@ -137,6 +157,32 @@ export class GeneralLedgerService {
       .where(and(...conditions))
       .groupBy(journalLines.accountId);
     return rows;
+  }
+
+  /**
+   * Foreign-currency totals of the given accounts: the sum of the foreign amounts
+   * carried by their posted lines, per currency. For an account bound to a
+   * currency this is its balance in that currency (every line on it carries one).
+   */
+  async foreignActivity(
+    filter: BalanceFilter & { accountIds: readonly string[] },
+    executor: DbExecutor = this.db,
+  ): Promise<ForeignAccountActivity[]> {
+    const conditions = this.conditions(filter);
+    if (!conditions) return [];
+    conditions.push(isNotNull(journalLines.foreignCurrency));
+    return executor
+      .select({
+        accountId: journalLines.accountId,
+        currency: sql<string>`${journalLines.foreignCurrency}`,
+        foreignDebit: sql<string>`coalesce(sum(${journalLines.foreignDebit}), 0)`,
+        foreignCredit: sql<string>`coalesce(sum(${journalLines.foreignCredit}), 0)`,
+      })
+      .from(journalLines)
+      .innerJoin(journalEntries, eq(journalEntries.id, journalLines.journalEntryId))
+      .innerJoin(accounts, eq(accounts.id, journalLines.accountId))
+      .where(and(...conditions))
+      .groupBy(journalLines.accountId, journalLines.foreignCurrency);
   }
 
   /**

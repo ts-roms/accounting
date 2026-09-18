@@ -140,19 +140,37 @@ export function LeaseReportsPage() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Amount value={row.paymentAmount} />
+                            <Amount value={row.paymentAmount} currency={row.currency} />
                           </TableCell>
                           <TableCell>
-                            <Amount value={row.liabilityBalance} zeroAsDash />
+                            <Amount
+                              value={row.liabilityBalance}
+                              currency={row.currency}
+                              zeroAsDash
+                            />
+                            {row.currency !== r.currency ? (
+                              <div className="text-right text-xs text-muted-foreground">
+                                <Amount value={row.liabilityBalanceBase} currency={r.currency} />
+                              </div>
+                            ) : null}
                           </TableCell>
                           <TableCell>
-                            <Amount value={row.rouCost} zeroAsDash />
+                            <Amount value={row.rouCost} currency={row.currency} zeroAsDash />
                           </TableCell>
                           <TableCell>
-                            <Amount value={row.rouAccumulatedDepreciation} zeroAsDash />
+                            <Amount
+                              value={row.rouAccumulatedDepreciation}
+                              currency={row.currency}
+                              zeroAsDash
+                            />
                           </TableCell>
                           <TableCell>
-                            <Amount value={row.rouCarrying} zeroAsDash />
+                            <Amount value={row.rouCarrying} currency={row.currency} zeroAsDash />
+                            {row.currency !== r.currency ? (
+                              <div className="text-right text-xs text-muted-foreground">
+                                <Amount value={row.rouCarryingBase} currency={r.currency} />
+                              </div>
+                            ) : null}
                           </TableCell>
                           <TableCell>
                             <Amount value={row.remainingPayments} zeroAsDash />

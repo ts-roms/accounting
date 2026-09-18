@@ -209,6 +209,7 @@ interface FormState {
   commencementDate: string;
   termMonths: string;
   paymentAmount: string;
+  currency: string;
   paymentFrequency: LeasePaymentFrequency;
   paymentTiming: LeasePaymentTiming;
   annualDiscountRate: string;
@@ -228,6 +229,7 @@ const empty = (): FormState => ({
   commencementDate: today(),
   termMonths: '36',
   paymentAmount: '',
+  currency: '',
   paymentFrequency: 'MONTHLY',
   paymentTiming: 'IN_ADVANCE',
   annualDiscountRate: '',
@@ -247,6 +249,7 @@ const fromLease = (l: LeaseDetail): FormState => ({
   commencementDate: l.commencementDate,
   termMonths: String(l.termMonths),
   paymentAmount: l.paymentAmount,
+  currency: l.currency,
   paymentFrequency: l.paymentFrequency,
   paymentTiming: l.paymentTiming,
   annualDiscountRate: l.annualDiscountRate ?? '',
@@ -313,6 +316,7 @@ export function LeaseDialog({
             commencementDate: form.commencementDate,
             termMonths: Number(form.termMonths),
             paymentAmount: form.paymentAmount,
+            currency: text(form.currency)?.toUpperCase(),
             paymentFrequency: form.paymentFrequency,
             paymentTiming: form.paymentTiming,
             annualDiscountRate: text(form.annualDiscountRate) ?? null,
@@ -417,6 +421,18 @@ export function LeaseDialog({
               value={form.annualDiscountRate}
               disabled={!draftTerms}
               onChange={(e) => set('annualDiscountRate', e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Contract currency</Label>
+            <Input
+              placeholder="Company base"
+              maxLength={3}
+              className="font-mono uppercase"
+              value={form.currency}
+              disabled={!draftTerms}
+              onChange={(e) => set('currency', e.target.value)}
+              data-testid="lease-currency"
             />
           </div>
           <div className="space-y-1">

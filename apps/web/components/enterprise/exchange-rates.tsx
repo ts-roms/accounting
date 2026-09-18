@@ -289,16 +289,18 @@ export function FxRevaluationsPage() {
   const create = useCreateFxRevaluation();
   const canRun = hasPermission(P['fx.revalue']);
   const lines = preview.data?.lines ?? [];
+  // Receivables and bank balances gain when worth more base; payables and lease liabilities lose.
+  const isAsset = (side: string) => side === 'AR' || side === 'BANK';
   const gain = lines.reduce(
     (s, l) =>
       s +
-      (l.side === 'AR' ? Math.max(Number(l.adjustment), 0) : Math.max(-Number(l.adjustment), 0)),
+      (isAsset(l.side) ? Math.max(Number(l.adjustment), 0) : Math.max(-Number(l.adjustment), 0)),
     0,
   );
   const loss = lines.reduce(
     (s, l) =>
       s +
-      (l.side === 'AR' ? Math.max(-Number(l.adjustment), 0) : Math.max(Number(l.adjustment), 0)),
+      (isAsset(l.side) ? Math.max(-Number(l.adjustment), 0) : Math.max(Number(l.adjustment), 0)),
     0,
   );
   return (

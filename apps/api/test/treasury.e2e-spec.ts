@@ -375,6 +375,8 @@ describe('Treasury platform (e2e)', () => {
         type: 'ASSET',
         subtype: 'BANK',
         parentId: acc['1100'],
+        // A foreign-currency bank account books to a GL account bound to that currency.
+        currency: 'USD',
       })
       .expect(201);
     acc['1170'] = usdGl.body.id;

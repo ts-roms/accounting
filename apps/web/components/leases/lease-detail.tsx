@@ -77,6 +77,7 @@ export function LeaseDetailPage({ id }: { id: string }) {
   const canManage = hasPermission(P['lease.manage']);
   const canPost = hasPermission(P['lease.post']);
   const finance = l.classification === 'FINANCE';
+  const foreign = Number(l.exchangeRate) !== 1;
   const editable = l.status === 'DRAFT' || l.status === 'ACTIVE';
 
   return (
@@ -179,17 +180,36 @@ export function LeaseDetailPage({ id }: { id: string }) {
       ) : null}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Stat
-          label="Lease liability"
-          value={<Amount value={l.liabilityBalance} className="text-left" zeroAsDash />}
-          hint={finance ? `Initially ${money(l.initialLiability)}` : 'Exempt - no liability'}
+          label={`Lease liability (${l.currency})`}
+          value={
+            <Amount
+              value={l.liabilityBalance}
+              currency={l.currency}
+              className="text-left"
+              zeroAsDash
+            />
+          }
+          hint={
+            finance
+              ? foreign
+                ? `In the ledger ${money(l.liabilityBalanceBase)} · commenced at ${Number(l.exchangeRate)}`
+                : `Initially ${money(l.initialLiability)}`
+              : 'Exempt - no liability'
+          }
           testId="lease-liability"
         />
         <Stat
-          label="Right-of-use carrying"
-          value={<Amount value={l.rouCarrying} className="text-left" zeroAsDash />}
+          label={`Right-of-use carrying (${l.currency})`}
+          value={
+            <Amount value={l.rouCarrying} currency={l.currency} className="text-left" zeroAsDash />
+          }
           hint={
             finance
-              ? `Cost ${money(l.rouCost)} less ${money(l.rouAccumulatedDepreciation)}`
+              ? foreign
+                ? `In the ledger ${money(
+                    (Number(l.rouCostBase) - Number(l.rouAccumulatedDepreciationBase)).toFixed(4),
+                  )} at the commencement rate`
+                : `Cost ${money(l.rouCost)} less ${money(l.rouAccumulatedDepreciation)}`
               : undefined
           }
         />

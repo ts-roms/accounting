@@ -16,6 +16,8 @@ import type {
   IntegrityReport,
 } from '@/modules/accounting/integrity/integrity.service';
 import { GeneralLedgerService } from '@/modules/accounting/ledger/general-ledger.service';
+import { ExchangeRatesService } from '@/modules/fx/exchange-rates.service';
+import { FxService } from '@/modules/fx/fx.service';
 import { addMonths, maturityBuckets } from './lease.logic';
 
 export interface LeaseRegisterRow {
@@ -32,10 +34,15 @@ export interface LeaseRegisterRow {
   paymentFrequency: string;
   annualDiscountRate: string | null;
   initialLiability: string;
+  /** Contract-currency figures. */
+  currency: string;
   liabilityBalance: string;
   rouCost: string;
   rouAccumulatedDepreciation: string;
   rouCarrying: string;
+  /** Base-currency carrying figures (what the ledger holds); equal to the above for base leases. */
+  liabilityBalanceBase: string;
+  rouCarryingBase: string;
   remainingMonths: number;
   remainingPayments: string;
   nextPaymentDate: string | null;
@@ -103,7 +110,23 @@ export class LeaseReportsService {
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly accounts: AccountsService,
     private readonly ledger: GeneralLedgerService,
+    private readonly rates: ExchangeRatesService,
+    private readonly fx: FxService,
   ) {}
+
+  /** Closing rate per contract currency (1 for base) - one lookup per currency in a report. */
+  private async closingRates(
+    companyId: string,
+    currencies: Iterable<string>,
+    asOf: string,
+  ): Promise<Map<string, string>> {
+    const out = new Map<string, string>();
+    for (const c of new Set(currencies)) {
+      const { rate } = await this.rates.documentRate(companyId, c, asOf, undefined);
+      out.set(c, rate);
+    }
+    return out;
+  }
 
   async register(companyId: string, asOf: string): Promise<LeaseRegister> {
     const currency = await this.accounts.companyCurrency(companyId);
@@ -128,9 +151,15 @@ export class LeaseReportsService {
           )
           .orderBy(asc(leaseScheduleLines.sequence))
       : [];
+    const closing = await this.closingRates(
+      companyId,
+      rows.map((r) => r.lease.currency),
+      asOf,
+    );
     const out: LeaseRegisterRow[] = rows.map(({ lease, vendorName }) => {
       const mine = lines.filter((l) => l.leaseId === lease.id);
-      const unpaid = mine.filter((l) => !l.paidAt && !Money.of(l.payment, currency).isZero());
+      const fc = lease.currency;
+      const unpaid = mine.filter((l) => !l.paidAt && !Money.of(l.payment, fc).isZero());
       return {
         leaseId: lease.id,
         leaseNumber: lease.leaseNumber,
@@ -145,17 +174,25 @@ export class LeaseReportsService {
         paymentFrequency: lease.paymentFrequency,
         annualDiscountRate: lease.annualDiscountRate,
         initialLiability: lease.initialLiability,
+        currency: fc,
         liabilityBalance: lease.liabilityBalance,
         rouCost: lease.rouCost,
         rouAccumulatedDepreciation: lease.rouAccumulatedDepreciation,
-        rouCarrying: Money.of(lease.rouCost, currency)
-          .subtract(Money.of(lease.rouAccumulatedDepreciation, currency))
+        rouCarrying: Money.of(lease.rouCost, fc)
+          .subtract(Money.of(lease.rouAccumulatedDepreciation, fc))
+          .toString(),
+        liabilityBalanceBase: lease.liabilityBalanceBase,
+        rouCarryingBase: Money.of(lease.rouCostBase, currency)
+          .subtract(Money.of(lease.rouAccumulatedDepreciationBase, currency))
           .toString(),
         remainingMonths: mine.filter((l) => l.status === 'PENDING').length,
+        // Undiscounted payments still due, in base at the closing rate.
         remainingPayments: Money.sum(
-          unpaid.map((l) => Money.of(l.payment, currency)),
-          currency,
-        ).toString(),
+          unpaid.map((l) => Money.of(l.payment, fc)),
+          fc,
+        )
+          .convert(currency, closing.get(fc)!)
+          .toString(),
         nextPaymentDate: unpaid[0]?.paymentDate ?? null,
       };
     });
@@ -173,10 +210,24 @@ export class LeaseReportsService {
         leases: out.length,
         finance: active.filter((r) => r.classification === 'FINANCE').length,
         exempt: active.filter((r) => r.classification !== 'FINANCE').length,
-        liability: sum((r) => r.liabilityBalance),
-        rouCost: sum((r) => r.rouCost),
-        rouAccumulatedDepreciation: sum((r) => r.rouAccumulatedDepreciation),
-        rouCarrying: sum((r) => r.rouCarrying),
+        // Totals are base: contract-currency rows cannot be added across currencies.
+        liability: sum((r) => r.liabilityBalanceBase),
+        rouCost: sum((r) =>
+          Money.of(r.rouCarryingBase, currency)
+            .add(
+              Money.of(r.rouAccumulatedDepreciation, r.currency).convert(
+                currency,
+                closing.get(r.currency)!,
+              ),
+            )
+            .toString(),
+        ),
+        rouAccumulatedDepreciation: sum((r) =>
+          Money.of(r.rouAccumulatedDepreciation, r.currency)
+            .convert(currency, closing.get(r.currency)!)
+            .toString(),
+        ),
+        rouCarrying: sum((r) => r.rouCarryingBase),
         remainingPayments: sum((r) => r.remainingPayments),
       },
     };
@@ -205,9 +256,19 @@ export class LeaseReportsService {
           .orderBy(asc(leaseScheduleLines.sequence))
       : [];
     const horizon = addMonthsMinusDay(asOf, 12);
+    const closing = await this.closingRates(
+      companyId,
+      active.map((l) => l.currency),
+      asOf,
+    );
+    // Contract-currency figures are presented in base at the closing rate (the liability
+    // is monetary), so leases in different currencies add up.
     const byLease = active.map((lease) => {
       const mine = lines.filter((l) => l.leaseId === lease.id);
-      const liability = Money.of(lease.liabilityBalance, currency);
+      const fc = lease.currency;
+      const rate = closing.get(fc)!;
+      const toBase = (m: Money) => m.convert(currency, rate);
+      const liability = toBase(Money.of(lease.liabilityBalance, fc));
       // Schedule view: the liability one year out is the closing balance of the last month ending by then.
       const within = mine.filter((l) => l.periodEnd <= horizon && l.status !== 'CANCELLED');
       const lastWithin = within[within.length - 1];
@@ -215,11 +276,13 @@ export class LeaseReportsService {
       const nonCurrent =
         lease.classification !== 'FINANCE' || !beyond
           ? Money.zero(currency)
-          : Money.of(lastWithin?.closingLiability ?? lease.liabilityBalance, currency);
+          : toBase(Money.of(lastWithin?.closingLiability ?? lease.liabilityBalance, fc));
       const bounded = nonCurrent.greaterThan(liability) ? liability : nonCurrent;
-      const remaining = Money.sum(
-        mine.filter((l) => !l.paidAt).map((l) => Money.of(l.payment, currency)),
-        currency,
+      const remaining = toBase(
+        Money.sum(
+          mine.filter((l) => !l.paidAt).map((l) => Money.of(l.payment, fc)),
+          fc,
+        ),
       );
       return {
         leaseId: lease.id,
@@ -231,9 +294,12 @@ export class LeaseReportsService {
         remainingPayments: remaining,
       };
     });
+    const leaseCurrency = new Map(active.map((l) => [l.id, l.currency]));
     const buckets = maturityBuckets(
       lines.map((l) => ({
-        payment: l.payment,
+        payment: Money.of(l.payment, leaseCurrency.get(l.leaseId)!)
+          .convert(currency, closing.get(leaseCurrency.get(l.leaseId)!)!)
+          .toString(),
         paymentDate: l.paymentDate,
         paid: Boolean(l.paidAt),
       })),
@@ -280,8 +346,8 @@ export class LeaseReportsService {
       .select({
         active: sql<number>`count(*) filter (where ${leases.status} = 'ACTIVE')::int`,
         draft: sql<number>`count(*) filter (where ${leases.status} = 'DRAFT')::int`,
-        liability: sql<string>`coalesce(sum(${leases.liabilityBalance}) filter (where ${leases.status} = 'ACTIVE'), 0)`,
-        carrying: sql<string>`coalesce(sum(${leases.rouCost} - ${leases.rouAccumulatedDepreciation}) filter (where ${leases.status} = 'ACTIVE'), 0)`,
+        liability: sql<string>`coalesce(sum(${leases.liabilityBalanceBase}) filter (where ${leases.status} = 'ACTIVE'), 0)`,
+        carrying: sql<string>`coalesce(sum(${leases.rouCostBase} - ${leases.rouAccumulatedDepreciationBase}) filter (where ${leases.status} = 'ACTIVE'), 0)`,
       })
       .from(leases)
       .where(eq(leases.companyId, companyId));
@@ -343,7 +409,7 @@ export class LeaseReportsService {
     const findings = await Promise.all([
       this.liabilityVsLedger(companyId, asOf, currency),
       this.rouVsLedger(companyId, asOf, currency),
-      this.scheduleTotals(companyId, currency),
+      this.scheduleTotals(companyId),
       this.runsOverdue(companyId, asOf),
       this.paymentsOverdue(companyId, asOf, currency),
     ]);
@@ -361,8 +427,14 @@ export class LeaseReportsService {
     asOf: string,
     currency: string,
   ): Promise<IntegrityFinding> {
-    const ledger = await this.mappedBalance(companyId, 'LEASE_LIABILITY', asOf, currency, 'CREDIT');
-    if (ledger === null)
+    const ledgerRaw = await this.mappedBalance(
+      companyId,
+      'LEASE_LIABILITY',
+      asOf,
+      currency,
+      'CREDIT',
+    );
+    if (ledgerRaw === null)
       return finding(
         'LEASE_LIABILITY_VS_LEDGER',
         'CRITICAL',
@@ -371,8 +443,12 @@ export class LeaseReportsService {
         [],
         'No LEASE_LIABILITY mapping yet.',
       );
+    // The period-end revaluation moves the ledger liability to the closing rate and reverses
+    // the next day; the register carries the settled base, so compare net of it.
+    const revalued = Money.of(await this.fx.adjustmentsAsOf(companyId, 'LEASE', asOf), currency);
+    const ledger = ledgerRaw.subtract(revalued);
     const [agg] = await this.db
-      .select({ total: sql<string>`coalesce(sum(${leaseEvents.liabilityChange}), 0)` })
+      .select({ total: sql<string>`coalesce(sum(${leaseEvents.liabilityChangeBase}), 0)` })
       .from(leaseEvents)
       .innerJoin(leases, eq(leases.id, leaseEvents.leaseId))
       .where(
@@ -426,7 +502,7 @@ export class LeaseReportsService {
       );
     const ledger = cost.subtract(accumulated);
     const [agg] = await this.db
-      .select({ total: sql<string>`coalesce(sum(${leaseEvents.rouChange}), 0)` })
+      .select({ total: sql<string>`coalesce(sum(${leaseEvents.rouChangeBase}), 0)` })
       .from(leaseEvents)
       .innerJoin(leases, eq(leases.id, leaseEvents.leaseId))
       .where(
@@ -461,7 +537,7 @@ export class LeaseReportsService {
    * last posted month's closing balance adjusted for payments made early or
    * late.
    */
-  private async scheduleTotals(companyId: string, currency: string): Promise<IntegrityFinding> {
+  private async scheduleTotals(companyId: string): Promise<IntegrityFinding> {
     const active = await this.db
       .select()
       .from(leases)
@@ -474,6 +550,8 @@ export class LeaseReportsService {
       );
     const samples: Array<Record<string, unknown>> = [];
     for (const lease of active) {
+      // Schedule arithmetic is in the contract currency.
+      const currency = lease.currency;
       const lines = await this.db
         .select()
         .from(leaseScheduleLines)
@@ -493,7 +571,7 @@ export class LeaseReportsService {
         lines.map((l) => Money.of(l.depreciation, currency)),
         currency,
       );
-      if (!dep.equals(Money.of(lease.rouCost, currency)))
+      if (!dep.equals(Money.of(lease.rouCost, lease.currency)))
         problems.push(`depreciation ${dep.toString()} vs cost ${lease.rouCost}`);
       const posted = lines.filter((l) => l.status === 'POSTED');
       const lastPosted = posted[posted.length - 1];
@@ -514,7 +592,7 @@ export class LeaseReportsService {
         currency,
       );
       const expected = base.add(unpaidPosted).subtract(paidPending);
-      if (!expected.equals(Money.of(lease.liabilityBalance, currency)))
+      if (!expected.equals(Money.of(lease.liabilityBalance, lease.currency)))
         problems.push(`register ${lease.liabilityBalance} vs schedule ${expected.toString()}`);
       if (problems.length)
         samples.push({ leaseNumber: lease.leaseNumber, problems: problems.join('; ') });

@@ -66,9 +66,10 @@ export interface JournalLineView {
   departmentId: string | null;
   costCenterId: string | null;
   projectId: string | null;
-  /** Foreign-currency journals only. */
+  /** Foreign amount beside the base amount (foreign journals, currency-bound accounts). */
   foreignDebit: string | null;
   foreignCredit: string | null;
+  foreignCurrency: string | null;
   exchangeRate: string | null;
 }
 
@@ -1000,6 +1001,7 @@ export class JournalEntriesService {
         projectId: journalLines.projectId,
         foreignDebit: journalLines.foreignDebit,
         foreignCredit: journalLines.foreignCredit,
+        foreignCurrency: journalLines.foreignCurrency,
         exchangeRate: journalLines.exchangeRate,
       })
       .from(journalLines)
@@ -1140,6 +1142,7 @@ export class JournalEntriesService {
         projectId: line.projectId ?? null,
         foreignDebit: line.foreignDebit ?? null,
         foreignCredit: line.foreignCredit ?? null,
+        foreignCurrency: line.foreignCurrency ?? null,
         exchangeRate: line.exchangeRate ?? null,
       })),
     );

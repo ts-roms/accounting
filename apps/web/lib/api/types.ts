@@ -266,6 +266,7 @@ export interface JournalLineView {
   projectId: string | null;
   foreignDebit: string | null;
   foreignCredit: string | null;
+  foreignCurrency: string | null;
   exchangeRate: string | null;
 }
 
@@ -1293,7 +1294,11 @@ export interface BankAccount {
   branchId: string | null;
   notes: string | null;
   status: EntityStatus;
+  /** Book balance in the company base currency. */
   ledgerBalance: string;
+  baseCurrency: string;
+  /** Book balance in the account's own currency; null for base-currency accounts. */
+  foreignBalance: string | null;
   unreconciledCount: number;
   lastStatementDate: string | null;
 }
@@ -1687,9 +1692,11 @@ export interface ExchangeRate {
 }
 
 export interface FxRevaluationLine {
+  /** AR / AP: open documents; BANK: a foreign-currency bank account; LEASE: a foreign-currency lease liability. */
   side: FxSide;
   documentId: string;
   documentNumber: string;
+  accountId?: string;
   currency: string;
   openAmount: string;
   documentRate: string;

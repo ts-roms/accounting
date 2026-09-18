@@ -1,5 +1,17 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, getTableColumns, inArray, lte, ne, sql, type SQL } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  getTableColumns,
+  inArray,
+  isNotNull,
+  lte,
+  ne,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import { Money } from '@accounting/money';
 import { P, type PermissionKey, type FxSide, type PaginatedResult } from '@accounting/types';
 import type { CreateFxRevaluationInput } from '@accounting/validation';
@@ -9,11 +21,13 @@ import { ErrorCodes } from '@/common/errors/error-codes';
 import { offsetFor, toPaginatedResult } from '@/common/pagination/pagination';
 import { DRIZZLE, type Database, type DbExecutor } from '@/database/database.types';
 import {
+  accounts,
   fxAdjustments,
   fxRevaluations,
   invoices,
   journalEntries,
   journalLines,
+  leases,
   vendorBills,
   type FxRevaluation,
 } from '@/database/schema';
@@ -23,6 +37,7 @@ import {
   type PostingActor,
   type PostingLine,
 } from '@/modules/accounting/journals/posting.service';
+import { GeneralLedgerService } from '@/modules/accounting/ledger/general-ledger.service';
 import { DocumentNumberingService } from '@/modules/accounting/numbering/document-numbering.service';
 import { AuditService } from '@/modules/audit/audit.service';
 import { ExchangeRatesService } from './exchange-rates.service';
@@ -30,9 +45,15 @@ import { realizedFx } from './fx.logic';
 
 const MODULE = 'FX';
 
+/** One revalued monetary item, as stored on the run. */
+type RevaluationLine = NonNullable<(typeof fxRevaluations.$inferSelect)['lines']>[number];
+
+/** Realized differences arise on settling receivables or payables. */
+export type SettlementSide = Extract<FxSide, 'AR' | 'AP'>;
+
 export interface RealizedFxInput {
   companyId: string;
-  side: FxSide;
+  side: SettlementSide;
   entryDate: string;
   /** Settled amount in the document currency. */
   amount: Money;
@@ -82,6 +103,7 @@ export class FxService {
     private readonly posting: AccountingPostingService,
     private readonly numbering: DocumentNumberingService,
     private readonly rates: ExchangeRatesService,
+    private readonly ledger: GeneralLedgerService,
   ) {}
 
   /**
@@ -107,7 +129,7 @@ export class FxService {
     allocations: ReadonlyArray<{ amount: string; documentRate: string; currency: string }>,
     settlementRate: string,
     baseCurrency: string,
-    side: FxSide,
+    side: SettlementSide,
   ): Money {
     return Money.sum(
       allocations.map((a) =>
@@ -325,18 +347,27 @@ export class FxService {
   async preview(companyId: string, asOfDate: string, executor: DbExecutor = this.db) {
     const ctx = await this.rates.companyContext(companyId, executor);
     const open = await this.openForeignItems(executor, companyId, ctx.baseCurrency, asOfDate);
-    const lines = [];
+    const lines: RevaluationLine[] = [];
+    const closingRates = new Map<string, string>();
+    const closingRate = async (currency: string) => {
+      if (!closingRates.has(currency))
+        closingRates.set(
+          currency,
+          await this.rates.rateFor(
+            ctx.organizationId,
+            currency,
+            ctx.baseCurrency,
+            asOfDate,
+            executor,
+          ),
+        );
+      return closingRates.get(currency)!;
+    };
     for (const item of open) {
-      const closingRate = await this.rates.rateFor(
-        ctx.organizationId,
-        item.currency,
-        ctx.baseCurrency,
-        asOfDate,
-        executor,
-      );
+      const rate = await closingRate(item.currency);
       const openAmount = Money.of(item.open, item.currency);
       const adjustment = openAmount
-        .convert(ctx.baseCurrency, closingRate)
+        .convert(ctx.baseCurrency, rate)
         .subtract(openAmount.convert(ctx.baseCurrency, item.exchangeRate));
       if (adjustment.isZero()) continue;
       lines.push({
@@ -346,8 +377,37 @@ export class FxService {
         currency: item.currency,
         openAmount: openAmount.toString(),
         documentRate: item.exchangeRate,
-        closingRate,
+        closingRate: rate,
         /** Signed change in the base value of the open item (positive = worth more base). */
+        adjustment: adjustment.toString(),
+      });
+    }
+    // Foreign-currency bank balances and lease liabilities: carried at the base of their
+    // history, restated to foreign balance x closing rate.
+    for (const item of await this.foreignBalances(
+      executor,
+      companyId,
+      ctx.baseCurrency,
+      asOfDate,
+    )) {
+      const rate = await closingRate(item.currency);
+      const foreign = Money.of(item.foreign, item.currency);
+      const carrying = Money.of(item.base, ctx.baseCurrency);
+      const adjustment = foreign.convert(ctx.baseCurrency, rate).subtract(carrying);
+      if (adjustment.isZero()) continue;
+      lines.push({
+        side: item.side,
+        documentId: item.id,
+        documentNumber: item.documentNumber,
+        accountId: item.accountId,
+        currency: item.currency,
+        openAmount: foreign.toString(),
+        documentRate: foreign.isZero()
+          ? rate
+          : Money.of(carrying.toString(), ctx.baseCurrency, 8)
+              .divide(foreign.toString())
+              .toString(),
+        closingRate: rate,
         adjustment: adjustment.toString(),
       });
     }
@@ -397,20 +457,40 @@ export class FxService {
       let apEffect = Money.zero(baseCurrency);
       let gain = Money.zero(baseCurrency);
       let loss = Money.zero(baseCurrency);
+      // Asset (BANK) and liability (LEASE) balances, per GL account: value change in base.
+      const assetEffects = new Map<string, { amount: Money; currency: string; label: string }>();
+      const liabilityEffects = new Map<string, { amount: Money; label: string }>();
       for (const l of lines) {
         const adj = Money.of(l.adjustment, baseCurrency);
         if (l.side === 'AR') {
           arEffect = arEffect.add(adj);
           if (adj.isPositive()) gain = gain.add(adj);
           else loss = loss.add(adj.abs());
-        } else {
+        } else if (l.side === 'AP') {
           apEffect = apEffect.add(adj); // positive = liability grew (credit AP)
+          if (adj.isPositive()) loss = loss.add(adj);
+          else gain = gain.add(adj.abs());
+        } else if (l.side === 'BANK') {
+          const cur = assetEffects.get(l.accountId!) ?? {
+            amount: Money.zero(baseCurrency),
+            currency: l.currency,
+            label: l.documentNumber,
+          };
+          assetEffects.set(l.accountId!, { ...cur, amount: cur.amount.add(adj) });
+          if (adj.isPositive()) gain = gain.add(adj);
+          else loss = loss.add(adj.abs());
+        } else {
+          const cur = liabilityEffects.get(l.accountId!) ?? {
+            amount: Money.zero(baseCurrency),
+            label: 'lease liabilities',
+          };
+          liabilityEffects.set(l.accountId!, { ...cur, amount: cur.amount.add(adj) });
           if (adj.isPositive()) loss = loss.add(adj);
           else gain = gain.add(adj.abs());
         }
       }
       const build = (sign: 1 | -1) => {
-        const out = [];
+        const out: PostingLine[] = [];
         const arAmt = sign === 1 ? arEffect : arEffect.negate();
         const apAmt = sign === 1 ? apEffect : apEffect.negate();
         const g = sign === 1 ? gain : gain.negate();
@@ -429,6 +509,29 @@ export class FxService {
             credit: apAmt.isPositive() ? apAmt.toString() : '0',
             description: 'Revaluation of open payables',
           });
+        for (const [accountId, e] of assetEffects) {
+          const amt = sign === 1 ? e.amount : e.amount.negate();
+          // The bank account is bound to its currency: the line carries a zero foreign
+          // amount (the balance in that currency does not move, only its base value).
+          out.push({
+            accountId,
+            debit: amt.isPositive() ? amt.toString() : '0',
+            credit: amt.isNegative() ? amt.abs().toString() : '0',
+            description: `Revaluation of ${e.label} (${e.currency})`,
+            foreignDebit: '0',
+            foreignCredit: '0',
+            foreignCurrency: e.currency,
+          });
+        }
+        for (const [accountId, e] of liabilityEffects) {
+          const amt = sign === 1 ? e.amount : e.amount.negate();
+          out.push({
+            accountId,
+            debit: amt.isNegative() ? amt.abs().toString() : '0',
+            credit: amt.isPositive() ? amt.toString() : '0',
+            description: `Revaluation of ${e.label}`,
+          });
+        }
         if (!g.isZero())
           out.push({
             accountId: gainAcct.id,
@@ -539,6 +642,52 @@ export class FxService {
           journalEntryId: reversal.id,
         });
       }
+      const bankEffect = [...assetEffects.values()].reduce(
+        (acc, e) => acc.add(e.amount),
+        Money.zero(baseCurrency),
+      );
+      if (!bankEffect.isZero()) {
+        adjRows.push(
+          {
+            side: 'BANK' as const,
+            adjustmentType: 'REVALUATION' as const,
+            adjustmentDate: input.asOfDate,
+            amount: bankEffect.toString(),
+            journalEntryId: entry.id,
+          },
+          {
+            side: 'BANK' as const,
+            adjustmentType: 'REVALUATION_REVERSAL' as const,
+            adjustmentDate: reversalDate,
+            amount: bankEffect.negate().toString(),
+            journalEntryId: reversal.id,
+          },
+        );
+      }
+      const leaseEffect = [...liabilityEffects.values()].reduce(
+        (acc, e) => acc.add(e.amount),
+        Money.zero(baseCurrency),
+      );
+      if (!leaseEffect.isZero()) {
+        // Recorded as the change in the credit balance (a bigger liability = positive), the
+        // figure the lease integrity check subtracts from the ledger.
+        adjRows.push(
+          {
+            side: 'LEASE' as const,
+            adjustmentType: 'REVALUATION' as const,
+            adjustmentDate: input.asOfDate,
+            amount: leaseEffect.toString(),
+            journalEntryId: entry.id,
+          },
+          {
+            side: 'LEASE' as const,
+            adjustmentType: 'REVALUATION_REVERSAL' as const,
+            adjustmentDate: reversalDate,
+            amount: leaseEffect.negate().toString(),
+            journalEntryId: reversal.id,
+          },
+        );
+      }
       await tx.insert(fxAdjustments).values(
         adjRows.map((r) => ({
           ...r,
@@ -614,6 +763,118 @@ export class FxService {
       ...ar.map((r) => ({ side: 'AR' as const, ...r, open: openOf(r) })),
       ...ap.map((r) => ({ side: 'AP' as const, ...r, open: openOf(r) })),
     ].filter((r) => Number(r.open) > 0);
+  }
+
+  /**
+   * Foreign-currency balances carried at historical base: bank GL accounts bound
+   * to a currency (foreign balance = sum of the foreign amounts on their lines)
+   * and active finance leases in a foreign currency (the register's balances).
+   */
+  private async foreignBalances(
+    executor: DbExecutor,
+    companyId: string,
+    baseCurrency: string,
+    asOf: string,
+  ): Promise<
+    Array<{
+      side: 'BANK' | 'LEASE';
+      id: string;
+      documentNumber: string;
+      accountId: string;
+      currency: string;
+      foreign: string;
+      base: string;
+    }>
+  > {
+    const out: Array<{
+      side: 'BANK' | 'LEASE';
+      id: string;
+      documentNumber: string;
+      accountId: string;
+      currency: string;
+      foreign: string;
+      base: string;
+    }> = [];
+    const bound = await executor
+      .select({
+        id: accounts.id,
+        code: accounts.code,
+        name: accounts.name,
+        currency: accounts.currency,
+      })
+      .from(accounts)
+      .where(
+        and(
+          eq(accounts.companyId, companyId),
+          isNotNull(accounts.currency),
+          ne(accounts.currency, baseCurrency),
+          eq(accounts.status, 'ACTIVE'),
+        ),
+      );
+    if (bound.length) {
+      const ids = bound.map((a) => a.id);
+      const [base, foreign] = await Promise.all([
+        this.ledger.activity({ companyId, to: asOf, accountIds: ids }, executor),
+        this.ledger.foreignActivity({ companyId, to: asOf, accountIds: ids }, executor),
+      ]);
+      // Revaluations reverse the next day, but one dated on or before asOf that has not yet
+      // reversed sits in the base balance: take it out so the carrying is the settled base.
+      for (const a of bound) {
+        const b = base.find((x) => x.accountId === a.id);
+        const f = foreign.find((x) => x.accountId === a.id && x.currency === a.currency);
+        const foreignBalance = Money.of(f?.foreignDebit ?? '0', a.currency!).subtract(
+          Money.of(f?.foreignCredit ?? '0', a.currency!),
+        );
+        const baseBalance = Money.of(b?.debit ?? '0', baseCurrency).subtract(
+          Money.of(b?.credit ?? '0', baseCurrency),
+        );
+        if (foreignBalance.isZero() && baseBalance.isZero()) continue;
+        out.push({
+          side: 'BANK',
+          id: a.id,
+          documentNumber: `${a.code} ${a.name}`,
+          accountId: a.id,
+          currency: a.currency!,
+          foreign: foreignBalance.toString(),
+          base: baseBalance.toString(),
+        });
+      }
+    }
+    const fxLeases = await executor
+      .select({
+        id: leases.id,
+        leaseNumber: leases.leaseNumber,
+        currency: leases.currency,
+        liabilityBalance: leases.liabilityBalance,
+        liabilityBalanceBase: leases.liabilityBalanceBase,
+        liabilityAccountId: leases.liabilityAccountId,
+      })
+      .from(leases)
+      .where(
+        and(
+          eq(leases.companyId, companyId),
+          eq(leases.status, 'ACTIVE'),
+          eq(leases.classification, 'FINANCE'),
+          ne(leases.currency, baseCurrency),
+          lte(leases.commencementDate, asOf),
+        ),
+      );
+    if (fxLeases.length) {
+      const mapped = await this.accounts.resolveMapped(companyId, 'LEASE_LIABILITY', executor);
+      for (const l of fxLeases) {
+        if (Money.of(l.liabilityBalance, l.currency).isZero()) continue;
+        out.push({
+          side: 'LEASE',
+          id: l.id,
+          documentNumber: l.leaseNumber,
+          accountId: l.liabilityAccountId ?? mapped.id,
+          currency: l.currency,
+          foreign: l.liabilityBalance,
+          base: l.liabilityBalanceBase,
+        });
+      }
+    }
+    return out;
   }
 
   private viewQuery(executor: DbExecutor) {

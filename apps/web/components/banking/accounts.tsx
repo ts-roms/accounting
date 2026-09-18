@@ -109,13 +109,21 @@ export function BankAccountsPage() {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="flex items-baseline justify-between">
-                      <span className="text-sm text-muted-foreground">Ledger balance</span>
+                      <span className="text-sm text-muted-foreground">
+                        {a.foreignBalance !== null ? `Balance (${a.currency})` : 'Ledger balance'}
+                      </span>
                       <Amount
-                        value={a.ledgerBalance}
+                        value={a.foreignBalance ?? a.ledgerBalance}
                         currency={a.currency}
                         className="text-lg font-semibold"
                       />
                     </div>
+                    {a.foreignBalance !== null ? (
+                      <div className="flex items-baseline justify-between text-xs text-muted-foreground">
+                        <span>Ledger ({a.baseCurrency})</span>
+                        <Amount value={a.ledgerBalance} currency={a.baseCurrency} />
+                      </div>
+                    ) : null}
                     <div className="flex items-baseline justify-between text-xs text-muted-foreground">
                       <span>Last statement {a.lastStatementDate ?? '-'}</span>
                       <span>

@@ -232,6 +232,20 @@
       "when": 1789705755304,
       "tag": "0032_journal_lines_foreign_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1789726810059,
+      "tag": "0033_journal_lines_foreign_currency",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1789728194155,
+      "tag": "0034_multi_currency_depth",
+      "breakpoints": true
     }
   ]
 }
