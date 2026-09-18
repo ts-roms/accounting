@@ -568,4 +568,130 @@ describe('Multi-currency depth (e2e)', () => {
     ).toBe(true);
     await trialBalanced();
   });
+
+  // ------------------------------------------------------------ USD payroll
+
+  it('a USD-paid employee runs through a USD pay run: policy items convert at the run rate, the journal is base, payment realizes FX', async () => {
+    const employee = await as(http().post('/api/v1/employees'), finance)
+      .send({
+        firstName: 'Mia',
+        lastName: 'Santos',
+        jobTitle: 'Remote consultant',
+        payFrequency: 'MONTHLY',
+        currency: 'USD',
+        baseSalary: '1000',
+        hireDate: '2026-10-01',
+        paymentMethod: 'BANK',
+      })
+      .expect(201);
+    expect(employee.body.currency).toBe('USD');
+    // Fund the USD bank (USD 5,000 at 60.00 in October).
+    const funding = await as(http().post('/api/v1/bank-transactions'))
+      .send({
+        bankAccountId: usdBankId,
+        transactionType: 'DEPOSIT',
+        transactionDate: '2026-10-02',
+        amount: '5000',
+        counterpartyAccountId: acc['4900'],
+      })
+      .expect(201);
+    await as(http().post(`/api/v1/bank-transactions/${funding.body.id}/post`), finance).expect(201);
+
+    // October run in USD: only USD-paid staff; the period-end rate (60.00) values the journal.
+    const run = await as(http().post('/api/v1/payroll/runs'), finance)
+      .send({
+        payFrequency: 'MONTHLY',
+        periodStart: '2026-10-01',
+        periodEnd: '2026-10-31',
+        payDate: '2026-11-05',
+        currency: 'USD',
+        bankAccountId: usdBankId,
+      })
+      .expect(201);
+    expect(run.body.currency).toBe('USD');
+    expect(run.body.exchangeRate).toBe('60.00000000'); // the 30 September quote set above
+    const calculated = await as(
+      http().post(`/api/v1/payroll/runs/${run.body.id}/calculate`),
+      finance,
+    ).expect(200);
+    expect(calculated.body.employeeCount).toBe(1);
+    const slip = calculated.body.payslips[0] as {
+      gross: string;
+      net: string;
+      netBase: string;
+      grossBase: string;
+      lines: Array<{ code: string; amount: string; baseAmount: string; type: string }>;
+    };
+    // Gross = USD 1,000 salary + the company transport allowance (PHP 2,000 policy -> USD at 60.00).
+    expect(slip.gross).toBe('1033.3333');
+    expect(slip.lines.find((l) => l.code === 'ALLOW-TRANSPO')!.baseAmount).toBe('2000.0000');
+    // Company policy amounts are base: the HDMF fixed deduction (PHP) and the SSS cap convert at 60.00;
+    // the withholding bracket reads PHP 60,000 taxable-less-pre-tax and converts the tax back.
+    const hdmf = slip.lines.find((l) => l.code === 'HDMF-EE')!;
+    expect(Number(hdmf.amount)).toBeCloseTo(200 / 60, 3);
+    expect(hdmf.baseAmount).toBe('200.0000'); // the exact policy figure, not a round trip
+    const wtax = slip.lines.find((l) => l.code === 'WTAX')!;
+    expect(Number(wtax.amount)).toBeGreaterThan(0);
+    expect(Number(wtax.baseAmount)).toBeCloseTo(Number(wtax.amount) * 60, 1);
+    // Base net is the sum of the lines' base amounts, never a rounded total.
+    const lineBase = (t: string) =>
+      slip.lines
+        .filter((l) => l.type === t)
+        .reduce((a, l) => a.add(Money.of(l.baseAmount, 'PHP')), Money.zero('PHP'));
+    expect(slip.netBase).toBe(
+      lineBase('EARNING')
+        .subtract(lineBase('DEDUCTION'))
+        .subtract(lineBase('WITHHOLDING_TAX'))
+        .toString(),
+    );
+    expect(calculated.body.netTotalBase).toBe(slip.netBase);
+
+    await as(http().post(`/api/v1/payroll/runs/${run.body.id}/submit`), finance).expect(200);
+    await as(http().post(`/api/v1/payroll/runs/${run.body.id}/approve`)).expect(200);
+    const posted = await as(
+      http().post(`/api/v1/payroll/runs/${run.body.id}/post`),
+      finance,
+    ).expect(200);
+    const entry = await journal(posted.body.journalEntryId);
+    const on = (code: string, side: 'debit' | 'credit') =>
+      entry.lines
+        .filter((l) => l.accountId === acc[code])
+        .reduce((a, l) => a.add(Money.of(l[side], 'PHP')), Money.zero('PHP'))
+        .toString();
+    expect(on('6100', 'debit')).toBe(slip.grossBase);
+    expect(on('2170', 'credit')).toBe(slip.netBase);
+    expect(entry.lines.every((l) => l.foreignCurrency === null)).toBe(true);
+
+    // Paid on 5 November at 62.00 from the USD bank: cash PHP net x 60 with the USD amount on the
+    // bank line; the payable is relieved at the run's base; the difference is a realized loss.
+    await as(http().put('/api/v1/exchange-rates'))
+      .send({ fromCurrency: 'USD', toCurrency: 'PHP', rateDate: '2026-11-01', rate: '62' })
+      .expect(200);
+    const paid = await as(http().post(`/api/v1/payroll/runs/${run.body.id}/pay`), finance)
+      .send({ paymentDate: '2026-11-05' })
+      .expect(200);
+    const net = Money.of(slip.net, 'USD');
+    const cashBase = net.convert('PHP', '62');
+    expect(paid.body.paidBase).toBe(cashBase.toString());
+    const [bankLine] = await lineOn(paid.body.paymentJournalEntryId, '1170');
+    expect(bankLine).toMatchObject({
+      credit: cashBase.toString(),
+      foreignCredit: slip.net,
+      foreignCurrency: 'USD',
+    });
+    expect((await lineOn(paid.body.paymentJournalEntryId, '2170'))[0]?.debit).toBe(slip.netBase);
+    const loss = cashBase.subtract(Money.of(slip.netBase, 'PHP'));
+    expect((await lineOn(paid.body.paymentJournalEntryId, '6910'))[0]?.debit).toBe(loss.toString());
+
+    // A PHP bank cannot pay a EUR run, but a base-currency bank may pay a USD run - and the employee
+    // payable ties to the ledger before and after payment.
+    for (const asOf of ['2026-10-31', '2026-11-30']) {
+      const integrity = await as(http().get(`/api/v1/payroll/integrity?asOf=${asOf}`)).expect(200);
+      const f = integrity.body.findings.find(
+        (x: { check: string }) => x.check === 'EMPLOYEE_PAYABLE_VS_LEDGER',
+      );
+      expect({ asOf, count: f.count, samples: f.samples }).toEqual({ asOf, count: 0, samples: [] });
+    }
+    await trialBalanced();
+  });
 });

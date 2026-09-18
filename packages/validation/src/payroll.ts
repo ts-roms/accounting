@@ -10,10 +10,12 @@ import {
   PAY_RUN_STATUSES,
 } from '@accounting/types';
 import { amountSchema, isoDateSchema } from './accounting';
+import { exchangeRateValueSchema } from './enterprise';
 import { dimensionRefsSchema } from './dimensions';
 import {
   codeSchema,
   nameSchema,
+  optionalCurrencyCodeSchema,
   optionalText,
   paginationQuerySchema,
   uuidSchema,
@@ -34,7 +36,9 @@ export const createEmployeeSchema = dimensionRefsSchema
     jobTitle: optionalText(120),
     employmentType: z.enum(EMPLOYMENT_TYPES).default('FULL_TIME'),
     payFrequency: z.enum(PAY_FREQUENCIES).default('MONTHLY'),
-    /** Base pay per pay period, company base currency. */
+    /** Pay currency; omitted = the company base currency. */
+    currency: optionalCurrencyCodeSchema,
+    /** Base pay per pay period, in the pay currency. */
     baseSalary: amountSchema,
     hireDate: isoDateSchema,
     terminationDate: isoDateSchema.nullable().optional(),
@@ -59,6 +63,7 @@ export const updateEmployeeSchema = dimensionRefsSchema.extend({
   jobTitle: optionalText(120),
   employmentType: z.enum(EMPLOYMENT_TYPES).optional(),
   payFrequency: z.enum(PAY_FREQUENCIES).optional(),
+  currency: optionalCurrencyCodeSchema,
   baseSalary: amountSchema.optional(),
   hireDate: isoDateSchema.optional(),
   terminationDate: isoDateSchema.nullable().optional(),
@@ -191,6 +196,10 @@ export const createPayRunSchema = z
     payDate: isoDateSchema,
     description: optionalText(200),
     bankAccountId: uuidSchema.nullable().optional(),
+    /** Pay currency of the run (employees paid in it); omitted = the company base currency. */
+    currency: optionalCurrencyCodeSchema,
+    /** Foreign-currency runs: rate override for the period end (1 unit = rate base units); the rate table otherwise. */
+    exchangeRate: exchangeRateValueSchema.optional(),
   })
   .refine((r) => r.periodEnd >= r.periodStart, {
     message: 'Period end precedes start',
@@ -225,6 +234,8 @@ export type ListPayRunsQuery = z.infer<typeof listPayRunsQuerySchema>;
 export const payPayRunSchema = z.object({
   paymentDate: isoDateSchema.optional(),
   bankAccountId: uuidSchema.optional(),
+  /** Foreign-currency runs: rate of the payment (1 unit = rate base units); the rate table otherwise. */
+  exchangeRate: exchangeRateValueSchema.optional(),
   reference: optionalText(100),
 });
 export type PayPayRunInput = z.infer<typeof payPayRunSchema>;

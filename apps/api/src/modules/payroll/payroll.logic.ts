@@ -46,6 +46,8 @@ export interface PayslipLineDraft {
   code: string;
   description: string;
   amount: string;
+  /** `amount` in the company base currency (equal to `amount` for base-currency runs). */
+  baseAmount: string;
   taxable: boolean;
   source: string;
 }
@@ -58,7 +60,29 @@ export interface PayslipDraft {
   employerContributions: string;
   reimbursements: string;
   net: string;
+  /** Base-currency figures: sums of the lines' base amounts, so a journal built from them ties. */
+  base: {
+    gross: string;
+    taxable: string;
+    withholding: string;
+    deductions: string;
+    employerContributions: string;
+    reimbursements: string;
+    net: string;
+  };
   lines: PayslipLineDraft[];
+}
+
+/**
+ * Base-currency context of a foreign-currency payslip: 1 unit of the pay
+ * currency = `rate` base units. Pay items are company policy written in base
+ * (fixed amounts, contribution caps, bracket tables), so they are converted to
+ * the pay currency at the run rate; per-employee assignments and run inputs
+ * are entered in the pay currency as they are.
+ */
+export interface PayslipBase {
+  currency: string;
+  rate: string;
 }
 
 /** Progressive tax: the bracket whose `over` is the highest not above the taxable amount. */
@@ -92,16 +116,36 @@ export function percentOf(
   return base.multiply(rate).multiply('0.01');
 }
 
-function amountFor(applied: AppliedItem, base: Money, gross: Money, currency: string): Money {
+/** A base-currency policy amount (item amount, cap) expressed in the pay currency. */
+function policyAmount(amount: string, currency: string, base: PayslipBase | undefined): Money {
+  if (!base) return Money.parse(amount, currency);
+  return Money.of(Money.of(amount, currency, 20).divide(base.rate).toString(), currency);
+}
+
+function amountFor(
+  applied: AppliedItem,
+  base: Money,
+  gross: Money,
+  currency: string,
+  ctx?: PayslipBase,
+): Money {
   const { item } = applied;
   if (applied.source === 'INPUT') return Money.parse(applied.amount ?? '0', currency);
   switch (item.calculation) {
     case 'BASE_SALARY':
       return base;
     case 'FIXED':
-      return Money.parse(applied.amount ?? item.amount ?? '0', currency);
+      // An assignment amount is in the pay currency; the item's own amount is policy in base.
+      return applied.amount !== null && applied.amount !== undefined
+        ? Money.parse(applied.amount, currency)
+        : policyAmount(item.amount ?? '0', currency, ctx);
     case 'PERCENT_OF_GROSS':
-      return percentOf(gross, applied.rate ?? item.rate ?? '0', item.maxBase, currency);
+      return percentOf(
+        gross,
+        applied.rate ?? item.rate ?? '0',
+        item.maxBase ? policyAmount(item.maxBase, currency, ctx).toString() : null,
+        currency,
+      );
     case 'BRACKET':
       // Brackets apply to taxable pay, resolved by the caller after earnings are known.
       return Money.zero(currency);
@@ -120,13 +164,26 @@ export function buildPayslip(input: {
   baseSalary: string;
   applied: readonly AppliedItem[];
   reimbursements?: readonly ReimbursementDef[];
+  /** Omit for base-currency runs. */
+  base?: PayslipBase;
 }): PayslipDraft {
   const c = input.currency;
+  const baseCurrency = input.base?.currency ?? c;
+  const rate = input.base?.rate ?? '1';
+  const toBase = (m: Money) => (input.base ? m.convert(baseCurrency, rate) : m);
   const base = Money.parse(input.baseSalary, c);
   const lines: PayslipLineDraft[] = [];
   const ordered = [...input.applied].sort(
     (a, b) => a.item.sortOrder - b.item.sortOrder || a.item.code.localeCompare(b.item.code),
   );
+  /** A fixed policy amount keeps its exact base figure instead of a round trip through the pay currency. */
+  const policyBase = (applied: AppliedItem): Money | undefined =>
+    input.base &&
+    applied.source !== 'INPUT' &&
+    applied.item.calculation === 'FIXED' &&
+    (applied.amount === null || applied.amount === undefined)
+      ? Money.parse(applied.item.amount ?? '0', baseCurrency)
+      : undefined;
   const push = (applied: AppliedItem, amount: Money) => {
     if (amount.isZero()) return;
     lines.push({
@@ -137,15 +194,22 @@ export function buildPayslip(input: {
       code: applied.item.code,
       description: applied.note ? `${applied.item.name} - ${applied.note}` : applied.item.name,
       amount: amount.toString(),
+      baseAmount: (policyBase(applied) ?? toBase(amount)).toString(),
       taxable: applied.item.type === 'EARNING' && applied.item.taxable,
       source: applied.source,
     });
+  };
+  /** Brackets are base-currency tables: read them on the base-converted amount, convert the tax back. */
+  const bracketFor = (taxBase: Money, brackets: readonly PayBracket[]): Money => {
+    if (!input.base) return bracketTax(taxBase, brackets, c);
+    const taxInBase = bracketTax(toBase(taxBase), brackets, baseCurrency);
+    return Money.of(Money.of(taxInBase.toString(), c, 20).divide(rate).toString(), c);
   };
 
   let gross = Money.zero(c);
   let taxable = Money.zero(c);
   for (const a of ordered.filter((x) => x.item.type === 'EARNING')) {
-    const amount = amountFor(a, base, gross, c);
+    const amount = amountFor(a, base, gross, c, input.base);
     push(a, amount);
     gross = gross.add(amount);
     if (a.item.taxable) taxable = taxable.add(amount);
@@ -153,7 +217,7 @@ export function buildPayslip(input: {
   let deductions = Money.zero(c);
   let preTax = Money.zero(c);
   for (const a of ordered.filter((x) => x.item.type === 'DEDUCTION')) {
-    const amount = amountFor(a, base, gross, c);
+    const amount = amountFor(a, base, gross, c, input.base);
     push(a, amount);
     deductions = deductions.add(amount);
     // Statutory percent-of-gross deductions reduce taxable pay; fixed ones (loans) do not.
@@ -161,7 +225,7 @@ export function buildPayslip(input: {
   }
   let employer = Money.zero(c);
   for (const a of ordered.filter((x) => x.item.type === 'EMPLOYER_CONTRIBUTION')) {
-    const amount = amountFor(a, base, gross, c);
+    const amount = amountFor(a, base, gross, c, input.base);
     push(a, amount);
     employer = employer.add(amount);
   }
@@ -172,8 +236,8 @@ export function buildPayslip(input: {
       a.source === 'INPUT'
         ? Money.parse(a.amount ?? '0', c)
         : a.item.calculation === 'BRACKET'
-          ? bracketTax(taxBase.isNegative() ? Money.zero(c) : taxBase, a.item.brackets, c)
-          : amountFor(a, base, gross, c);
+          ? bracketFor(taxBase.isNegative() ? Money.zero(c) : taxBase, a.item.brackets)
+          : amountFor(a, base, gross, c, input.base);
     push(a, amount);
     withholding = withholding.add(amount);
   }
@@ -189,6 +253,7 @@ export function buildPayslip(input: {
       code: 'CLAIM',
       description: `Expense claim ${r.claimNumber}`,
       amount: amount.toString(),
+      baseAmount: toBase(amount).toString(),
       taxable: false,
       source: 'CLAIM',
     });
@@ -197,6 +262,24 @@ export function buildPayslip(input: {
   const net = gross.subtract(deductions).subtract(withholding).add(reimbursements);
   if (net.isNegative())
     throw new RangeError(`Net pay is negative (${net.toString()}) - deductions exceed gross`);
+  // Base figures are sums of the rounded line conversions (never a rounded sum) so that a
+  // journal aggregated from the lines equals the payslip's base net exactly.
+  const sumBase = (pick: (l: PayslipLineDraft) => boolean) =>
+    lines
+      .filter(pick)
+      .reduce((acc, l) => acc.add(Money.of(l.baseAmount, baseCurrency)), Money.zero(baseCurrency));
+  const grossBase = sumBase((l) => l.type === 'EARNING' && !l.expenseClaimId);
+  const taxableEarningsBase = sumBase((l) => l.type === 'EARNING' && l.taxable);
+  const preTaxBase = sumBase(
+    (l) =>
+      l.type === 'DEDUCTION' &&
+      ordered.find((a) => a.item.id === l.payItemId)?.item.calculation === 'PERCENT_OF_GROSS',
+  );
+  const deductionsBase = sumBase((l) => l.type === 'DEDUCTION');
+  const withholdingBase = sumBase((l) => l.type === 'WITHHOLDING_TAX');
+  const employerBase = sumBase((l) => l.type === 'EMPLOYER_CONTRIBUTION');
+  const reimbursementsBase = sumBase((l) => Boolean(l.expenseClaimId));
+  const taxableBase = taxableEarningsBase.subtract(preTaxBase);
   return {
     gross: gross.toString(),
     taxable: taxBase.isNegative() ? Money.zero(c).toString() : taxBase.toString(),
@@ -205,6 +288,19 @@ export function buildPayslip(input: {
     employerContributions: employer.toString(),
     reimbursements: reimbursements.toString(),
     net: net.toString(),
+    base: {
+      gross: grossBase.toString(),
+      taxable: (taxableBase.isNegative() ? Money.zero(baseCurrency) : taxableBase).toString(),
+      withholding: withholdingBase.toString(),
+      deductions: deductionsBase.toString(),
+      employerContributions: employerBase.toString(),
+      reimbursements: reimbursementsBase.toString(),
+      net: grossBase
+        .subtract(deductionsBase)
+        .subtract(withholdingBase)
+        .add(reimbursementsBase)
+        .toString(),
+    },
     lines,
   };
 }

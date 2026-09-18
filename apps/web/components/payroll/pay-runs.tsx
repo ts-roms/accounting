@@ -1,6 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
+import { useSession } from '@/lib/auth/session';
 import { useAppRouter } from '@/lib/navigation/progress';
 import type { ColumnDef } from '@tanstack/react-table';
 import {
@@ -217,6 +218,7 @@ function NewRunDialog({ open, onClose }: { open: boolean; onClose: () => void })
     periodEnd: endOfMonth(today()),
     payDate: endOfMonth(today()),
     description: '',
+    currency: '',
   });
   React.useEffect(() => {
     if (open && settings.data)
@@ -281,6 +283,16 @@ function NewRunDialog({ open, onClose }: { open: boolean; onClose: () => void })
               data-testid="run-pay-date"
             />
           </Field>
+          <Field label="Pay currency">
+            <Input
+              placeholder="Company base"
+              maxLength={3}
+              className="font-mono uppercase"
+              value={form.currency}
+              onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))}
+              data-testid="run-currency"
+            />
+          </Field>
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose} disabled={create.isPending}>
@@ -294,6 +306,7 @@ function NewRunDialog({ open, onClose }: { open: boolean; onClose: () => void })
                 const run = await create.mutateAsync({
                   ...form,
                   description: form.description || undefined,
+                  currency: form.currency.trim() ? form.currency.trim().toUpperCase() : undefined,
                 });
                 onClose();
                 router.push(`/payroll/runs/${run.id}`);
@@ -372,6 +385,8 @@ function timeline(r: PayRun): TimelineStep[] {
 
 export function PayRunDetailPage({ id }: { id: string }) {
   const router = useAppRouter();
+  const { activeCompany } = useSession();
+  const baseCurrency = activeCompany?.baseCurrency ?? 'PHP';
   const run = usePayRun(id);
   const action = usePayRunAction();
   const reopen = useReopenPayRun();
@@ -528,9 +543,11 @@ export function PayRunDetailPage({ id }: { id: string }) {
               value={r.netTotal}
               currency={r.currency}
               hint={
-                Number(r.reimbursementTotal)
-                  ? `incl. ${formatMoney(r.reimbursementTotal, r.currency)} claims`
-                  : undefined
+                Number(r.exchangeRate) !== 1
+                  ? `in the ledger ${formatMoney(r.netTotalBase, baseCurrency)} at ${Number(r.exchangeRate)}${r.paidBase ? ` · paid ${formatMoney(r.paidBase, baseCurrency)}` : ''}`
+                  : Number(r.reimbursementTotal)
+                    ? `incl. ${formatMoney(r.reimbursementTotal, r.currency)} claims`
+                    : undefined
               }
             />
           </div>

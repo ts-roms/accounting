@@ -45,7 +45,10 @@ import {
 } from '@/modules/accounting/journals/posting.service';
 import { DocumentNumberingService } from '@/modules/accounting/numbering/document-numbering.service';
 import { AuditService } from '@/modules/audit/audit.service';
+import { foreignLineFields } from '@/modules/accounting/journals/foreign-line';
 import { BankingService } from '@/modules/banking/banking.service';
+import { ExchangeRatesService } from '@/modules/fx/exchange-rates.service';
+import { FxService } from '@/modules/fx/fx.service';
 import { ExpenseClaimsService } from '@/modules/budgeting/expense-claims.service';
 import { AuthorityService } from '@/modules/delegations/authority.service';
 import { OutboxService } from '@/modules/integrations/events/outbox.service';
@@ -101,6 +104,8 @@ export class PayRunsService {
     private readonly outbox: OutboxService,
     private readonly notifications: NotificationsService,
     private readonly config: PayrollConfigService,
+    private readonly rates: ExchangeRatesService,
+    private readonly fx: FxService,
   ) {}
 
   // ------------------------------------------------------------------ queries
@@ -198,6 +203,10 @@ export class PayRunsService {
           and(
             eq(payRuns.companyId, companyId),
             eq(payRuns.payFrequency, input.payFrequency),
+            eq(
+              payRuns.currency,
+              input.currency ?? (await this.accounts.companyCurrency(companyId, tx)),
+            ),
             sql`${payRuns.status} <> 'REVERSED'`,
             lte(payRuns.periodStart, input.periodEnd),
             sql`${payRuns.periodEnd} >= ${input.periodStart}`,
@@ -212,7 +221,16 @@ export class PayRunsService {
       const settings = await this.config.settings(companyId, tx);
       const bankAccountId = input.bankAccountId ?? settings.payrollBankAccountId ?? null;
       if (bankAccountId) await this.banking.bankAccount(companyId, bankAccountId, tx);
-      const currency = await this.accounts.companyCurrency(companyId, tx);
+      const baseCurrency = await this.accounts.companyCurrency(companyId, tx);
+      const currency = input.currency ?? baseCurrency;
+      // Foreign-currency runs: the period-end rate (override or table) values the payroll journal.
+      const { rate } = await this.rates.documentRate(
+        companyId,
+        currency,
+        input.periodEnd,
+        input.exchangeRate,
+        tx,
+      );
       const documentNumber = await this.numbering.allocate(
         companyId,
         'PYR',
@@ -230,6 +248,7 @@ export class PayRunsService {
           payDate: input.payDate,
           description: input.description ?? null,
           currency,
+          exchangeRate: rate,
           bankAccountId,
           createdBy: actor.id,
         })
@@ -330,6 +349,8 @@ export class PayRunsService {
       const run = await this.lock(tx, companyId, id);
       this.assertStatus(run, ['DRAFT', 'CALCULATED'], 'calculated');
       const settings = await this.config.settings(companyId, tx);
+      const baseCurrency = await this.accounts.companyCurrency(companyId, tx);
+      const foreign = run.currency !== baseCurrency;
       const staff = await tx
         .select()
         .from(employees)
@@ -337,6 +358,7 @@ export class PayRunsService {
           and(
             eq(employees.companyId, companyId),
             eq(employees.payFrequency, run.payFrequency),
+            eq(employees.currency, run.currency),
             eq(employees.status, 'ACTIVE'),
             lte(employees.hireDate, run.periodEnd),
             or(
@@ -349,7 +371,7 @@ export class PayRunsService {
       if (staff.length === 0)
         throw new BusinessRuleError(
           ErrorCodes.EMPLOYEE_INACTIVE,
-          `No active ${run.payFrequency.toLowerCase().replace('_', '-')} employees for this period.`,
+          `No active ${run.payFrequency.toLowerCase().replace('_', '-')} employees paid in ${run.currency} for this period.`,
         );
       const items = await tx
         .select()
@@ -371,13 +393,15 @@ export class PayRunsService {
           ),
         );
       const inputs = await tx.select().from(payRunInputs).where(eq(payRunInputs.payRunId, id));
-      const claims = settings.reimburseExpenseClaims
-        ? await this.claims.postedClaimsForUsers(
-            tx,
-            companyId,
-            staff.map((e) => e.userId).filter(Boolean) as string[],
-          )
-        : [];
+      // Expense claims are booked in base; they reimburse through base-currency runs only.
+      const claims =
+        settings.reimburseExpenseClaims && !foreign
+          ? await this.claims.postedClaimsForUsers(
+              tx,
+              companyId,
+              staff.map((e) => e.userId).filter(Boolean) as string[],
+            )
+          : [];
       const resolver = this.accountResolver(tx, companyId);
 
       await tx.delete(payslips).where(eq(payslips.payRunId, id));
@@ -389,6 +413,15 @@ export class PayRunsService {
         employer: Money.zero(run.currency),
         reimbursements: Money.zero(run.currency),
         net: Money.zero(run.currency),
+      };
+      const baseTotals = {
+        gross: Money.zero(baseCurrency),
+        taxable: Money.zero(baseCurrency),
+        withholding: Money.zero(baseCurrency),
+        deductions: Money.zero(baseCurrency),
+        employer: Money.zero(baseCurrency),
+        reimbursements: Money.zero(baseCurrency),
+        net: Money.zero(baseCurrency),
       };
       for (const e of staff) {
         const applied = this.appliedFor(e, run, items, assignments, inputs);
@@ -402,6 +435,7 @@ export class PayRunsService {
             baseSalary: e.baseSalary,
             applied,
             reimbursements,
+            base: foreign ? { currency: baseCurrency, rate: run.exchangeRate } : undefined,
           });
         } catch (err) {
           throw new BusinessRuleError(
@@ -428,6 +462,13 @@ export class PayRunsService {
             employerContributions: draft.employerContributions,
             reimbursements: draft.reimbursements,
             net: draft.net,
+            grossBase: draft.base.gross,
+            taxableBase: draft.base.taxable,
+            withholdingBase: draft.base.withholding,
+            deductionsBase: draft.base.deductions,
+            employerContributionsBase: draft.base.employerContributions,
+            reimbursementsBase: draft.base.reimbursements,
+            netBase: draft.base.net,
             paymentMethod: e.paymentMethod,
             bankName: e.bankName,
             bankAccountNumber: e.bankAccountNumber,
@@ -446,6 +487,7 @@ export class PayRunsService {
             code: l.code,
             description: l.description,
             amount: l.amount,
+            baseAmount: l.baseAmount,
             taxable: l.taxable,
             accountId: resolved.accountId,
             offsetAccountId: resolved.offsetAccountId,
@@ -462,6 +504,18 @@ export class PayRunsService {
           Money.of(draft.reimbursements, run.currency),
         );
         totals.net = totals.net.add(Money.of(draft.net, run.currency));
+        const b = draft.base;
+        baseTotals.gross = baseTotals.gross.add(Money.of(b.gross, baseCurrency));
+        baseTotals.taxable = baseTotals.taxable.add(Money.of(b.taxable, baseCurrency));
+        baseTotals.withholding = baseTotals.withholding.add(Money.of(b.withholding, baseCurrency));
+        baseTotals.deductions = baseTotals.deductions.add(Money.of(b.deductions, baseCurrency));
+        baseTotals.employer = baseTotals.employer.add(
+          Money.of(b.employerContributions, baseCurrency),
+        );
+        baseTotals.reimbursements = baseTotals.reimbursements.add(
+          Money.of(b.reimbursements, baseCurrency),
+        );
+        baseTotals.net = baseTotals.net.add(Money.of(b.net, baseCurrency));
       }
       await tx
         .update(payRuns)
@@ -475,6 +529,13 @@ export class PayRunsService {
           employerTotal: totals.employer.toString(),
           reimbursementTotal: totals.reimbursements.toString(),
           netTotal: totals.net.toString(),
+          grossTotalBase: baseTotals.gross.toString(),
+          taxableTotalBase: baseTotals.taxable.toString(),
+          withholdingTotalBase: baseTotals.withholding.toString(),
+          deductionTotalBase: baseTotals.deductions.toString(),
+          employerTotalBase: baseTotals.employer.toString(),
+          reimbursementTotalBase: baseTotals.reimbursements.toString(),
+          netTotalBase: baseTotals.net.toString(),
           calculatedAt: new Date(),
         })
         .where(eq(payRuns.id, id));
@@ -639,7 +700,8 @@ export class PayRunsService {
       this.assertStatus(run, ['APPROVED'], 'posted');
       const detail = await this.get(companyId, id);
       const payable = await this.accounts.resolveMapped(companyId, 'EMPLOYEE_PAYABLE', tx);
-      const c = run.currency;
+      // The journal carries base: every line's base amount at the run's rate (foreign runs).
+      const c = await this.accounts.companyCurrency(companyId, tx);
       type Key = string;
       const agg = new Map<Key, PostingLine & { debitM: Money; creditM: Money }>();
       const add = (
@@ -683,19 +745,19 @@ export class PayRunsService {
           switch (l.type) {
             case 'EARNING':
               if (l.expenseClaimId) break; // the claim's own posting already carries the expense and the payable
-              add(l.accountId, 'debit', l.amount, label, slip);
+              add(l.accountId, 'debit', l.baseAmount, label, slip);
               break;
             case 'DEDUCTION':
             case 'WITHHOLDING_TAX':
-              add(l.accountId, 'credit', l.amount, label, slip);
+              add(l.accountId, 'credit', l.baseAmount, label, slip);
               break;
             case 'EMPLOYER_CONTRIBUTION':
-              add(l.accountId, 'debit', l.amount, label, slip);
-              add(l.offsetAccountId!, 'credit', l.amount, label, slip);
+              add(l.accountId, 'debit', l.baseAmount, label, slip);
+              add(l.offsetAccountId!, 'credit', l.baseAmount, label, slip);
               break;
           }
         }
-        const owed = Money.of(slip.net, c).subtract(Money.of(slip.reimbursements, c));
+        const owed = Money.of(slip.netBase, c).subtract(Money.of(slip.reimbursementsBase, c));
         if (owed.isPositive())
           add(payable.id, 'credit', owed.toString(), `${run.documentNumber} - net pay`, slip);
       }
@@ -789,6 +851,33 @@ export class PayRunsService {
           ErrorCodes.PAY_RUN_INVALID_STATE,
           'Nothing to pay - the run has no net pay.',
         );
+      const baseCurrency = await this.accounts.companyCurrency(companyId, tx);
+      // Paid in the run's currency from an account in it, or in base from a base account.
+      if (bank.currency !== run.currency && bank.currency !== baseCurrency)
+        throw new BusinessRuleError(
+          ErrorCodes.CURRENCY_MISMATCH,
+          `${run.documentNumber} pays ${run.currency}; ${bank.code} is a ${bank.currency} account.`,
+        );
+      // Cash leaves at the rate of the day; the payable carries the run's base - the difference
+      // is realized FX.
+      const { rate: payRate } = await this.rates.documentRate(
+        companyId,
+        run.currency,
+        paymentDate,
+        input.exchangeRate,
+        tx,
+      );
+      const cashBase = net.convert(baseCurrency, payRate);
+      const owedBase = Money.of(run.netTotalBase, baseCurrency);
+      const gain = owedBase.subtract(cashBase);
+      const fxLines = await this.fx.realizedLines(tx, companyId, gain);
+      const [bankGl] = await this.accounts.findByIds(companyId, [bank.glAccountId], tx);
+      const bankForeign = foreignLineFields(
+        bankGl!,
+        baseCurrency,
+        { currency: run.currency, amount: net.toString(), exchangeRate: payRate },
+        'credit',
+      );
       const reference = input.reference ?? run.documentNumber;
       const entry = await this.posting.postEvent(
         tx,
@@ -804,16 +893,18 @@ export class PayRunsService {
           lines: [
             {
               accountId: payable.id,
-              debit: net.toString(),
+              debit: owedBase.toString(),
               credit: '0',
               description: `${run.documentNumber} net pay settled`,
             },
             {
               accountId: bank.glAccountId,
               debit: '0',
-              credit: net.toString(),
+              credit: cashBase.toString(),
               description: `Payroll ${run.documentNumber}`,
+              ...bankForeign,
             },
+            ...fxLines,
           ],
         },
         { permission: P['payroll.post'] },
@@ -842,6 +933,7 @@ export class PayRunsService {
           paymentJournalEntryId: entry.id,
           bankAccountId: bank.id,
           paymentDate,
+          paidBase: cashBase.toString(),
           paymentReference: reference,
           paidBy: actor.id,
           paidAt: new Date(),
@@ -859,6 +951,8 @@ export class PayRunsService {
             paymentJournalEntryId: entry.id,
             bankAccount: bank.code,
             net: net.toString(),
+            paidBase: cashBase.toString(),
+            realizedFx: gain.toString(),
             claimsSettled: claimIds.length,
           },
           companyId,

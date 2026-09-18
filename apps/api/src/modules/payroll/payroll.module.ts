@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AccountingModule } from '@/modules/accounting/accounting.module';
+import { FxModule } from '@/modules/fx/fx.module';
 import { BankingModule } from '@/modules/banking/banking.module';
 import { BudgetingModule } from '@/modules/budgeting/budgeting.module';
 import { DelegationsModule } from '@/modules/delegations/delegations.module';
@@ -22,6 +23,7 @@ import { PayrollRemindersJob } from './payroll.job';
   imports: [
     AccountingModule,
     BankingModule,
+    FxModule,
     BudgetingModule,
     DelegationsModule,
     WorkflowsModule,
