@@ -88,7 +88,11 @@ export class BankingService {
     const rows = await this.viewQuery(this.db)
       .where(eq(bankAccounts.companyId, companyId))
       .orderBy(asc(bankAccounts.code));
-    const activity = await this.ledger.activity({ companyId, to: '9999-12-31' });
+    const activity = await this.ledger.activity({
+      companyId,
+      to: '9999-12-31',
+      accountIds: rows.map((r) => r.glAccountId),
+    });
     return rows.map((r) => {
       const a = activity.find((x) => x.accountId === r.glAccountId);
       return {
@@ -123,7 +127,10 @@ export class BankingService {
     asOf: string,
     executor: DbExecutor = this.db,
   ): Promise<string> {
-    const activity = await this.ledger.activity({ companyId, to: asOf }, executor);
+    const activity = await this.ledger.activity(
+      { companyId, to: asOf, accountIds: [glAccountId] },
+      executor,
+    );
     const a = activity.find((x) => x.accountId === glAccountId);
     return Money.of(a?.debit ?? '0', currency)
       .subtract(Money.of(a?.credit ?? '0', currency))

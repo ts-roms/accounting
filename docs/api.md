@@ -100,6 +100,7 @@ Base path: `/api/v1` (URI versioning). OpenAPI UI: `http://localhost:3001/api/do
 | GET                   | `/general-ledger?accountId&from&to&branchId&page&pageSize`                                                                                                                                                             | `journal.view`                    |
 | GET                   | `/reports/trial-balance?from&to&includeZero`                                                                                                                                                                           | `reports.view`                    |
 | GET                   | `/reports/income-statement?from&to`                                                                                                                                                                                    | `reports.view`                    |
+| GET                   | `/reports/income-statement/trend?to&months`                                                                                                                                                                            | `reports.view`                    |
 | GET                   | `/reports/balance-sheet?asOf`                                                                                                                                                                                          | `reports.view`                    |
 
 Amounts are decimal strings with up to 4 fractional digits; dates are `YYYY-MM-DD`.

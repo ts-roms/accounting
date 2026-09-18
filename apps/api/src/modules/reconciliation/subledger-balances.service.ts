@@ -268,7 +268,11 @@ export class SubledgerBalancesService {
         ),
       )
       .groupBy(journalLines.accountId);
-    const activity = await this.ledger.activity({ companyId, to: asOf });
+    const activity = await this.ledger.activity({
+      companyId,
+      to: asOf,
+      accountIds: [...accountIds],
+    });
     const chart = await this.db
       .select({ id: accounts.id, code: accounts.code, name: accounts.name })
       .from(accounts)
@@ -310,7 +314,7 @@ export class SubledgerBalancesService {
     if (!ids.length)
       throw new BusinessRuleError(ErrorCodes.ACCOUNT_MAPPING_MISSING, 'No accounts to reconcile.');
     const [activity, chart] = await Promise.all([
-      this.ledger.activity({ companyId, to: asOf }),
+      this.ledger.activity({ companyId, to: asOf, accountIds: ids }),
       this.db
         .select({ id: accounts.id, code: accounts.code, name: accounts.name })
         .from(accounts)

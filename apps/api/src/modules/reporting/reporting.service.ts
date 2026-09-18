@@ -10,6 +10,7 @@ import type {
   BalanceSheetQuery,
   CashFlowQuery,
   IncomeStatementQuery,
+  IncomeStatementTrendQuery,
   TrialBalanceQuery,
 } from '@accounting/validation';
 import {
@@ -94,6 +95,25 @@ export interface IncomeStatementReport {
   netIncome: string;
   /** Same structure for the comparative window, when one was requested. */
   comparative?: Omit<IncomeStatementReport, 'comparative'>;
+}
+
+/** Section totals of one month, for trend charts (no rows). */
+export interface IncomeStatementTrendPoint {
+  from: string;
+  to: string;
+  revenue: string;
+  costOfSales: string;
+  grossProfit: string;
+  expenses: string;
+  operatingIncome: string;
+  otherIncome: string;
+  otherExpenses: string;
+  netIncome: string;
+}
+
+export interface IncomeStatementTrend {
+  currency: string;
+  months: IncomeStatementTrendPoint[];
 }
 
 export interface BalanceSheetReport {
@@ -261,6 +281,67 @@ export class ReportingService {
   }
 
   /**
+   * Income statement totals per calendar month for the `months` months ending
+   * in the month of `to`. One ledger read for the whole window: the dashboard
+   * trend used to issue one full report per month.
+   */
+  async incomeStatementTrend(
+    companyId: string,
+    query: IncomeStatementTrendQuery,
+  ): Promise<IncomeStatementTrend> {
+    const currency = await this.ledger.currency(companyId);
+    const months = monthWindows(query.to, query.months);
+    const first = months[0]!;
+    const [activity, chart] = await Promise.all([
+      this.ledger.activityByMonth({
+        companyId,
+        from: first.from,
+        to: query.to,
+        branchId: query.branchId,
+        accountTypes: INCOME_STATEMENT_TYPES,
+      }),
+      this.db
+        .select()
+        .from(accounts)
+        .where(eq(accounts.companyId, companyId))
+        .orderBy(asc(accounts.code)),
+    ]);
+    const points = months.map((m) => {
+      const amounts = rollUp(
+        chart,
+        activity.filter((a) => a.month === m.from),
+        currency,
+      );
+      const total = (type: AccountType) =>
+        Money.of(
+          buildSection(type, type, chart, amounts, [type], currency, m.from, m.to).total,
+          currency,
+        );
+      const revenue = total('REVENUE');
+      const costOfSales = total('COST_OF_SALES');
+      const expenses = total('EXPENSE');
+      const otherIncome = total('OTHER_INCOME');
+      const otherExpenses = total('OTHER_EXPENSE');
+      const grossProfit = revenue.subtract(costOfSales);
+      const operatingIncome = grossProfit.subtract(expenses);
+      const netIncome = operatingIncome.add(otherIncome).subtract(otherExpenses);
+      return {
+        from: m.from,
+        to: m.to,
+        revenue: revenue.toString(),
+        costOfSales: costOfSales.toString(),
+        grossProfit: grossProfit.toString(),
+        expenses: expenses.toString(),
+        operatingIncome: operatingIncome.toString(),
+        otherIncome: otherIncome.toString(),
+        otherExpenses: otherExpenses.toString(),
+        netIncome: netIncome.toString(),
+      };
+    });
+    return { currency, months: points };
+  }
+
+  /**
    * Indirect cash-flow statement from ledger movements. Year-end CLOSING
    * journals are excluded: they only move unclosed profit into retained
    * earnings and would otherwise cancel net income in a window that spans a
@@ -354,6 +435,18 @@ function index(rows: AccountActivity[]): Map<string, AccountActivity> {
 
 function split(net: Money, currency: string): [Money, Money] {
   return net.isNegative() ? [Money.zero(currency), net.abs()] : [net, Money.zero(currency)];
+}
+
+/** Calendar months ending in the month of `to`, oldest first; the last month ends on `to`. */
+function monthWindows(to: string, count: number): { from: string; to: string }[] {
+  const [y, m] = to.split('-').map(Number) as [number, number];
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  return Array.from({ length: count }, (_, i) => {
+    const offset = count - 1 - i;
+    const from = new Date(Date.UTC(y, m - 1 - offset, 1));
+    const end = new Date(Date.UTC(y, m - offset, 0));
+    return { from: iso(from), to: offset === 0 ? to : iso(end) };
+  });
 }
 
 function previousDay(iso: string): string {

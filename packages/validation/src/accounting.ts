@@ -261,6 +261,14 @@ export const incomeStatementQuerySchema = dimensionRefsSchema.extend({
 });
 export type IncomeStatementQuery = z.infer<typeof incomeStatementQuerySchema>;
 
+/** Monthly income statement totals ending in the month of `to` (one read for a trend chart). */
+export const incomeStatementTrendQuerySchema = z.object({
+  to: isoDateSchema,
+  months: z.coerce.number().int().min(1).max(36).default(6),
+  branchId: uuidSchema.optional(),
+});
+export type IncomeStatementTrendQuery = z.infer<typeof incomeStatementTrendQuerySchema>;
+
 export const balanceSheetQuerySchema = z.object({
   asOf: isoDateSchema,
   branchId: uuidSchema.optional(),

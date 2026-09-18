@@ -1,7 +1,6 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { useQueries } from '@tanstack/react-query';
 import {
   ArrowRight,
   Building2,
@@ -25,15 +24,13 @@ import {
   StatusBadge,
 } from '@accounting/ui';
 import { useSession } from '@/lib/auth/session';
-import { api } from '@/lib/api/client';
 import { useAuditLogs, useCompanies, useRoles, useUsers } from '@/lib/api/hooks';
 import {
-  accountingKeys,
   useBalanceSheet,
-  useIncomeStatement,
+  useIncomeStatementTrend,
   useJournalEntries,
 } from '@/lib/api/accounting-hooks';
-import type { IncomeStatementReport } from '@/lib/api/types';
+import type { IncomeStatementTrendPoint } from '@/lib/api/types';
 import { useAging } from '@/lib/api/subledger-hooks';
 import { AP_CONFIG, AR_CONFIG } from '@/lib/subledger/config';
 import { endOfMonth, startOfMonth, today } from '@/components/accounting/primitives';
@@ -81,8 +78,10 @@ export default function DashboardPage() {
 
   const thisMonth = monthRange(0);
   const lastMonth = monthRange(1);
-  const mtd = useIncomeStatement({ from: thisMonth.from, to: thisMonth.to }, canReport);
-  const prev = useIncomeStatement({ from: lastMonth.from, to: lastMonth.to }, canReport);
+  // One request covers the trend and the month-to-date tiles (last point = this month to today).
+  const trend = useIncomeStatementTrend({ to: now, months: MONTHS }, canReport);
+  const mtd = trend.data?.months[MONTHS - 1];
+  const prev = trend.data?.months[MONTHS - 2];
   const bs = useBalanceSheet({ asOf: now }, canReport);
   const prevBs = useBalanceSheet({ asOf: lastMonth.to }, canReport);
   // Company-scoped: wait for the active company like the report queries do (avoids a 403 on first load).
@@ -94,19 +93,8 @@ export default function DashboardPage() {
     () => Array.from({ length: MONTHS }, (_, i) => monthRange(MONTHS - 1 - i)),
     [],
   );
-  const trend = useQueries({
-    queries: months.map((m) => ({
-      queryKey: accountingKeys.incomeStatement({ from: m.from, to: m.to }),
-      queryFn: () =>
-        api.get<IncomeStatementReport>('/reports/income-statement', {
-          query: { from: m.from, to: m.to },
-        }),
-      enabled: canReport,
-      staleTime: 60_000,
-    })),
-  });
-  const trendLoading = canReport && trend.some((q) => q.isLoading);
-  const trendReady = canReport && trend.every((q) => q.data);
+  const trendLoading = canReport && trend.isLoading;
+  const trendReady = canReport && Boolean(trend.data);
 
   const cashOf = (report: typeof bs.data) =>
     report
@@ -117,9 +105,9 @@ export default function DashboardPage() {
       : undefined;
   const cash = cashOf(bs.data);
   const prevCash = cashOf(prevBs.data);
-  const expensesOf = (r: IncomeStatementReport | undefined) =>
+  const expensesOf = (r: IncomeStatementTrendPoint | undefined) =>
     r
-      ? Money.of(r.costOfSales.total, currency).add(Money.of(r.expenses.total, currency)).toString()
+      ? Money.of(r.costOfSales, currency).add(Money.of(r.expenses, currency)).toString()
       : undefined;
   const overdue = (report: typeof arAging.data) =>
     report
@@ -163,18 +151,18 @@ export default function DashboardPage() {
         <section aria-label="Key figures" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <FinancialMetricCard
             label="Revenue (MTD)"
-            value={mtd.data?.revenue.total}
+            value={mtd?.revenue}
             currency={currency}
-            delta={pctChange(mtd.data?.revenue.total, prev.data?.revenue.total)}
+            delta={pctChange(mtd?.revenue, prev?.revenue)}
             deltaLabel="vs last month"
             href="/reports/financial-statements"
             testId="kpi-revenue"
           />
           <FinancialMetricCard
             label="Expenses (MTD)"
-            value={expensesOf(mtd.data)}
+            value={expensesOf(mtd)}
             currency={currency}
-            delta={pctChange(expensesOf(mtd.data), expensesOf(prev.data))}
+            delta={pctChange(expensesOf(mtd), expensesOf(prev))}
             deltaLabel="vs last month"
             deltaDirection="down-is-good"
             href="/reports/financial-statements"
@@ -182,9 +170,9 @@ export default function DashboardPage() {
           />
           <FinancialMetricCard
             label="Net income (MTD)"
-            value={mtd.data?.netIncome}
+            value={mtd?.netIncome}
             currency={currency}
-            delta={pctChange(mtd.data?.netIncome, prev.data?.netIncome)}
+            delta={pctChange(mtd?.netIncome, prev?.netIncome)}
             deltaLabel="vs last month"
             href="/reports/financial-statements"
             testId="kpi-net-income"
@@ -229,13 +217,13 @@ export default function DashboardPage() {
                     key: 'revenue',
                     label: 'Revenue',
                     color: chartColor(0),
-                    values: trend.map((q) => Number(q.data!.revenue.total)),
+                    values: trend.data!.months.map((m) => Number(m.revenue)),
                   },
                   {
                     key: 'expenses',
                     label: 'Expenses',
                     color: chartColor(4),
-                    values: trend.map((q) => Number(expensesOf(q.data))),
+                    values: trend.data!.months.map((m) => Number(expensesOf(m))),
                   },
                 ]}
               />

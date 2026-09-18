@@ -198,7 +198,10 @@ export class IntercompanyReconciliationService {
         .from(accounts)
         .where(and(eq(accounts.companyId, c.id), eq(accounts.isIntercompany, true)));
       const activity = icAccounts.length
-        ? await this.ledger.activity({ companyId: c.id, to: asOf }, executor)
+        ? await this.ledger.activity(
+            { companyId: c.id, to: asOf, accountIds: icAccounts.map((a) => a.id) },
+            executor,
+          )
         : [];
       let receivable = Money.zero(c.baseCurrency);
       let payable = Money.zero(c.baseCurrency);

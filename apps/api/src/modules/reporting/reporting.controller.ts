@@ -6,6 +6,7 @@ import {
   balanceSheetQuerySchema,
   cashFlowQuerySchema,
   incomeStatementQuerySchema,
+  incomeStatementTrendQuerySchema,
   trialBalanceQuerySchema,
 } from '@accounting/validation';
 import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
@@ -16,6 +17,7 @@ import { ReportingService } from './reporting.service';
 
 class TrialBalanceQueryDto extends createZodDto(trialBalanceQuerySchema) {}
 class IncomeStatementQueryDto extends createZodDto(incomeStatementQuerySchema) {}
+class IncomeStatementTrendQueryDto extends createZodDto(incomeStatementTrendQuerySchema) {}
 class BalanceSheetQueryDto extends createZodDto(balanceSheetQuerySchema) {}
 class CashFlowQueryDto extends createZodDto(cashFlowQuerySchema) {}
 
@@ -36,6 +38,16 @@ export class ReportingController {
   @RequirePermissions(P['reports.view'])
   incomeStatement(@CurrentUser() user: AuthenticatedUser, @Query() query: IncomeStatementQueryDto) {
     return this.service.incomeStatement(user.companyId!, query);
+  }
+
+  @Get('income-statement/trend')
+  @RequirePermissions(P['reports.view'])
+  @ApiOperation({ summary: 'Income statement section totals per month (one read for a trend)' })
+  incomeStatementTrend(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: IncomeStatementTrendQueryDto,
+  ) {
+    return this.service.incomeStatementTrend(user.companyId!, query);
   }
 
   @Get('balance-sheet')

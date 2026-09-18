@@ -371,13 +371,17 @@ export class AiAssistantService {
       }
       case 'CASH': {
         need(P['reports.view']);
-        const activity = await this.ledger.activity({ companyId, to: asOf });
         const cashAccounts = await this.db
           .select({ id: accounts.id, code: accounts.code, name: accounts.name })
           .from(accounts)
           .where(
             and(eq(accounts.companyId, companyId), inArray(accounts.subtype, ['CASH', 'BANK'])),
           );
+        const activity = await this.ledger.activity({
+          companyId,
+          to: asOf,
+          accountIds: cashAccounts.map((a) => a.id),
+        });
         let total = Money.zero(currency);
         const sources: AnswerSource[] = [];
         for (const acc of cashAccounts) {

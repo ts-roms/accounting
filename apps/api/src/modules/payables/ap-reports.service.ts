@@ -510,7 +510,7 @@ export class ApReportsService {
     const discounts = Money.of(disc?.total ?? '0', currency);
     const subledger = inv.add(dn).subtract(cn).subtract(receipts).add(refunds).add(fxAdjustment);
 
-    const activity = await this.ledger.activity({ companyId, to: asOf });
+    const activity = await this.ledger.activity({ companyId, to: asOf, accountIds: [control.id] });
     const row = activity.find((a) => a.accountId === control.id);
     const ledgerBalance = signedBalance(
       Money.of(row?.debit ?? '0', currency).subtract(Money.of(row?.credit ?? '0', currency)),

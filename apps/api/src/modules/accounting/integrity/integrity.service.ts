@@ -1,10 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, gt, inArray, isNotNull, ne, sql } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
 import { alias, type PgColumn } from 'drizzle-orm/pg-core';
 import { Money } from '@accounting/money';
 import {
   LEDGER_STATUSES,
   type AccountMappingKey,
+  type DimensionType,
   type ReconciliationArea,
 } from '@accounting/types';
 import { DRIZZLE, type Database } from '@/database/database.types';
@@ -24,7 +25,7 @@ import {
   warehouses,
 } from '@/database/schema';
 import { AccountsService } from '@/modules/accounting/accounts/accounts.service';
-import { findDimensionRuleViolations } from '@/modules/accounting/dimensions/dimension-rules.logic';
+import { ruleApplies } from '@/modules/accounting/dimensions/dimension-rules.logic';
 import { DimensionRulesService } from '@/modules/accounting/dimensions/dimension-rules.service';
 import { SubledgerBalancesService } from '@/modules/reconciliation/subledger-balances.service';
 import { ReportingService } from '@/modules/reporting/reporting.service';
@@ -373,11 +374,30 @@ export class IntegrityService {
       .where(
         and(
           eq(journalEntries.companyId, companyId),
-          sql`(${journalEntries.currency} <> ${companies.baseCurrency}
-            OR ${journalEntries.transactionCurrency} = ${companies.baseCurrency}
-            OR EXISTS (SELECT 1 FROM journal_lines jl WHERE jl.journal_entry_id = ${journalEntries.id}
-                       AND (jl.foreign_debit IS NOT NULL OR jl.foreign_credit IS NOT NULL)
-                       AND ${journalEntries.transactionCurrency} IS NULL))`,
+          or(
+            ne(journalEntries.currency, companies.baseCurrency),
+            eq(journalEntries.transactionCurrency, companies.baseCurrency),
+            // Foreign amounts on the lines without a transaction currency on the header. The
+            // subquery walks the partial index on foreign lines rather than probing every entry.
+            and(
+              isNull(journalEntries.transactionCurrency),
+              inArray(
+                journalEntries.id,
+                this.db
+                  .select({ id: journalLines.journalEntryId })
+                  .from(journalLines)
+                  .where(
+                    and(
+                      eq(journalLines.companyId, companyId),
+                      or(
+                        isNotNull(journalLines.foreignDebit),
+                        isNotNull(journalLines.foreignCredit),
+                      ),
+                    ),
+                  ),
+              ),
+            ),
+          ),
         ),
       )
       .limit(20);
@@ -425,35 +445,56 @@ export class IntegrityService {
     const rules = await this.dimensionRules.activeRules(companyId);
     if (rules.length === 0)
       return finding('DIMENSION_RULE', 'WARNING', 'Posted lines satisfy dimension rules', []);
-    const rows = await this.db
-      .select({
-        lineId: journalLines.id,
-        documentNumber: journalEntries.documentNumber,
-        accountId: journalLines.accountId,
-        code: accounts.code,
-        type: accounts.type,
-        departmentId: journalLines.departmentId,
-        costCenterId: journalLines.costCenterId,
-        projectId: journalLines.projectId,
-      })
-      .from(journalLines)
-      .innerJoin(journalEntries, eq(journalEntries.id, journalLines.journalEntryId))
-      .innerJoin(accounts, eq(accounts.id, journalLines.accountId))
-      .where(
-        and(
-          eq(journalLines.companyId, companyId),
-          inArray(journalEntries.status, [...LEDGER_STATUSES]),
+    const chart = await this.db
+      .select({ id: accounts.id, code: accounts.code, type: accounts.type })
+      .from(accounts)
+      .where(eq(accounts.companyId, companyId));
+    const columns = {
+      DEPARTMENT: journalLines.departmentId,
+      COST_CENTER: journalLines.costCenterId,
+      PROJECT: journalLines.projectId,
+    } as const;
+    const covered = new Map<DimensionType, Set<string>>();
+    for (const rule of rules)
+      for (const account of chart)
+        if (ruleApplies(rule, account)) {
+          if (!covered.has(rule.dimensionType)) covered.set(rule.dimensionType, new Set());
+          covered.get(rule.dimensionType)!.add(account.id);
+        }
+    const byId = new Map(chart.map((a) => [a.id, a]));
+    const checks = [...covered.entries()].map(([dimensionType, ids]) =>
+      this.db
+        .select({
+          documentNumber: journalEntries.documentNumber,
+          accountId: journalLines.accountId,
+        })
+        .from(journalLines)
+        .innerJoin(journalEntries, eq(journalEntries.id, journalLines.journalEntryId))
+        .where(
+          and(
+            eq(journalLines.companyId, companyId),
+            inArray(journalLines.accountId, [...ids]),
+            isNull(columns[dimensionType]),
+            inArray(journalEntries.status, [...LEDGER_STATUSES]),
+          ),
+        )
+        .limit(20)
+        .then((rows) =>
+          rows.map((r) => {
+            const account = byId.get(r.accountId)!;
+            const rule = rules.find(
+              (x) => x.dimensionType === dimensionType && ruleApplies(x, account),
+            )!;
+            return {
+              documentNumber: r.documentNumber,
+              accountCode: account.code,
+              rule: rule.name,
+              dimensionType,
+            };
+          }),
         ),
-      );
-    const accountsById = new Map(
-      rows.map((r) => [r.accountId, { id: r.accountId, code: r.code, type: r.type }]),
     );
-    const violations = findDimensionRuleViolations(rules, rows, accountsById).map((v) => ({
-      documentNumber: rows[v.line - 1]?.documentNumber,
-      accountCode: v.accountCode,
-      rule: v.ruleName,
-      dimensionType: v.dimensionType,
-    }));
+    const violations = (await Promise.all(checks)).flat();
     return finding('DIMENSION_RULE', 'WARNING', 'Posted lines satisfy dimension rules', violations);
   }
 

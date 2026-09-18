@@ -326,6 +326,36 @@ describe('Accounting core (e2e)', () => {
     expect(is.body.expenses.total).toBe('125950.5000'); // seed 124,700 + 1,250.50 posted above
     expect(is.body.netIncome).toBe('1146049.5000');
     expect(bs.body.currentEarnings).toBe(is.body.netIncome);
+
+    // The monthly trend is one ledger read; each month ties to the full statement of that month.
+    const trend = await as(
+      admin,
+      http().get('/api/v1/reports/income-statement/trend?to=2026-04-15&months=4'),
+    ).expect(200);
+    expect(trend.body.months).toHaveLength(4);
+    expect(trend.body.months.map((m: { from: string; to: string }) => [m.from, m.to])).toEqual([
+      ['2026-01-01', '2026-01-31'],
+      ['2026-02-01', '2026-02-28'],
+      ['2026-03-01', '2026-03-31'],
+      ['2026-04-01', '2026-04-15'],
+    ]);
+    const march = await as(
+      admin,
+      http().get('/api/v1/reports/income-statement?from=2026-03-01&to=2026-03-31'),
+    ).expect(200);
+    const point = trend.body.months[2];
+    expect(point.revenue).toBe(march.body.revenue.total);
+    expect(point.expenses).toBe(march.body.expenses.total);
+    expect(point.netIncome).toBe(march.body.netIncome);
+    const summed = trend.body.months.reduce(
+      (acc: number, m: { revenue: string }) => acc + Number(m.revenue),
+      0,
+    );
+    const toApril15 = await as(
+      admin,
+      http().get('/api/v1/reports/income-statement?from=2026-01-01&to=2026-04-15'),
+    ).expect(200);
+    expect(summed.toFixed(4)).toBe(Number(toApril15.body.revenue.total).toFixed(4));
   });
 
   it('general ledger shows running balances and drills to journal entries', async () => {

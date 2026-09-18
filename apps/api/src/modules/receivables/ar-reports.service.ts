@@ -529,7 +529,7 @@ export class ArReportsService {
       .add(fxAdjustment)
       .subtract(writeOffTotal);
 
-    const activity = await this.ledger.activity({ companyId, to: asOf });
+    const activity = await this.ledger.activity({ companyId, to: asOf, accountIds: [control.id] });
     const row = activity.find((a) => a.accountId === control.id);
     const ledgerBalance = signedBalance(
       Money.of(row?.debit ?? '0', currency).subtract(Money.of(row?.credit ?? '0', currency)),

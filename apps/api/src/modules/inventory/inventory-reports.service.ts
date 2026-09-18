@@ -240,7 +240,11 @@ export class InventoryReportsService {
     const result: ValuationReport['accounts'] = [];
     let totalSub = Money.zero(currency);
     let totalLedger = Money.zero(currency);
-    const activity = await this.ledger.activity({ companyId, to: query.asOf });
+    const activity = await this.ledger.activity({
+      companyId,
+      to: query.asOf,
+      accountIds: accountRows.map((a) => a.id),
+    });
     for (const account of accountRows) {
       const sub = Money.of(rows.find((r) => r.accountId === account.id)?.value ?? '0', currency);
       const row = activity.find((a) => a.accountId === account.id);

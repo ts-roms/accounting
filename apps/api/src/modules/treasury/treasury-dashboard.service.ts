@@ -224,6 +224,7 @@ export class TreasuryDashboardService {
       join journal_entries je on je.id = jl.journal_entry_id
       join bank_accounts ba on ba.gl_account_id = jl.account_id and ba.company_id = je.company_id
       where je.company_id = ${companyId}
+        and jl.company_id = ${companyId}
         and je.status = 'POSTED'
         and je.entry_date > ${from}
         and je.entry_date <= ${asOf}

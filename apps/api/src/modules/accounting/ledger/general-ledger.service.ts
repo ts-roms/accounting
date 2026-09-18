@@ -44,6 +44,11 @@ export interface AccountActivity {
   credit: string;
 }
 
+export interface MonthlyAccountActivity extends AccountActivity {
+  /** First day of the month (ISO date). */
+  month: string;
+}
+
 export interface BalanceFilter {
   companyId: string;
   /** Inclusive lower bound (omit for all history). */
@@ -55,6 +60,12 @@ export interface BalanceFilter {
   costCenterId?: string | null;
   projectId?: string | null;
   accountTypes?: readonly AccountType[];
+  /**
+   * Restrict to these accounts. Callers that need one control or bank balance
+   * must pass it: the ledger then reads that account's lines through the
+   * (company, account) index instead of aggregating the whole company.
+   */
+  accountIds?: readonly string[];
   /** Leave out engine journals (e.g. year-end CLOSING for the cash-flow statement). */
   excludeJournalTypes?: readonly JournalType[];
 }
@@ -85,23 +96,35 @@ export function dimensionConditions(filter: {
 export class GeneralLedgerService {
   constructor(@Inject(DRIZZLE) private readonly db: Database) {}
 
-  /** Debit/credit totals per account for the filter window, from posted lines only. */
-  async activity(
-    filter: BalanceFilter,
-    executor: DbExecutor = this.db,
-  ): Promise<AccountActivity[]> {
+  /** WHERE clauses shared by every aggregate read; `null` when the filter can match nothing. */
+  private conditions(filter: BalanceFilter): SQL[] | null {
     const conditions: SQL[] = [
       eq(journalEntries.companyId, filter.companyId),
+      // Repeated on the line side so the (company, account) index applies.
+      eq(journalLines.companyId, filter.companyId),
       inArray(journalEntries.status, [...LEDGER_STATUSES]),
       lte(journalEntries.entryDate, filter.to),
     ];
     if (filter.from) conditions.push(gte(journalEntries.entryDate, filter.from));
+    if (filter.accountIds) {
+      if (filter.accountIds.length === 0) return null;
+      conditions.push(inArray(journalLines.accountId, [...filter.accountIds]));
+    }
     if (filter.branchId) conditions.push(eq(journalLines.branchId, filter.branchId));
     conditions.push(...dimensionConditions(filter));
     if (filter.accountTypes) conditions.push(inArray(accounts.type, [...filter.accountTypes]));
     if (filter.excludeJournalTypes?.length)
       conditions.push(notInArray(journalEntries.journalType, [...filter.excludeJournalTypes]));
+    return conditions;
+  }
 
+  /** Debit/credit totals per account for the filter window, from posted lines only. */
+  async activity(
+    filter: BalanceFilter,
+    executor: DbExecutor = this.db,
+  ): Promise<AccountActivity[]> {
+    const conditions = this.conditions(filter);
+    if (!conditions) return [];
     const rows = await executor
       .select({
         accountId: journalLines.accountId,
@@ -113,6 +136,32 @@ export class GeneralLedgerService {
       .innerJoin(accounts, eq(accounts.id, journalLines.accountId))
       .where(and(...conditions))
       .groupBy(journalLines.accountId);
+    return rows;
+  }
+
+  /**
+   * `activity()` split by calendar month of the entry date: one query for a
+   * trend chart instead of one report per month.
+   */
+  async activityByMonth(
+    filter: BalanceFilter,
+    executor: DbExecutor = this.db,
+  ): Promise<MonthlyAccountActivity[]> {
+    const conditions = this.conditions(filter);
+    if (!conditions) return [];
+    const month = sql<string>`to_char(date_trunc('month', ${journalEntries.entryDate}), 'YYYY-MM-DD')`;
+    const rows = await executor
+      .select({
+        month,
+        accountId: journalLines.accountId,
+        debit: sql<string>`coalesce(sum(${journalLines.debit}), 0)`,
+        credit: sql<string>`coalesce(sum(${journalLines.credit}), 0)`,
+      })
+      .from(journalLines)
+      .innerJoin(journalEntries, eq(journalEntries.id, journalLines.journalEntryId))
+      .innerJoin(accounts, eq(accounts.id, journalLines.accountId))
+      .where(and(...conditions))
+      .groupBy(month, journalLines.accountId);
     return rows;
   }
 
@@ -133,6 +182,7 @@ export class GeneralLedgerService {
 
     const base: SQL[] = [
       eq(journalEntries.companyId, companyId),
+      eq(journalLines.companyId, companyId),
       eq(journalLines.accountId, account.id),
       inArray(journalEntries.status, [...LEDGER_STATUSES]),
     ];
