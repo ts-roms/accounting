@@ -24,6 +24,7 @@ import {
   StatusBadge,
 } from '@accounting/ui';
 import { useSession } from '@/lib/auth/session';
+import { PendingApprovalsCard } from '@/components/enterprise/pending-approvals-card';
 import { useAuditLogs, useCompanies, useRoles, useUsers } from '@/lib/api/hooks';
 import {
   useBalanceSheet,
@@ -254,6 +255,8 @@ export default function DashboardPage() {
           />
         </div>
       ) : null}
+
+      <PendingApprovalsCard />
 
       <div className="grid gap-4 lg:grid-cols-3">
         <FinancialHealth className="lg:col-span-1" />

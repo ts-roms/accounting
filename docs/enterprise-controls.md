@@ -63,6 +63,37 @@ contract is the same everywhere: the submitting action calls
 `ApprovalsService.open`, the approving / releasing action calls
 `assertApproved`, and voiding or cancelling calls `cancelFor`.
 
+### Approval matrix
+
+Who may decide a step is part of the workflow, not only _what permission_ they
+hold. Each step carries two optional lists, `approverUserIds` and
+`approverRoleIds`: when either is non-empty the step is reserved for those
+users and the holders of those roles (in the company or organization-wide),
+who must still hold the step's `requiredPermission`; empty lists keep the
+previous behaviour (anyone with the permission). Named ids are validated
+against the company's organization on create / update. Eligibility is applied
+in one place - `namedApproverAdmits` inside `ApprovalsService.decide` and
+`enrich` - so `GET /approvals?mine=true`, `canDecide` and the decision
+itself agree; delegated permissions do not bypass named approvers, escalation
+(overdue + `escalationPermission`) does.
+
+`GET /approval-workflows/matrix` renders the configuration as a matrix: every
+document type, its amount bands in matching order, and per step the resolved
+approvers (`{ kind: USER | ROLE, id, name }`). `GET
+/approval-workflows/approver-options` (`workflow.manage`) lists the users and
+roles an editor may name. The web page `/admin/workflows` opens on the matrix
+(bands per document type, "anyone with <permission>" when a step names
+nobody) with the list view behind a tab; the workflow dialog edits named
+approvers per step.
+
+Opening a request now notifies the approvers of its first step
+(`APPROVAL_REQUIRED`, link `/admin/approvals`): the named users plus the
+holders of the named roles, or everyone with the step permission when the step
+names nobody; completing a step notifies the next step's approvers the same
+way. The dashboard shows a **Pending your approval** card (the caller's
+`mine=true` inbox, five newest, overdue flagged) with approve / reject in
+place through the same dialog as the inbox.
+
 Delegation of approval authority is being built separately (delegations module)
 and is not part of this phase.
 

@@ -236,6 +236,13 @@ export interface WorkflowStep {
   name: string;
   requiredPermission: string;
   minApprovers: number;
+  /**
+   * Approval matrix: when either list is non-empty, only these users or
+   * holders of these roles may decide the step (they still need the permission).
+   * Empty = anyone holding the permission.
+   */
+  approverUserIds?: string[];
+  approverRoleIds?: string[];
 }
 
 /** Configurable multi-step approval chains, matched by document type and amount band. */

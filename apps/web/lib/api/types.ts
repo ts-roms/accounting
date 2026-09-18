@@ -1799,6 +1799,39 @@ export interface WorkflowStep {
   name: string;
   requiredPermission: string;
   minApprovers: number;
+  /** Approval matrix: named users / roles that may decide the step (empty = anyone with the permission). */
+  approverUserIds?: string[];
+  approverRoleIds?: string[];
+}
+
+export interface MatrixApprover {
+  kind: 'USER' | 'ROLE';
+  id: string;
+  name: string;
+}
+
+export interface MatrixWorkflow {
+  id: string;
+  name: string;
+  minAmount: string;
+  maxAmount: string | null;
+  priority: number;
+  branchId: string | null;
+  status: EntityStatus;
+  deadlineHours: number | null;
+  escalationPermission: string | null;
+  openRequests: number;
+  steps: Array<WorkflowStep & { approvers: MatrixApprover[] }>;
+}
+
+export interface MatrixRow {
+  documentType: WorkflowDocumentType;
+  workflows: MatrixWorkflow[];
+}
+
+export interface ApproverOptions {
+  users: Array<{ id: string; name: string; email: string }>;
+  roles: Array<{ id: string; key: string; name: string }>;
 }
 
 export interface ApprovalWorkflow {

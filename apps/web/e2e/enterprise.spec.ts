@@ -58,7 +58,16 @@ test.describe('enterprise: FX, intercompany, workflows, attachments', () => {
     await page.getByTestId('wf-name').fill(`Large journals ${stamp}`);
     await page.getByTestId('wf-min').fill('50000');
     await page.getByTestId('wf-step-name').first().fill('Finance review');
+    // Approval matrix: reserve the step for the finance manager role.
+    await page.getByTestId('wf-step-approvers').first().click();
+    await page.getByTestId('wf-approver-role').filter({ hasText: 'Finance Manager' }).click();
+    await page.keyboard.press('Escape');
     await page.getByTestId('wf-save').click();
+    // The matrix shows the band under Journal Entry with the named role.
+    const band = page.getByTestId('matrix-band').filter({ hasText: `Large journals ${stamp}` });
+    await expect(band).toBeVisible();
+    await expect(band.getByTestId('matrix-approver')).toContainText('Finance Manager');
+    await page.getByTestId('workflows-view-list').click();
     await expect(
       page.getByTestId('workflow-row').filter({ hasText: `Large journals ${stamp}` }),
     ).toBeVisible();
@@ -78,18 +87,21 @@ test.describe('enterprise: FX, intercompany, workflows, attachments', () => {
     await page.getByRole('button', { name: 'Save draft' }).click();
     await expect(page).toHaveURL(/\/accounting\/journal-entries\/[0-9a-f-]+$/);
     const url = page.url();
+    const documentNumber = (await page.locator('h1 .font-mono').first().textContent())!.trim();
     await page.getByRole('button', { name: 'Submit for approval' }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Submit for approval' }).click();
     await expect(page.getByText('SUBMITTED', { exact: true })).toBeVisible();
 
-    // Finance decides from the inbox, then approves the journal.
+    // Finance (named through the role) decides from the dashboard card, then approves the journal.
     await login(page, FINANCE);
-    await page.goto('/admin/approvals');
-    await page.getByTestId('approvals-mine').click();
-    await page
-      .getByRole('row')
-      .filter({ hasText: `Large journals ${stamp}` })
+    await page.goto('/dashboard');
+    const card = page.getByTestId('pending-approvals-card');
+    await expect(card).toBeVisible();
+    await card
+      .getByTestId('pending-approval-row')
+      .filter({ hasText: documentNumber })
       .first()
+      .getByTestId('pending-approval-decide')
       .click();
     await page.getByTestId('approval-approve').click();
     await expect(page.getByRole('dialog')).toContainText('Approved');
@@ -101,6 +113,7 @@ test.describe('enterprise: FX, intercompany, workflows, attachments', () => {
     // Deactivate the workflow so other suites are not gated.
     await login(page);
     await page.goto('/admin/workflows');
+    await page.getByTestId('workflows-view-list').click();
     await page
       .getByTestId('workflow-row')
       .filter({ hasText: `Large journals ${stamp}` })

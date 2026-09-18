@@ -554,6 +554,123 @@ describe('Enterprise: multi-currency, intercompany, workflows, attachments (e2e)
     await as(http().post(`/api/v1/journal-entries/${je.body.id}/approve`), finance).expect(201);
   });
 
+  it('the approval matrix names who decides a step: named users and roles gate the decision and get notified', async () => {
+    const accountant = await login({ email: 'accountant@acme.local', password: 'P@ssw0rd123' });
+    const { rows: people } = await pool.query<{ id: string; email: string }>(
+      `select id, email from users where email in ('admin@acme.local', 'finance@acme.local')`,
+    );
+    const adminId = people.find((u) => u.email === 'admin@acme.local')!.id;
+    const financeId = people.find((u) => u.email === 'finance@acme.local')!.id;
+    const { rows: roleRows } = await pool.query<{ id: string }>(
+      `select id from roles where key = 'FINANCE_MANAGER' limit 1`,
+    );
+    const financeRoleId = roleRows[0]!.id;
+
+    // Editors pick approvers from the organization's users and roles.
+    const options = await as(http().get('/api/v1/approval-workflows/approver-options')).expect(200);
+    expect(options.body.users.map((u: { email: string }) => u.email)).toEqual(
+      expect.arrayContaining(['admin@acme.local', 'finance@acme.local']),
+    );
+    expect(options.body.roles.map((r: { id: string }) => r.id)).toContain(financeRoleId);
+    const foreign = await as(http().post('/api/v1/approval-workflows'))
+      .send({
+        documentType: 'JOURNAL_ENTRY',
+        name: 'Bad approver',
+        minAmount: '70000',
+        steps: [
+          {
+            name: 'Nobody',
+            requiredPermission: 'journal.approve',
+            approverUserIds: ['00000000-0000-4000-8000-000000000000'],
+          },
+        ],
+      })
+      .expect(422);
+    expect(foreign.body.code).toBe('VALIDATION_FAILED');
+
+    // Step 1 is reserved for the admin user, step 2 for holders of the finance role.
+    const workflow = await as(http().post('/api/v1/approval-workflows'))
+      .send({
+        documentType: 'JOURNAL_ENTRY',
+        name: 'Named approvers',
+        minAmount: '70000',
+        steps: [
+          { name: 'CFO', requiredPermission: 'journal.approve', approverUserIds: [adminId] },
+          {
+            name: 'Finance role',
+            requiredPermission: 'journal.approve',
+            approverRoleIds: [financeRoleId],
+          },
+        ],
+      })
+      .expect(201);
+    const matrix = await as(http().get('/api/v1/approval-workflows/matrix'), finance).expect(200);
+    const row = matrix.body.find(
+      (r: { documentType: string }) => r.documentType === 'JOURNAL_ENTRY',
+    );
+    const band = row.workflows.find((w: { id: string }) => w.id === workflow.body.id);
+    expect(band.steps[0].approvers).toEqual([
+      { kind: 'USER', id: adminId, name: expect.any(String) },
+    ]);
+    expect(band.steps[1].approvers).toEqual([
+      { kind: 'ROLE', id: financeRoleId, name: expect.any(String) },
+    ]);
+    expect(matrix.body.map((r: { documentType: string }) => r.documentType)).toContain('VENDOR');
+
+    const je = await as(http().post('/api/v1/journal-entries'), accountant)
+      .send({
+        entryDate: '2026-09-11',
+        description: 'Matrix-gated accrual',
+        lines: [
+          { accountId: acc['6400'], debit: '80000' },
+          { accountId: acc['2120'], credit: '80000' },
+        ],
+      })
+      .expect(201);
+    await as(http().post(`/api/v1/journal-entries/${je.body.id}/submit`), accountant).expect(201);
+    const pending = await as(
+      http().get('/api/v1/approvals?documentType=JOURNAL_ENTRY&status=PENDING'),
+    ).expect(200);
+    const request = pending.body.items.find(
+      (r: { documentId: string }) => r.documentId === je.body.id,
+    );
+    expect(request.workflowId).toBe(workflow.body.id);
+    // Opening the request notified the named approver of step 1 - and only them.
+    const { rows: notified } = await pool.query<{ user_id: string }>(
+      `select user_id from notifications where event_type = 'APPROVAL_REQUIRED' and entity_id = $1`,
+      [request.id],
+    );
+    expect(notified.map((n) => n.user_id)).toEqual([adminId]);
+
+    // Finance holds journal.approve but is not named on step 1: not in the inbox, cannot decide.
+    const financeInbox = await as(http().get('/api/v1/approvals?mine=true'), finance).expect(200);
+    expect(financeInbox.body.items.map((r: { id: string }) => r.id)).not.toContain(request.id);
+    const refused = await as(http().post(`/api/v1/approvals/${request.id}/decide`), finance)
+      .send({ decision: 'APPROVE' })
+      .expect(422);
+    expect(refused.body.code).toBe('APPROVAL_NOT_ELIGIBLE');
+    const adminInbox = await as(http().get('/api/v1/approvals?mine=true')).expect(200);
+    expect(adminInbox.body.items.map((r: { id: string }) => r.id)).toContain(request.id);
+    const step1 = await as(http().post(`/api/v1/approvals/${request.id}/decide`))
+      .send({ decision: 'APPROVE' })
+      .expect(201);
+    expect(step1.body.currentStep).toBe(1);
+    // Step 2 is open to the finance role: its holders were notified and finance may decide.
+    const { rows: notified2 } = await pool.query<{ user_id: string }>(
+      `select user_id from notifications where event_type = 'APPROVAL_REQUIRED' and entity_id = $1 and user_id = $2`,
+      [request.id, financeId],
+    );
+    expect(notified2).toHaveLength(1);
+    const done = await as(http().post(`/api/v1/approvals/${request.id}/decide`), finance)
+      .send({ decision: 'APPROVE' })
+      .expect(201);
+    expect(done.body.status).toBe('APPROVED');
+    await as(http().post(`/api/v1/journal-entries/${je.body.id}/approve`), finance).expect(201);
+    await as(http().patch(`/api/v1/approval-workflows/${workflow.body.id}`))
+      .send({ status: 'INACTIVE' })
+      .expect(200);
+  });
+
   // -------------------------------------------------------------- attachments
 
   it('attachments upload, list, download with checksum and delete; unsafe files are refused', async () => {

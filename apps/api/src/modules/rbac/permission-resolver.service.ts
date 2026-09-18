@@ -6,6 +6,8 @@ import { permissions, rolePermissions, roles, userRoles } from '@/database/schem
 export interface ResolvedAccess {
   permissions: Set<string>;
   roleKeys: string[];
+  /** Ids of the roles behind the permissions (approval matrix eligibility). */
+  roleIds: string[];
 }
 
 /**
@@ -41,11 +43,13 @@ export class PermissionResolverService {
 
     const permissionSet = new Set<string>();
     const roleKeys = new Set<string>();
+    const roleIds = new Set<string>();
     for (const row of rows) {
       roleKeys.add(row.roleKey);
+      roleIds.add(row.roleId);
       if (row.permissionKey) permissionSet.add(row.permissionKey);
     }
-    return { permissions: permissionSet, roleKeys: [...roleKeys].sort() };
+    return { permissions: permissionSet, roleKeys: [...roleKeys].sort(), roleIds: [...roleIds] };
   }
 
   /** Permissions granted by a set of roles (used by SoD checks before assignment). */
