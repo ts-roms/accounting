@@ -21,6 +21,8 @@ import {
   type Integration,
 } from '@/database/schema';
 import { AuditService } from '@/modules/audit/audit.service';
+import { PermissionResolverService } from '@/modules/rbac/permission-resolver.service';
+import { grantableScopes } from '../api-keys/api-key.logic';
 import { IntegrationLogsService } from '../logs/integration-logs.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import type {
@@ -64,9 +66,33 @@ export class IntegrationsService {
     private readonly logs: IntegrationLogsService,
     private readonly notifications: NotificationsService,
     private readonly config: AppConfigService,
+    private readonly resolver: PermissionResolverService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(IntegrationsService.name);
+  }
+
+  /**
+   * Rule (shared with API keys): an integration cannot carry authority the person
+   * granting its scopes does not hold. Sync jobs and inbound webhooks act as the
+   * integration's creator intersected with its scopes, so without this check any
+   * `integration.manage` holder could widen an integration created by a more
+   * privileged user into a posting principal acting as that user.
+   */
+  private async assertGrantable(
+    actor: AuthenticatedUser,
+    scopes: readonly string[],
+    companyId: string | null,
+  ): Promise<void> {
+    if (scopes.length === 0) return;
+    const access = await this.resolver.resolve(actor.id, companyId ?? undefined);
+    const { denied } = grantableScopes(scopes, access.permissions);
+    if (denied.length > 0)
+      throw new BusinessRuleError(
+        ErrorCodes.SCOPE_NOT_GRANTABLE,
+        'You can only grant scopes covered by your own permissions.',
+        { denied },
+      );
   }
 
   providers(): Array<Omit<ConnectorDescriptor, 'configSchema'> & { configFields: string[] }> {
@@ -152,6 +178,7 @@ export class IntegrationsService {
         ErrorCodes.COMPANY_NOT_ACCESSIBLE,
         'Company must match the active company.',
       );
+    await this.assertGrantable(actor, input.scopes, input.companyId ?? actor.companyId ?? null);
     const id = await this.db.transaction(async (tx) => {
       const [existing] = await tx
         .select({ id: integrations.id })
@@ -221,6 +248,10 @@ export class IntegrationsService {
     id: string,
     input: UpdateIntegrationInput,
   ): Promise<IntegrationView> {
+    if (input.scopes) {
+      const existing = await this.getRow(actor.organizationId, id);
+      await this.assertGrantable(actor, input.scopes, existing.companyId);
+    }
     await this.db.transaction(async (tx) => {
       const existing = await this.getRow(actor.organizationId, id, tx);
       const connector = this.registry.get(existing.provider);

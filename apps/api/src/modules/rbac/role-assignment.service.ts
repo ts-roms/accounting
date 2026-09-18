@@ -1,9 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
+import { P } from '@accounting/types';
 import type { AssignUserRoleInput } from '@accounting/validation';
+import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { AuditService } from '@/modules/audit/audit.service';
 import { AuthorizationCacheService } from '@/modules/rbac/authorization-cache.service';
-import { BusinessRuleError, NotFoundError } from '@/common/errors/app-error';
+import { BusinessRuleError, ForbiddenError, NotFoundError } from '@/common/errors/app-error';
 import { ErrorCodes } from '@/common/errors/error-codes';
 import { isUniqueViolation } from '@/common/utils/pg-errors';
 import { RequestContext } from '@/common/context/request-context';
@@ -60,20 +62,30 @@ export class RoleAssignmentService {
   }
 
   async assign(
+    actor: AuthenticatedUser,
     organizationId: string,
     userId: string,
     input: AssignUserRoleInput,
   ): Promise<AssignmentResult> {
     const result = await this.db.transaction(async (tx) =>
-      this.assignWithin(tx, organizationId, userId, input),
+      this.assignWithin(tx, actor, organizationId, userId, input),
     );
     this.cache.invalidateUser(userId);
     return result;
   }
 
-  /** Same as `assign` but participates in an outer transaction (user creation). */
+  /**
+   * Same as `assign` but participates in an outer transaction (user creation).
+   *
+   * The actor must hold `role.assign` in the scope being granted: an
+   * organization-wide assignment needs the permission organization-wide, a
+   * company-scoped one needs it for that company. The route guard only proves the
+   * actor holds it somewhere (the active company), and user creation is guarded by
+   * `user.create` alone - neither is enough to hand out roles.
+   */
   async assignWithin(
     tx: DbExecutor,
+    actor: AuthenticatedUser,
     organizationId: string,
     userId: string,
     input: AssignUserRoleInput,
@@ -81,6 +93,14 @@ export class RoleAssignmentService {
     await this.assertUserInOrg(organizationId, userId, tx);
     const role = await this.rolesService.getOrThrow(organizationId, input.roleId, tx);
     const companyId = input.companyId ?? null;
+
+    const actorAccess = await this.resolver.resolve(actor.id, companyId ?? undefined, tx);
+    if (!actorAccess.permissions.has(P['role.assign']))
+      throw new ForbiddenError(
+        companyId
+          ? 'You may only assign roles in companies where you hold role.assign.'
+          : 'Organization-wide roles need an organization-wide role.assign.',
+      );
 
     if (companyId) {
       const [company] = await tx

@@ -1713,6 +1713,56 @@ describe('Integration platform (e2e)', () => {
     ).toBe(0);
   });
 
+  it('caps integration scopes by the permissions of whoever grants them (no widening past the editor)', async () => {
+    // A custom role that manages integrations but cannot post bills.
+    const role = await as(server().post('/api/v1/roles'))
+      .send({
+        key: 'INTEGRATOR',
+        name: 'Integrator',
+        permissions: ['integration.view', 'integration.manage', 'vendor.view', 'bill.view'],
+      })
+      .expect(201);
+    await as(server().post('/api/v1/users'))
+      .send({
+        email: 'integrator@acme.local',
+        firstName: 'Inte',
+        lastName: 'Grator',
+        password: 'Integrate!1',
+        roleIds: [role.body.id],
+      })
+      .expect(201);
+    const integrator = await login({ email: 'integrator@acme.local', password: 'Integrate!1' });
+
+    // The portal (created by the admin, who may post) cannot be widened to bills:post by the integrator...
+    const denied = await as(server().patch(`/api/v1/integrations/${portalId}`), integrator)
+      .send({ scopes: ['vendors:write', 'bills:write', 'bills:post'] })
+      .expect(422);
+    expect(denied.body.code).toBe('SCOPE_NOT_GRANTABLE');
+    expect(denied.body.details.denied.map((d: { scope: string }) => d.scope)).toEqual([
+      'vendors:write',
+      'bills:write',
+      'bills:post',
+    ]);
+    // ...nor created with scopes they do not hold; scopes within their permissions are fine.
+    const created = await as(server().post('/api/v1/integrations'), integrator)
+      .send({
+        provider: 'DEMO_PROCUREMENT',
+        name: 'Integrator portal',
+        config: {},
+        scopes: ['bills:post'],
+      })
+      .expect(422);
+    expect(created.body.code).toBe('SCOPE_NOT_GRANTABLE');
+    await as(server().patch(`/api/v1/integrations/${portalId}`), integrator)
+      .send({ name: 'Renamed by integrator' })
+      .expect(200);
+    // The existing scopes were untouched by the refused request.
+    const portal = await as(server().get(`/api/v1/integrations/${portalId}`)).expect(200);
+    expect(portal.body.scopes).toEqual(
+      expect.arrayContaining(['vendors:write', 'bills:write', 'bills:post']),
+    );
+  });
+
   it('soft-deletes an integration, wiping credentials while keeping the audit trail', async () => {
     await as(server().delete(`/api/v1/integrations/${gatewayId}`)).expect(204);
     await as(server().get(`/api/v1/integrations/${gatewayId}`)).expect(404);

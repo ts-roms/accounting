@@ -47,6 +47,10 @@ describe('Foundation (e2e)', () => {
 
   const http = () => request(app.getHttpServer());
   const asAdmin = (req: request.Test) => req.set('Cookie', adminCookies).set(CSRF);
+  const login = async (who: { email: string; password: string }): Promise<string[]> => {
+    const res = await http().post('/api/v1/auth/login').send(who).expect(200);
+    return (res.headers['set-cookie'] as unknown as string[]).map((c) => c.split(';')[0]!);
+  };
 
   it('rejects unauthenticated access with the standard error envelope', async () => {
     const res = await http().get('/api/v1/auth/me').expect(401);
@@ -76,6 +80,101 @@ describe('Foundation (e2e)', () => {
       .send({})
       .expect(403);
     expect(res.body.code).toBe('CSRF_HEADER_MISSING');
+  });
+
+  it('rejects a cross-site form post to the sign-in route (login CSRF) but accepts JSON', async () => {
+    // A top-level <form> can only send urlencoded / multipart bodies and carries no custom header.
+    const forged = await http()
+      .post('/api/v1/auth/login')
+      .type('form')
+      .send({ email: ADMIN.email, password: ADMIN.password })
+      .expect(403);
+    expect(forged.body.code).toBe('CSRF_HEADER_MISSING');
+    // Script-initiated JSON (what the web client and API clients send) still signs in.
+    await http()
+      .post('/api/v1/auth/login')
+      .send({ email: ADMIN.email, password: ADMIN.password })
+      .expect(200);
+  });
+
+  it('bounds role assignment by the assigner: user.create alone cannot hand out roles, and a company-scoped role.assign stays in its company', async () => {
+    const roles = await asAdmin(http().get('/api/v1/roles')).expect(200);
+    const roleId = (key: string) => roles.body.find((r: { key: string }) => r.key === key).id;
+    const companies = await asAdmin(http().get('/api/v1/companies')).expect(200);
+    const [companyA, companyB] = companies.body as Array<{ id: string }>;
+
+    // An "onboarding" role: may create users, may not assign roles.
+    const onboarding = await asAdmin(http().post('/api/v1/roles'))
+      .send({
+        key: 'ONBOARDING',
+        name: 'Onboarding',
+        permissions: ['user.create', 'user.view', 'role.view'],
+      })
+      .expect(201);
+    await asAdmin(http().post('/api/v1/users'))
+      .send({
+        email: 'onboarder@acme.local',
+        firstName: 'On',
+        lastName: 'Boarder',
+        password: 'Onboard!Pass1',
+        roleIds: [onboarding.body.id],
+      })
+      .expect(201);
+    const onboarder = await login({ email: 'onboarder@acme.local', password: 'Onboard!Pass1' });
+    const asOnboarder = (req: request.Test) => req.set('Cookie', onboarder).set(CSRF);
+    const escalated = await asOnboarder(http().post('/api/v1/users'))
+      .send({
+        email: 'shadow.admin@acme.local',
+        firstName: 'Shadow',
+        lastName: 'Admin',
+        password: 'Shadow!Pass1',
+        roleIds: [roleId('SUPER_ADMIN')],
+      })
+      .expect(403);
+    expect(escalated.body.code).toBe('FORBIDDEN');
+    expect(
+      (await asAdmin(http().get('/api/v1/users?search=shadow.admin@')).expect(200)).body.items,
+    ).toHaveLength(0);
+    // Creating a user without roles is still within user.create.
+    await asOnboarder(http().post('/api/v1/users'))
+      .send({
+        email: 'plain@acme.local',
+        firstName: 'Plain',
+        lastName: 'User',
+        password: 'Plain!Pass1',
+      })
+      .expect(201);
+
+    // A company-scoped ACCOUNTING_ADMIN holds role.assign only inside that company.
+    const scopedAdmin = await asAdmin(http().post('/api/v1/users'))
+      .send({
+        email: 'scoped.admin@acme.local',
+        firstName: 'Scoped',
+        lastName: 'Admin',
+        password: 'Scoped!Pass1',
+      })
+      .expect(201);
+    await asAdmin(http().post(`/api/v1/users/${scopedAdmin.body.id}/roles`))
+      .send({ roleId: roleId('ACCOUNTING_ADMIN'), companyId: companyA!.id })
+      .expect(201);
+    const scoped = await login({ email: 'scoped.admin@acme.local', password: 'Scoped!Pass1' });
+    const asScoped = (req: request.Test) =>
+      req.set('Cookie', scoped).set(CSRF).set('x-company-id', companyA!.id);
+    // Organization-wide grant (no companyId) from a company-scoped grant: refused.
+    await asScoped(http().post(`/api/v1/users/${scopedAdmin.body.id}/roles`))
+      .send({ roleId: roleId('SUPER_ADMIN') })
+      .expect(403);
+    // Grant in another company: refused.
+    await asScoped(http().post(`/api/v1/users/${scopedAdmin.body.id}/roles`))
+      .send({ roleId: roleId('ACCOUNTANT'), companyId: companyB!.id })
+      .expect(403);
+    // Grant inside the administered company: allowed.
+    await asScoped(http().post(`/api/v1/users/${scopedAdmin.body.id}/roles`))
+      .send({ roleId: roleId('ACCOUNTANT'), companyId: companyA!.id })
+      .expect(201);
+    // Outside the active company the scoped grant confers nothing.
+    const me = await http().get('/api/v1/auth/me').set('Cookie', scoped).expect(200);
+    expect(me.body.permissions).not.toContain('role.assign');
   });
 
   it('validates input with Zod and reports issues', async () => {
