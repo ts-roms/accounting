@@ -9,16 +9,16 @@ import {
   STATEMENT_LINE_STATUSES,
   MATCH_CONFIDENCES,
 } from '@accounting/types';
-import { amountSchema, isoDateSchema, signedAmountSchema } from './accounting';
-import { exchangeRateValueSchema } from './enterprise';
+import { amountSchema, isoDateSchema, signedAmountSchema } from './accounting.js';
+import { exchangeRateValueSchema } from './enterprise.js';
 import {
   codeSchema,
   nameSchema,
   optionalText,
   paginationQuerySchema,
   uuidSchema,
-} from './primitives';
-import { percentSchema } from './subledger';
+} from './primitives.js';
+import { percentSchema } from './subledger.js';
 
 // -------------------------------------------------------------- fixed assets
 

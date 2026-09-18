@@ -20,7 +20,7 @@ import {
   WRITE_OFF_REASONS,
   WRITE_OFF_STATUSES,
 } from '@accounting/types';
-import { amountSchema, isoDateSchema } from './accounting';
+import { amountSchema, isoDateSchema } from './accounting.js';
 import {
   addressSchema,
   codeSchema,
@@ -30,8 +30,8 @@ import {
   paginationQuerySchema,
   queryBooleanSchema,
   uuidSchema,
-} from './primitives';
-import { percentSchema, quantitySchema } from './subledger';
+} from './primitives.js';
+import { percentSchema, quantitySchema } from './subledger.js';
 
 // -------------------------------------------------------------- payment terms
 

@@ -11,15 +11,15 @@ import {
   REPORT_ROW_KINDS,
   REPORT_SIGNS,
 } from '@accounting/types';
-import { isoDateSchema } from './accounting';
-import { dimensionRefsSchema } from './dimensions';
+import { isoDateSchema } from './accounting.js';
+import { dimensionRefsSchema } from './dimensions.js';
 import {
   codeSchema,
   nameSchema,
   optionalText,
   paginationQuerySchema,
   uuidSchema,
-} from './primitives';
+} from './primitives.js';
 
 // ------------------------------------------------------------ definitions
 

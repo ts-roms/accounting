@@ -5,7 +5,7 @@
  * never a role change: the delegate acts "on behalf of" and every use is
  * recorded.
  */
-import type { PermissionKey } from './permissions';
+import type { PermissionKey } from './permissions.js';
 
 export const DELEGATION_STATUSES = [
   'PENDING',

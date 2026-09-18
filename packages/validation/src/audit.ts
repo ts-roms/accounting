@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { AUDIT_ACTIONS } from '@accounting/types';
-import { paginationQuerySchema, uuidSchema } from './primitives';
+import { paginationQuerySchema, uuidSchema } from './primitives.js';
 
 export const listAuditLogsQuerySchema = paginationQuerySchema.extend({
   action: z.enum(AUDIT_ACTIONS).optional(),

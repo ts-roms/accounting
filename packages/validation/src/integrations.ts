@@ -13,7 +13,7 @@ import {
   WEBHOOK_DELIVERY_STATUSES,
   WEBHOOK_SUBSCRIPTION_STATUSES,
 } from '@accounting/types';
-import { nameSchema, optionalText, paginationQuerySchema, uuidSchema } from './primitives';
+import { nameSchema, optionalText, paginationQuerySchema, uuidSchema } from './primitives.js';
 
 // ----------------------------------------------------------------- registry
 

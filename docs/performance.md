@@ -40,6 +40,48 @@ ledger grows. Every report still derives from posted journal lines (see
 - **Cache authorization, not figures.** `AuthorizationCacheService` caches who
   may do what for a short TTL; ledger figures are never cached.
 
+## Navigation (web)
+
+"Navigation is slow" has two very different causes, so measure the right one.
+`infrastructure/scripts/nav-measure.mjs <base>` (run from `apps/web`; the recipe is: click a real
+sidebar link, then time from the click to the first DOM change inside
+`<main>` and to the last one, with a MutationObserver installed by
+`addInitScript`) against a **production build** (`next build` + `next start`)
+and against `next dev`:
+
+| Hop (click -> page content)  | Production, before | Production, after | Dev (Turbopack), before | Dev, after |
+| ---------------------------- | ------------------ | ----------------- | ----------------------- | ---------- |
+| Revisit (route already seen) | 40-120 ms          | 35-70 ms          | 0.7-3 s                 | 0.1-0.6 s  |
+| First visit of a route       | 60-300 ms          | 30-270 ms         | 0.5-19 s                | 1.1-2.6 s  |
+
+- **Production was never slow**: a hop is the API call plus 30-70 ms of
+  rendering. What people feel in local development is Turbopack compiling each
+  route on first visit (no prefetch in dev) and, before this change, a server
+  round trip for the route shell on _every_ navigation.
+- **Router cache** (`next.config.ts` `experimental.staleTimes: { dynamic: 300 }`):
+  every screen is a client component that fetches its own data with React
+  Query, so the server payload of a route is a static shell. Keeping visited
+  routes in the client router cache makes revisits instant in both modes; data
+  freshness is unaffected (React Query owns it).
+- **Shared packages ship as ESM**: `types`, `validation`, `money` and
+  `config` were CommonJS, which a bundler cannot tree-shake - every page that
+  imported one schema carried the whole 460 kB validation bundle (the login
+  page loaded 331 kB of JS). They now build twice (`dist` CommonJS for the
+  API and Jest, `dist/esm` + `sideEffects: false` for Next through the
+  `import` export condition; relative imports inside the packages carry
+  `.js` extensions so Node can load the ESM build too). First-load JS: login
+  331 -> 247 kB, heaviest routes 447 -> 363 kB; the biggest chunk fell from
+  487 kB to 226 kB (the shell: cmdk / Radix, loaded once).
+- **First load after sign-in** no longer fires company-scoped queries before
+  the active company is chosen (`SessionProvider` keeps the shell skeleton
+  until it is) - previously the first page of a fresh browser got 403s and
+  refetched.
+
+To feel the real thing locally, run the production build:
+`pnpm --filter @accounting/web build && pnpm --filter @accounting/web start`
+(the `.claude/launch.json` entries `api-verify` / `web-verify` do the same on
+3011 / 3021).
+
 ## Period-balance read model
 
 `account_period_balances` is the one derived table beside the ledger. It is

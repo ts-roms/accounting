@@ -7,8 +7,8 @@ import {
   ELIMINATION_RULE_TYPES,
   TRANSLATION_METHODS,
 } from '@accounting/types';
-import { amountSchema, isoDateSchema } from './accounting';
-import { exchangeRateValueSchema } from './enterprise';
+import { amountSchema, isoDateSchema } from './accounting.js';
+import { exchangeRateValueSchema } from './enterprise.js';
 import {
   codeSchema,
   nameSchema,
@@ -17,8 +17,8 @@ import {
   paginationQuerySchema,
   queryBooleanSchema,
   uuidSchema,
-} from './primitives';
-import { percentSchema } from './subledger';
+} from './primitives.js';
+import { percentSchema } from './subledger.js';
 
 const accountCode = z.string().trim().min(1).max(40);
 

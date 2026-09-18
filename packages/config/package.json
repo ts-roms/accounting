@@ -7,12 +7,14 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/index.js",
       "default": "./dist/index.js"
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "build": "node ../tsconfig/esm-marker.mjs && tsc -p tsconfig.build.json && tsc -p tsconfig.esm.json",
+    "dev": "node ../tsconfig/esm-marker.mjs && tsc -b tsconfig.build.json tsconfig.esm.json --watch --preserveWatchOutput",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint src"
   },
@@ -24,5 +26,7 @@
   },
   "files": [
     "dist"
-  ]
+  ],
+  "module": "./dist/esm/index.js",
+  "sideEffects": false
 }

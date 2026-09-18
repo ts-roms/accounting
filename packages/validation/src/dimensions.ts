@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { uuidSchema } from './primitives';
+import { uuidSchema } from './primitives.js';
 
 /** Department / cost center / project references carried by journal and document lines. */
 export const dimensionRefsSchema = z.object({

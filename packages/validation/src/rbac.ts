@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { PERMISSION_KEYS, SOD_ENFORCEMENTS, type PermissionKey } from '@accounting/types';
-import { codeSchema, nameSchema, optionalText, paginationQuerySchema } from './primitives';
+import { codeSchema, nameSchema, optionalText, paginationQuerySchema } from './primitives.js';
 
 const permissionKeySchema = z
   .string()

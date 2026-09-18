@@ -5,9 +5,14 @@ import {
   RETURN_STATUSES,
   RETURN_TYPES,
 } from '@accounting/types';
-import { amountSchema, isoDateSchema } from './accounting';
-import { optionalText, paginationQuerySchema, queryBooleanSchema, uuidSchema } from './primitives';
-import { percentSchema, quantitySchema } from './subledger';
+import { amountSchema, isoDateSchema } from './accounting.js';
+import {
+  optionalText,
+  paginationQuerySchema,
+  queryBooleanSchema,
+  uuidSchema,
+} from './primitives.js';
+import { percentSchema, quantitySchema } from './subledger.js';
 
 // -------------------------------------------------------------------- orders
 
