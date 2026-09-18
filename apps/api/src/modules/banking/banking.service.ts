@@ -48,6 +48,7 @@ import {
   type PostingLine,
 } from '@/modules/accounting/journals/posting.service';
 import { GeneralLedgerService } from '@/modules/accounting/ledger/general-ledger.service';
+import { ExchangeRatesService } from '@/modules/fx/exchange-rates.service';
 import { DocumentNumberingService } from '@/modules/accounting/numbering/document-numbering.service';
 import { AuditService } from '@/modules/audit/audit.service';
 
@@ -56,7 +57,11 @@ const MODULE = 'BANKING';
 export interface BankAccountView extends BankAccount {
   glAccountCode: string;
   glAccountName: string;
+  /** Book balance in the company base currency (the GL account balance). */
   ledgerBalance: string;
+  baseCurrency: string;
+  /** Book balance in the account's own currency; null for base-currency accounts. */
+  foreignBalance: string | null;
   unreconciledCount: number;
   lastStatementDate: string | null;
 }
@@ -80,6 +85,7 @@ export class BankingService {
     private readonly posting: AccountingPostingService,
     private readonly numbering: DocumentNumberingService,
     private readonly ledger: GeneralLedgerService,
+    private readonly rates: ExchangeRatesService,
   ) {}
 
   // ---------------------------------------------------------------- accounts
@@ -88,20 +94,12 @@ export class BankingService {
     const rows = await this.viewQuery(this.db)
       .where(eq(bankAccounts.companyId, companyId))
       .orderBy(asc(bankAccounts.code));
-    const activity = await this.ledger.activity({
+    const balances = await this.balances(
       companyId,
-      to: '9999-12-31',
-      accountIds: rows.map((r) => r.glAccountId),
-    });
-    return rows.map((r) => {
-      const a = activity.find((x) => x.accountId === r.glAccountId);
-      return {
-        ...r,
-        ledgerBalance: Money.of(a?.debit ?? '0', r.currency)
-          .subtract(Money.of(a?.credit ?? '0', r.currency))
-          .toString(),
-      };
-    });
+      rows.map((r) => ({ glAccountId: r.glAccountId, currency: r.currency })),
+      '9999-12-31',
+    );
+    return rows.map((r) => ({ ...r, ...balances.get(r.glAccountId)! }));
   }
 
   async getAccount(companyId: string, id: string): Promise<BankAccountView> {
@@ -109,17 +107,15 @@ export class BankingService {
       and(eq(bankAccounts.id, id), eq(bankAccounts.companyId, companyId)),
     );
     if (!row) throw new NotFoundError('Bank account', id);
-    return {
-      ...row,
-      ledgerBalance: await this.ledgerBalance(
-        companyId,
-        row.glAccountId,
-        row.currency,
-        '9999-12-31',
-      ),
-    };
+    const balances = await this.balances(
+      companyId,
+      [{ glAccountId: row.glAccountId, currency: row.currency }],
+      '9999-12-31',
+    );
+    return { ...row, ...balances.get(row.glAccountId)! };
   }
 
+  /** Base balance of the GL account (what statements reconcile against in base). */
   async ledgerBalance(
     companyId: string,
     glAccountId: string,
@@ -127,14 +123,62 @@ export class BankingService {
     asOf: string,
     executor: DbExecutor = this.db,
   ): Promise<string> {
-    const activity = await this.ledger.activity(
-      { companyId, to: asOf, accountIds: [glAccountId] },
-      executor,
-    );
-    const a = activity.find((x) => x.accountId === glAccountId);
-    return Money.of(a?.debit ?? '0', currency)
-      .subtract(Money.of(a?.credit ?? '0', currency))
-      .toString();
+    const balances = await this.balances(companyId, [{ glAccountId, currency }], asOf, executor);
+    return balances.get(glAccountId)!.ledgerBalance;
+  }
+
+  /** Balance in the bank account's own currency (foreign when bound, base otherwise) - what a statement shows. */
+  async bookBalance(
+    companyId: string,
+    glAccountId: string,
+    currency: string,
+    asOf: string,
+    executor: DbExecutor = this.db,
+  ): Promise<string> {
+    const b = (await this.balances(companyId, [{ glAccountId, currency }], asOf, executor)).get(
+      glAccountId,
+    )!;
+    return b.foreignBalance ?? b.ledgerBalance;
+  }
+
+  /**
+   * Book balances of bank GL accounts: base from the base amounts, and for an
+   * account bound to a foreign currency the foreign balance from the foreign
+   * amounts every line on it carries. Both are the ledger, never stored.
+   */
+  async balances(
+    companyId: string,
+    targets: ReadonlyArray<{ glAccountId: string; currency: string }>,
+    asOf: string,
+    executor: DbExecutor = this.db,
+  ): Promise<
+    Map<string, { ledgerBalance: string; baseCurrency: string; foreignBalance: string | null }>
+  > {
+    const baseCurrency = await this.accounts.companyCurrency(companyId, executor);
+    const ids = targets.map((t) => t.glAccountId);
+    const [activity, foreign] = await Promise.all([
+      this.ledger.activity({ companyId, to: asOf, accountIds: ids }, executor),
+      this.ledger.foreignActivity({ companyId, to: asOf, accountIds: ids }, executor),
+    ]);
+    const out = new Map<
+      string,
+      { ledgerBalance: string; baseCurrency: string; foreignBalance: string | null }
+    >();
+    for (const t of targets) {
+      const a = activity.find((x) => x.accountId === t.glAccountId);
+      const ledgerBalance = Money.of(a?.debit ?? '0', baseCurrency)
+        .subtract(Money.of(a?.credit ?? '0', baseCurrency))
+        .toString();
+      let foreignBalance: string | null = null;
+      if (t.currency !== baseCurrency) {
+        const f = foreign.find((x) => x.accountId === t.glAccountId && x.currency === t.currency);
+        foreignBalance = Money.of(f?.foreignDebit ?? '0', t.currency)
+          .subtract(Money.of(f?.foreignCredit ?? '0', t.currency))
+          .toString();
+      }
+      out.set(t.glAccountId, { ledgerBalance, baseCurrency, foreignBalance });
+    }
+    return out;
   }
 
   async createAccount(
@@ -156,7 +200,20 @@ export class BankingService {
           'A bank account must book to an active CASH or BANK asset account.',
         );
       }
-      const currency = input.currency ?? (await this.accounts.companyCurrency(companyId, tx));
+      const baseCurrency = await this.accounts.companyCurrency(companyId, tx);
+      const currency = input.currency ?? baseCurrency;
+      // The GL account carries the foreign balance, so it must be bound to the same currency
+      // (the posting gateway then insists every line on it carries its foreign amount).
+      if (currency !== baseCurrency && gl.currency !== currency)
+        throw new BusinessRuleError(
+          ErrorCodes.CURRENCY_MISMATCH,
+          `${gl.code} ${gl.name} must be a ${currency} account to book a ${currency} bank account (it is ${gl.currency ?? baseCurrency}).`,
+        );
+      if (currency === baseCurrency && gl.currency && gl.currency !== baseCurrency)
+        throw new BusinessRuleError(
+          ErrorCodes.CURRENCY_MISMATCH,
+          `${gl.code} ${gl.name} is a ${gl.currency} account; the bank account must be in ${gl.currency}.`,
+        );
       let row: BankAccount | undefined;
       try {
         [row] = await tx
@@ -330,12 +387,20 @@ export class BankingService {
         if (existing) return existing.id;
       }
       const account = await this.bankAccount(companyId, input.bankAccountId, tx);
-      await this.validateSides(companyId, input, tx);
+      await this.validateSides(companyId, { ...input, currency: account.currency }, tx);
       await this.posting.resolvePeriod(tx, companyId, input.transactionDate, { draft: true });
       const documentNumber = await this.numbering.allocate(
         companyId,
         'BTX',
         Number(input.transactionDate.slice(0, 4)),
+        tx,
+      );
+      const amount = Money.parse(input.amount, account.currency);
+      const { rate, baseCurrency } = await this.rates.documentRate(
+        companyId,
+        account.currency,
+        input.transactionDate,
+        input.exchangeRate,
         tx,
       );
       const [created] = await tx
@@ -346,8 +411,10 @@ export class BankingService {
           bankAccountId: account.id,
           transactionType: input.transactionType,
           transactionDate: input.transactionDate,
-          amount: Money.parse(input.amount, account.currency).toString(),
+          amount: amount.toString(),
           currency: account.currency,
+          exchangeRate: rate,
+          baseAmount: amount.convert(baseCurrency, rate).toString(),
           counterpartyAccountId:
             input.transactionType === 'TRANSFER' ? null : input.counterpartyAccountId!,
           toBankAccountId: input.transactionType === 'TRANSFER' ? input.toBankAccountId! : null,
@@ -401,13 +468,33 @@ export class BankingService {
           input.counterpartyAccountId ?? existing.counterpartyAccountId ?? undefined,
         toBankAccountId: input.toBankAccountId ?? existing.toBankAccountId ?? undefined,
       };
-      await this.validateSides(companyId, merged as CreateBankTransactionInput, tx);
+      await this.validateSides(
+        companyId,
+        { ...(merged as CreateBankTransactionInput), currency: existing.currency },
+        tx,
+      );
+      const amount = Money.parse(merged.amount, existing.currency);
+      const rateChanged = input.exchangeRate !== undefined || input.transactionDate !== undefined;
+      const { rate, baseCurrency } = rateChanged
+        ? await this.rates.documentRate(
+            companyId,
+            existing.currency,
+            merged.transactionDate,
+            input.exchangeRate,
+            tx,
+          )
+        : {
+            rate: existing.exchangeRate,
+            baseCurrency: await this.accounts.companyCurrency(companyId, tx),
+          };
       await tx
         .update(bankTransactions)
         .set({
           transactionType: merged.transactionType,
           transactionDate: merged.transactionDate,
-          amount: Money.parse(merged.amount, existing.currency).toString(),
+          amount: amount.toString(),
+          exchangeRate: rate,
+          baseAmount: amount.convert(baseCurrency, rate).toString(),
           counterpartyAccountId:
             merged.transactionType === 'TRANSFER' ? null : (merged.counterpartyAccountId ?? null),
           toBankAccountId:
@@ -705,7 +792,18 @@ export class BankingService {
     account: BankAccount,
     tx: DbExecutor,
   ): Promise<PostingLine[]> {
-    const amount = t.amount;
+    const amount = t.baseAmount;
+    const baseCurrency = await this.accounts.companyCurrency(companyId, tx);
+    // A foreign-currency bank account's line carries the amount in its own currency too.
+    const foreign = (debit: boolean) =>
+      account.currency === baseCurrency
+        ? {}
+        : {
+            foreignDebit: debit ? t.amount : '0',
+            foreignCredit: debit ? '0' : t.amount,
+            foreignCurrency: account.currency,
+            exchangeRate: t.exchangeRate,
+          };
     if (t.transactionType === 'TRANSFER') {
       const to = await this.bankAccount(companyId, t.toBankAccountId!, tx);
       return [
@@ -714,12 +812,14 @@ export class BankingService {
           debit: amount,
           credit: '0',
           description: `Transfer in from ${account.code}`,
+          ...foreign(true),
         },
         {
           accountId: account.glAccountId,
           debit: '0',
           credit: amount,
           description: `Transfer out to ${to.code}`,
+          ...foreign(false),
         },
       ];
     }
@@ -730,6 +830,7 @@ export class BankingService {
         debit: moneyIn ? amount : '0',
         credit: moneyIn ? '0' : amount,
         description: `${label(t.transactionType)} ${t.documentNumber}`,
+        ...foreign(moneyIn),
       },
       {
         accountId: t.counterpartyAccountId!,
@@ -745,7 +846,7 @@ export class BankingService {
     input: Pick<
       CreateBankTransactionInput,
       'transactionType' | 'counterpartyAccountId' | 'toBankAccountId' | 'bankAccountId'
-    >,
+    > & { currency: string },
     tx: DbExecutor,
   ): Promise<void> {
     if (input.transactionType === 'TRANSFER') {
@@ -754,7 +855,13 @@ export class BankingService {
           ErrorCodes.VALIDATION_FAILED,
           'A transfer needs a different destination bank account.',
         );
-      await this.bankAccount(companyId, input.toBankAccountId, tx);
+      const to = await this.bankAccount(companyId, input.toBankAccountId, tx);
+      // One amount, one currency: a cross-currency move is a treasury transfer (two legs, FX).
+      if (to.currency !== input.currency)
+        throw new BusinessRuleError(
+          ErrorCodes.CURRENCY_MISMATCH,
+          `${to.code} is a ${to.currency} account; use a treasury transfer to move ${input.currency} into it.`,
+        );
       return;
     }
     if (!input.counterpartyAccountId)

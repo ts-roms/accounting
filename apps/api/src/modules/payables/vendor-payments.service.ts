@@ -23,6 +23,10 @@ import type {
   VoidDocumentInput,
 } from '@accounting/validation';
 import { AccountsService } from '@/modules/accounting/accounts/accounts.service';
+import {
+  assertAccountTakesCurrency,
+  foreignLineFields,
+} from '@/modules/accounting/journals/foreign-line';
 import { AccountingPostingService } from '@/modules/accounting/journals/posting.service';
 import { DocumentNumberingService } from '@/modules/accounting/numbering/document-numbering.service';
 import { AuditService } from '@/modules/audit/audit.service';
@@ -221,7 +225,7 @@ export class VendorPaymentsService {
         input.exchangeRate,
         tx,
       );
-      await this.assertCashAccount(companyId, input.cashAccountId, tx);
+      await this.assertCashAccount(companyId, input.cashAccountId, currency, baseCurrency, tx);
       await this.posting.resolvePeriod(tx, companyId, input.paymentDate, { draft: true });
       const amount = Money.parse(input.amount, currency);
       if (input.paymentType === 'REFUND' && input.allocations.length > 0) {
@@ -578,7 +582,14 @@ export class VendorPaymentsService {
       const vendor = await this.vendorsService.getOrThrow(companyId, vendorId, tx);
       const paymentDate = input.paymentDate ?? existing.paymentDate;
       await this.posting.resolvePeriod(tx, companyId, paymentDate, { draft: true });
-      if (input.cashAccountId) await this.assertCashAccount(companyId, input.cashAccountId, tx);
+      if (input.cashAccountId)
+        await this.assertCashAccount(
+          companyId,
+          input.cashAccountId,
+          existing.currency,
+          await this.accounts.companyCurrency(companyId, tx),
+          tx,
+        );
       if (vendor.currency !== existing.currency) {
         throw new BusinessRuleError(
           ErrorCodes.CURRENCY_MISMATCH,
@@ -793,6 +804,18 @@ export class VendorPaymentsService {
       // Base amounts: the bank side at the payment rate; the control side at each bill's rate.
       const baseCurrency = await this.accounts.companyCurrency(companyId, tx);
       const baseAmount = amount.convert(baseCurrency, existing.exchangeRate);
+      const cashAccount = await this.accounts.getOrThrow(companyId, existing.cashAccountId, tx);
+      // A foreign-currency bank account's line also carries the payment in its own currency.
+      const cashForeign = foreignLineFields(
+        cashAccount,
+        baseCurrency,
+        {
+          currency: existing.currency,
+          amount: amount.toString(),
+          exchangeRate: existing.exchangeRate,
+        },
+        isDisbursement ? 'credit' : 'debit',
+      );
       const gain = isDisbursement
         ? this.fx.settlementGain(
             draftAllocations.map((a) => ({
@@ -841,6 +864,7 @@ export class VendorPaymentsService {
               debit: isDisbursement ? '0' : baseAmount.toString(),
               credit: isDisbursement ? baseAmount.toString() : '0',
               description: `${existing.documentNumber} ${existing.method.toLowerCase().replace('_', ' ')}`,
+              ...cashForeign,
             },
             ...discountLines,
             ...fxLines,
@@ -1163,6 +1187,8 @@ export class VendorPaymentsService {
   private async assertCashAccount(
     companyId: string,
     accountId: string,
+    currency: string,
+    baseCurrency: string,
     tx: DbExecutor,
   ): Promise<void> {
     const account = await this.accounts.getOrThrow(companyId, accountId, tx);
@@ -1172,6 +1198,7 @@ export class VendorPaymentsService {
         `${account.code} ${account.name} is not a usable cash or bank account.`,
       );
     }
+    assertAccountTakesCurrency(account, baseCurrency, currency);
   }
 }
 

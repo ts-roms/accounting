@@ -5,8 +5,11 @@
 export const EXCHANGE_RATE_SOURCES = ['MANUAL', 'IMPORT', 'SYSTEM'] as const;
 export type ExchangeRateSource = (typeof EXCHANGE_RATE_SOURCES)[number];
 
-/** Which subledger an FX adjustment touched. */
-export const FX_SIDES = ['AR', 'AP'] as const;
+/**
+ * Which monetary item an FX adjustment touched: open receivables, open payables,
+ * foreign-currency bank balances, foreign-currency lease liabilities.
+ */
+export const FX_SIDES = ['AR', 'AP', 'BANK', 'LEASE'] as const;
 export type FxSide = (typeof FX_SIDES)[number];
 
 export const FX_ADJUSTMENT_TYPES = ['REALIZED', 'REVALUATION', 'REVALUATION_REVERSAL'] as const;

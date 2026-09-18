@@ -628,7 +628,8 @@ function ReplenishDialog({
               <SelectContent>
                 {(banks.data ?? []).map((b) => (
                   <SelectItem key={b.id} value={b.id}>
-                    {b.code} {b.name} - {formatMoney(b.ledgerBalance, b.currency)}
+                    {b.code} {b.name} -{' '}
+                    {formatMoney(b.foreignBalance ?? b.ledgerBalance, b.currency)}
                   </SelectItem>
                 ))}
               </SelectContent>

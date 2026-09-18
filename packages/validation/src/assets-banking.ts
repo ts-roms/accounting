@@ -10,6 +10,7 @@ import {
   MATCH_CONFIDENCES,
 } from '@accounting/types';
 import { amountSchema, isoDateSchema, signedAmountSchema } from './accounting';
+import { exchangeRateValueSchema } from './enterprise';
 import {
   codeSchema,
   nameSchema,
@@ -187,6 +188,8 @@ export const createBankTransactionSchema = z.object({
   transactionType: z.enum(BANK_TRANSACTION_TYPES),
   transactionDate: isoDateSchema,
   amount: amountSchema.refine((v) => Number(v) > 0, 'Amount must be positive'),
+  /** Foreign-currency bank accounts: rate override (1 unit = rate base units); the rate table otherwise. */
+  exchangeRate: exchangeRateValueSchema.optional(),
   /** Other side of the entry (expense, income, clearing...). Not used for transfers. */
   counterpartyAccountId: uuidSchema.optional(),
   /** Transfers: destination bank account. */

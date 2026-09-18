@@ -33,6 +33,7 @@ import {
 } from '@/modules/accounting/journals/posting.service';
 import { DocumentNumberingService } from '@/modules/accounting/numbering/document-numbering.service';
 import { AuditService } from '@/modules/audit/audit.service';
+import { ExchangeRatesService } from '@/modules/fx/exchange-rates.service';
 import { OutboxService } from '@/modules/integrations/events/outbox.service';
 import { NotificationsService } from '@/modules/integrations/notifications/notifications.service';
 import { LeasesConfigService } from './leases-config.service';
@@ -108,6 +109,7 @@ export class LeaseRunsService {
     private readonly leasesService: LeasesService,
     private readonly outbox: OutboxService,
     private readonly notifications: NotificationsService,
+    private readonly rates: ExchangeRatesService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(LeaseRunsService.name);
@@ -180,8 +182,18 @@ export class LeaseRunsService {
         depreciation: Money.zero(currency),
       };
       bucket.months += 1;
-      bucket.interest = bucket.interest.add(Money.of(d.line.interest, currency));
-      bucket.depreciation = bucket.depreciation.add(Money.of(d.line.depreciation, currency));
+      // Preview in base: depreciation at the commencement rate (fixed), interest at the
+      // rate in force on the period end (what the run will post).
+      const { rate } = await this.rates.documentRate(
+        companyId,
+        d.lease.currency,
+        periodEnd,
+        undefined,
+      );
+      bucket.interest = bucket.interest.add(
+        Money.of(d.line.interest, d.lease.currency).convert(currency, rate),
+      );
+      bucket.depreciation = bucket.depreciation.add(Money.of(d.line.depreciationBase, currency));
       byLease.set(d.lease.id, bucket);
     }
     const groups = [...byLease.values()];
@@ -247,14 +259,33 @@ export class LeaseRunsService {
       for (const leaseId of leaseIds) {
         const lease = await this.leasesService.lock(tx, companyId, leaseId);
         const mine = due.filter((d) => d.lease.id === leaseId).map((d) => d.line);
-        const interest = Money.sum(
-          mine.map((l) => Money.of(l.interest, currency)),
-          currency,
+        // Interest accretes in the contract currency and is expensed at the rate of the run's
+        // period end (a monetary charge of the period); depreciation is the historical base
+        // fixed at commencement. Each line remembers its base interest for the reversal.
+        const { rate: runRate } = await this.rates.documentRate(
+          companyId,
+          lease.currency,
+          input.periodEnd,
+          undefined,
+          tx,
         );
+        const interestFc = Money.sum(
+          mine.map((l) => Money.of(l.interest, lease.currency)),
+          lease.currency,
+        );
+        const lineInterestBase = mine.map((l) =>
+          Money.of(l.interest, lease.currency).convert(currency, runRate),
+        );
+        const interest = Money.sum(lineInterestBase, currency);
         const depreciation = Money.sum(
-          mine.map((l) => Money.of(l.depreciation, currency)),
+          mine.map((l) => Money.of(l.depreciationBase, currency)),
           currency,
         );
+        for (let i = 0; i < mine.length; i += 1)
+          await tx
+            .update(leaseScheduleLines)
+            .set({ interestBase: lineInterestBase[i]!.toString() })
+            .where(eq(leaseScheduleLines.id, mine[i]!.id));
         const accts = await this.config.resolveAccounts(companyId, lease, tx);
         const dims = this.leasesService.dims(lease);
         const label = `${lease.leaseNumber} ${lease.name}`;
@@ -292,16 +323,26 @@ export class LeaseRunsService {
               ...dims,
             },
           );
-        const liabilityAfter = Money.of(lease.liabilityBalance, currency).add(interest);
-        const accumulatedAfter = Money.of(lease.rouAccumulatedDepreciation, currency).add(
-          depreciation,
+        const depreciationFc = Money.sum(
+          mine.map((l) => Money.of(l.depreciation, lease.currency)),
+          lease.currency,
         );
-        const carryingAfter = Money.of(lease.rouCost, currency).subtract(accumulatedAfter);
+        const liabilityAfter = Money.of(lease.liabilityBalance, lease.currency).add(interestFc);
+        const accumulatedAfter = Money.of(lease.rouAccumulatedDepreciation, lease.currency).add(
+          depreciationFc,
+        );
+        const carryingAfter = Money.of(lease.rouCost, lease.currency).subtract(accumulatedAfter);
         await tx
           .update(leases)
           .set({
             liabilityBalance: liabilityAfter.toString(),
             rouAccumulatedDepreciation: accumulatedAfter.toString(),
+            liabilityBalanceBase: Money.of(lease.liabilityBalanceBase, currency)
+              .add(interest)
+              .toString(),
+            rouAccumulatedDepreciationBase: Money.of(lease.rouAccumulatedDepreciationBase, currency)
+              .add(depreciation)
+              .toString(),
           })
           .where(eq(leases.id, leaseId));
         const months = `month${mine.length > 1 ? 's' : ''} ${mine[0]!.sequence}${mine.length > 1 ? `-${mine[mine.length - 1]!.sequence}` : ''}`;
@@ -311,8 +352,10 @@ export class LeaseRunsService {
             leaseId,
             eventType: 'INTEREST',
             eventDate: input.periodEnd,
-            liabilityChange: interest.toString(),
+            liabilityChange: interestFc.toString(),
             rouChange: '0',
+            liabilityChangeBase: interest.toString(),
+            rouChangeBase: '0',
             liabilityAfter: liabilityAfter.toString(),
             rouCarryingAfter: carryingAfter.toString(),
             runId: run!.id,
@@ -325,7 +368,9 @@ export class LeaseRunsService {
             eventType: 'DEPRECIATION',
             eventDate: input.periodEnd,
             liabilityChange: '0',
-            rouChange: depreciation.negate().toString(),
+            rouChange: depreciationFc.negate().toString(),
+            liabilityChangeBase: '0',
+            rouChangeBase: depreciation.negate().toString(),
             liabilityAfter: liabilityAfter.toString(),
             rouCarryingAfter: carryingAfter.toString(),
             runId: run!.id,
@@ -473,19 +518,41 @@ export class LeaseRunsService {
             `${lease.leaseNumber} has been ${lease.status.toLowerCase()}; its run cannot be reversed.`,
           );
         const mine = lines.filter((l) => l.leaseId === leaseId);
+        const fc = lease.currency;
+        const interestFc = Money.sum(
+          mine.map((l) => Money.of(l.interest, fc)),
+          fc,
+        );
+        const depreciationFc = Money.sum(
+          mine.map((l) => Money.of(l.depreciation, fc)),
+          fc,
+        );
+        // Base effects exactly as posted: the run's base interest per line, historical depreciation.
         const interest = Money.sum(
-          mine.map((l) => Money.of(l.interest, currency)),
+          mine.map((l) => Money.of(l.interestBase ?? l.interest, currency)),
           currency,
         );
         const depreciation = Money.sum(
-          mine.map((l) => Money.of(l.depreciation, currency)),
+          mine.map((l) => Money.of(l.depreciationBase, currency)),
           currency,
         );
-        const liabilityAfter = Money.of(lease.liabilityBalance, currency).subtract(interest);
-        const accumulatedAfter = Money.of(lease.rouAccumulatedDepreciation, currency).subtract(
-          depreciation,
+        const liabilityAfter = Money.of(lease.liabilityBalance, fc).subtract(interestFc);
+        const accumulatedAfter = Money.of(lease.rouAccumulatedDepreciation, fc).subtract(
+          depreciationFc,
         );
-        if (liabilityAfter.isNegative() || accumulatedAfter.isNegative())
+        const liabilityBaseAfter = Money.of(lease.liabilityBalanceBase, currency).subtract(
+          interest,
+        );
+        const accumulatedBaseAfter = Money.of(
+          lease.rouAccumulatedDepreciationBase,
+          currency,
+        ).subtract(depreciation);
+        if (
+          liabilityAfter.isNegative() ||
+          accumulatedAfter.isNegative() ||
+          liabilityBaseAfter.isNegative() ||
+          accumulatedBaseAfter.isNegative()
+        )
           throw new BusinessRuleError(
             ErrorCodes.LEASE_RUN_INVALID_STATE,
             `${lease.leaseNumber} has moved on since ${run.documentNumber}; remeasure instead of reversing.`,
@@ -495,17 +562,21 @@ export class LeaseRunsService {
           .set({
             liabilityBalance: liabilityAfter.toString(),
             rouAccumulatedDepreciation: accumulatedAfter.toString(),
+            liabilityBalanceBase: liabilityBaseAfter.toString(),
+            rouAccumulatedDepreciationBase: accumulatedBaseAfter.toString(),
           })
           .where(eq(leases.id, leaseId));
-        const carryingAfter = Money.of(lease.rouCost, currency).subtract(accumulatedAfter);
+        const carryingAfter = Money.of(lease.rouCost, fc).subtract(accumulatedAfter);
         await tx.insert(leaseEvents).values([
           {
             companyId,
             leaseId,
             eventType: 'INTEREST',
             eventDate: run.periodEnd,
-            liabilityChange: interest.negate().toString(),
+            liabilityChange: interestFc.negate().toString(),
             rouChange: '0',
+            liabilityChangeBase: interest.negate().toString(),
+            rouChangeBase: '0',
             liabilityAfter: liabilityAfter.toString(),
             rouCarryingAfter: carryingAfter.toString(),
             runId: run.id,
@@ -518,7 +589,9 @@ export class LeaseRunsService {
             eventType: 'DEPRECIATION',
             eventDate: run.periodEnd,
             liabilityChange: '0',
-            rouChange: depreciation.toString(),
+            rouChange: depreciationFc.toString(),
+            liabilityChangeBase: '0',
+            rouChangeBase: depreciation.toString(),
             liabilityAfter: liabilityAfter.toString(),
             rouCarryingAfter: carryingAfter.toString(),
             runId: run.id,

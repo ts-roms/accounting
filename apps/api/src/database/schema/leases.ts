@@ -6,6 +6,7 @@ import {
   date,
   index,
   integer,
+  numeric,
   pgEnum,
   pgTable,
   text,
@@ -99,12 +100,25 @@ export const leases = pgTable(
     initialDirectCosts: money('initial_direct_costs').notNull().default('0'),
     leaseIncentives: money('lease_incentives').notNull().default('0'),
     underlyingAssetValue: money('underlying_asset_value'),
+    /** Contract currency; the schedule and the carrying figures below are in it. */
     currency: char('currency', { length: 3 }).notNull(),
+    /** 1 unit of `currency` = `exchangeRate` base units at commencement (1 for base-currency leases). */
+    exchangeRate: numeric('exchange_rate', { precision: 19, scale: 8 }).notNull().default('1'),
     /** Carrying figures - agree with the ledger at all times. */
     initialLiability: money('initial_liability').notNull().default('0'),
     liabilityBalance: money('liability_balance').notNull().default('0'),
     rouCost: money('rou_cost').notNull().default('0'),
     rouAccumulatedDepreciation: money('rou_accumulated_depreciation').notNull().default('0'),
+    /**
+     * Base-currency carrying figures. The liability is monetary (settled at the
+     * rate of each instalment, revalued at period end); the right-of-use asset
+     * is not (its base cost is fixed at the commencement rate).
+     */
+    liabilityBalanceBase: money('liability_balance_base').notNull().default('0'),
+    rouCostBase: money('rou_cost_base').notNull().default('0'),
+    rouAccumulatedDepreciationBase: money('rou_accumulated_depreciation_base')
+      .notNull()
+      .default('0'),
     /** Optional GL overrides; company mappings otherwise. */
     rouAssetAccountId: uuid('rou_asset_account_id').references(() => accounts.id, {
       onDelete: 'restrict',
@@ -216,6 +230,10 @@ export const leaseScheduleLines = pgTable(
     openingLiability: money('opening_liability').notNull().default('0'),
     interest: money('interest').notNull().default('0'),
     depreciation: money('depreciation').notNull().default('0'),
+    /** Base-currency depreciation, fixed at the commencement rate (sums to the ROU base cost). */
+    depreciationBase: money('depreciation_base').notNull().default('0'),
+    /** Base-currency interest at the rate of the run that posted it; null while pending. */
+    interestBase: money('interest_base'),
     /** Zero for months without a payment. */
     payment: money('payment').notNull().default('0'),
     paymentDate: date('payment_date'),
@@ -265,6 +283,9 @@ export const leaseEvents = pgTable(
     liabilityChange: money('liability_change').notNull().default('0'),
     /** Signed change to the right-of-use carrying amount. */
     rouChange: money('rou_change').notNull().default('0'),
+    /** The same effects in the company base currency - what the ledger carries. */
+    liabilityChangeBase: money('liability_change_base').notNull().default('0'),
+    rouChangeBase: money('rou_change_base').notNull().default('0'),
     liabilityAfter: money('liability_after').notNull().default('0'),
     rouCarryingAfter: money('rou_carrying_after').notNull().default('0'),
     runId: uuid('run_id').references(() => leaseRuns.id, { onDelete: 'set null' }),

@@ -41,12 +41,19 @@ export interface Lease {
   initialDirectCosts: string;
   leaseIncentives: string;
   underlyingAssetValue: string | null;
+  /** Contract currency; the schedule and carrying figures are in it. */
   currency: string;
+  /** Commencement rate (1 for base-currency leases). */
+  exchangeRate: string;
   initialLiability: string;
   liabilityBalance: string;
   rouCost: string;
   rouAccumulatedDepreciation: string;
   rouCarrying: string;
+  /** Base-currency carrying figures - what the ledger holds. */
+  liabilityBalanceBase: string;
+  rouCostBase: string;
+  rouAccumulatedDepreciationBase: string;
   bankAccountId: string | null;
   bankAccountCode: string | null;
   branchId: string | null;
@@ -205,10 +212,13 @@ export interface LeaseRegisterRow {
   paymentFrequency: string;
   annualDiscountRate: string | null;
   initialLiability: string;
+  currency: string;
   liabilityBalance: string;
   rouCost: string;
   rouAccumulatedDepreciation: string;
   rouCarrying: string;
+  liabilityBalanceBase: string;
+  rouCarryingBase: string;
   remainingMonths: number;
   remainingPayments: string;
   nextPaymentDate: string | null;

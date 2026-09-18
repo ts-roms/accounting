@@ -521,7 +521,7 @@ export class StatementsService {
       .from(bankReconciliations)
       .where(eq(bankReconciliations.statementId, statementId));
     const ledgerBalance = Money.of(
-      await this.banking.ledgerBalance(
+      await this.banking.bookBalance(
         companyId,
         account.glAccountId,
         currency,
@@ -743,8 +743,9 @@ export class StatementsService {
       .select({
         id: journalLines.id,
         entryDate: journalEntries.entryDate,
-        debit: journalLines.debit,
-        credit: journalLines.credit,
+        // Statements are in the account currency: a currency-bound account's lines carry it.
+        debit: sql<string>`coalesce(${journalLines.foreignDebit}, ${journalLines.debit})`,
+        credit: sql<string>`coalesce(${journalLines.foreignCredit}, ${journalLines.credit})`,
         reference: journalEntries.reference,
         description: journalLines.description,
       })
@@ -785,8 +786,9 @@ export class StatementsService {
         entryDate: journalEntries.entryDate,
         description: journalLines.description,
         reference: journalEntries.reference,
-        debit: journalLines.debit,
-        credit: journalLines.credit,
+        // Statements are in the account currency: a currency-bound account's lines carry it.
+        debit: sql<string>`coalesce(${journalLines.foreignDebit}, ${journalLines.debit})`,
+        credit: sql<string>`coalesce(${journalLines.foreignCredit}, ${journalLines.credit})`,
         matchedStatementLineId: bankLineMatches.statementLineId,
       })
       .from(journalLines)

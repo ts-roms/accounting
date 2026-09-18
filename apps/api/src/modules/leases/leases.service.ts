@@ -39,11 +39,16 @@ import {
 import { DocumentNumberingService } from '@/modules/accounting/numbering/document-numbering.service';
 import { AuditService } from '@/modules/audit/audit.service';
 import { BankingService } from '@/modules/banking/banking.service';
+import { foreignLineFields } from '@/modules/accounting/journals/foreign-line';
+import { ExchangeRatesService } from '@/modules/fx/exchange-rates.service';
+import { FxService } from '@/modules/fx/fx.service';
 import { OutboxService } from '@/modules/integrations/events/outbox.service';
 import {
   FREQUENCY_MONTHS,
+  baseRelieved,
   buildLeaseSchedule,
   classify,
+  convertSeriesAtRate,
   presentValue,
   type LeaseSchedule,
 } from './lease.logic';
@@ -96,6 +101,8 @@ export class LeasesService {
     private readonly banking: BankingService,
     private readonly config: LeasesConfigService,
     private readonly outbox: OutboxService,
+    private readonly rates: ExchangeRatesService,
+    private readonly fx: FxService,
   ) {}
 
   // ------------------------------------------------------------------ queries
@@ -193,7 +200,7 @@ export class LeasesService {
     const id = await this.db.transaction(async (tx) => {
       await this.assertRefs(companyId, input, tx);
       const settings = await this.config.settings(companyId, tx);
-      const currency = await this.accounts.companyCurrency(companyId, tx);
+      const currency = input.currency ?? (await this.accounts.companyCurrency(companyId, tx));
       const leaseNumber = await this.numbering.allocate(
         companyId,
         'LSE',
@@ -265,6 +272,7 @@ export class LeasesService {
         );
       const termKeys = [
         'commencementDate',
+        'currency',
         'termMonths',
         'paymentAmount',
         'paymentFrequency',
@@ -305,6 +313,7 @@ export class LeasesService {
       if (existing.status === 'DRAFT')
         Object.assign(patch, {
           commencementDate: merged.commencementDate,
+          currency: merged.currency,
           termMonths: merged.termMonths,
           paymentAmount: merged.paymentAmount,
           paymentFrequency: merged.paymentFrequency,
@@ -399,16 +408,34 @@ export class LeasesService {
       );
       const postingDate = input.postingDate ?? existing.commencementDate;
       const currency = existing.currency;
+      // Contract currency -> base at the commencement rate: the right-of-use asset keeps this
+      // rate for life (non-monetary); the liability starts here and is remeasured as it settles.
+      const { rate: fxRate, baseCurrency } = await this.rates.documentRate(
+        companyId,
+        currency,
+        existing.commencementDate,
+        input.exchangeRate,
+        tx,
+      );
+      const toBase = (amount: string) => Money.of(amount, currency).convert(baseCurrency, fxRate);
+      const liabilityBase = toBase(schedule.initialLiability);
+      const rouCostBase = toBase(schedule.rouCost);
+      const depreciationBase = convertSeriesAtRate(
+        schedule.lines.map((l) => l.depreciation),
+        currency,
+        baseCurrency,
+        fxRate,
+      );
       let journalEntryId: string | null = null;
       if (!exempt) {
         await this.posting.resolvePeriod(tx, companyId, postingDate, { draft: true });
         const accts = await this.config.resolveAccounts(companyId, existing, tx);
-        const idc = Money.of(existing.initialDirectCosts, currency);
-        const incentives = Money.of(existing.leaseIncentives, currency);
+        const idc = toBase(existing.initialDirectCosts);
+        const incentives = toBase(existing.leaseIncentives);
         const lines: PostingLine[] = [
           {
             accountId: accts.rouAsset,
-            debit: schedule.rouCost,
+            debit: rouCostBase.toString(),
             credit: '0',
             description: `${existing.leaseNumber} right-of-use asset`,
             ...this.dims(existing),
@@ -416,7 +443,7 @@ export class LeasesService {
           {
             accountId: accts.liability,
             debit: '0',
-            credit: schedule.initialLiability,
+            credit: liabilityBase.toString(),
             description: `${existing.leaseNumber} lease liability`,
             ...this.dims(existing),
           },
@@ -430,7 +457,9 @@ export class LeasesService {
               ErrorCodes.ACCOUNT_NOT_POSTABLE,
               'The clearing account is not postable.',
             );
-          const net = idc.subtract(incentives);
+          // ROU base = liability base + costs - incentives exactly: the plug of the rounded
+          // conversions lands on the clearing line.
+          const net = rouCostBase.subtract(liabilityBase);
           if (!net.isZero())
             lines.push({
               accountId: clearing.id,
@@ -439,6 +468,11 @@ export class LeasesService {
               description: `${existing.leaseNumber} initial direct costs less incentives`,
               ...this.dims(existing),
             });
+        } else if (!rouCostBase.equals(liabilityBase)) {
+          throw new BusinessRuleError(
+            ErrorCodes.LEASE_SCHEDULE_INVALID,
+            'Right-of-use cost and liability disagree without initial direct costs or incentives.',
+          );
         }
         const entry = await this.posting.postEvent(
           tx,
@@ -468,12 +502,16 @@ export class LeasesService {
           liabilityBalance: schedule.initialLiability,
           rouCost: schedule.rouCost,
           rouAccumulatedDepreciation: '0',
+          exchangeRate: fxRate,
+          liabilityBalanceBase: exempt ? '0' : liabilityBase.toString(),
+          rouCostBase: exempt ? '0' : rouCostBase.toString(),
+          rouAccumulatedDepreciationBase: '0',
           commencementJournalEntryId: journalEntryId,
           commencedAt: new Date(),
         })
         .where(eq(leases.id, id));
       await tx.insert(leaseScheduleLines).values(
-        schedule.lines.map((l) => ({
+        schedule.lines.map((l, i) => ({
           companyId,
           leaseId: id,
           sequence: l.sequence,
@@ -482,6 +520,7 @@ export class LeasesService {
           openingLiability: l.openingLiability,
           interest: l.interest,
           depreciation: l.depreciation,
+          depreciationBase: exempt ? '0' : depreciationBase[i]!,
           payment: l.payment,
           paymentDate: l.paymentDate,
           closingLiability: l.closingLiability,
@@ -494,6 +533,8 @@ export class LeasesService {
         eventDate: postingDate,
         liabilityChange: schedule.initialLiability,
         rouChange: schedule.rouCost,
+        liabilityChangeBase: exempt ? '0' : liabilityBase.toString(),
+        rouChangeBase: exempt ? '0' : rouCostBase.toString(),
         liabilityAfter: schedule.initialLiability,
         rouCarryingAfter: schedule.rouCost,
         journalEntryId,
@@ -592,20 +633,48 @@ export class LeasesService {
           `Post the lease run through ${line.periodEnd} before paying an in-arrears instalment.`,
         );
       const bank = await this.banking.bankAccount(companyId, input.bankAccountId, tx);
-      if (bank.currency !== currency)
+      const baseCurrency = await this.accounts.companyCurrency(companyId, tx);
+      // Paid in the contract currency from an account in that currency, or in base from a base account.
+      if (bank.currency !== currency && bank.currency !== baseCurrency)
         throw new BusinessRuleError(
           ErrorCodes.VALIDATION_FAILED,
           `Lease payments post in ${currency}; ${bank.code} is a ${bank.currency} account.`,
         );
       const accts = await this.config.resolveAccounts(companyId, lease, tx);
-      const liabilityAfter = finance
-        ? Money.of(lease.liabilityBalance, currency).subtract(payment)
-        : Money.zero(currency);
+      const liabilityBefore = Money.of(lease.liabilityBalance, currency);
+      const liabilityAfter = finance ? liabilityBefore.subtract(payment) : Money.zero(currency);
       if (liabilityAfter.isNegative())
         throw new BusinessRuleError(
           ErrorCodes.LEASE_SCHEDULE_INVALID,
           'The payment exceeds the lease liability; post the lease run first.',
         );
+      // Cash leaves at the rate of the day; the liability is relieved at its carrying base
+      // (its share of the base the register carries) - the difference is realized FX.
+      const { rate: payRate } = await this.rates.documentRate(
+        companyId,
+        currency,
+        input.paymentDate,
+        input.exchangeRate,
+        tx,
+      );
+      const cashBase = payment.convert(baseCurrency, payRate);
+      const liabilityBaseBefore = Money.of(lease.liabilityBalanceBase, baseCurrency);
+      const relievedBase = finance
+        ? baseRelieved(liabilityBefore, liabilityBaseBefore, payment)
+        : cashBase;
+      const liabilityBaseAfter = finance
+        ? liabilityBaseBefore.subtract(relievedBase)
+        : Money.zero(baseCurrency);
+      // Settling for less base than carried is a gain (a smaller liability, same cash).
+      const gain = finance ? relievedBase.subtract(cashBase) : Money.zero(baseCurrency);
+      const fxLines = await this.fx.realizedLines(tx, companyId, gain);
+      const [bankGl] = await this.accounts.findByIds(companyId, [bank.glAccountId], tx);
+      const bankForeign = foreignLineFields(
+        bankGl!,
+        baseCurrency,
+        { currency, amount: payment.toString(), exchangeRate: payRate },
+        'credit',
+      );
       const entry = await this.posting.postEvent(
         tx,
         {
@@ -621,7 +690,7 @@ export class LeasesService {
           lines: [
             {
               accountId: finance ? accts.liability : accts.leaseExpense,
-              debit: payment.toString(),
+              debit: relievedBase.toString(),
               credit: '0',
               description: finance
                 ? `${lease.leaseNumber} liability settled`
@@ -631,10 +700,12 @@ export class LeasesService {
             {
               accountId: bank.glAccountId,
               debit: '0',
-              credit: payment.toString(),
+              credit: cashBase.toString(),
               description: input.memo ?? `Lease payment ${lease.leaseNumber}`,
               ...this.dims(lease),
+              ...bankForeign,
             },
+            ...fxLines,
           ],
         },
         { permission: P['lease.post'] },
@@ -655,7 +726,10 @@ export class LeasesService {
       if (finance)
         await tx
           .update(leases)
-          .set({ liabilityBalance: liabilityAfter.toString() })
+          .set({
+            liabilityBalance: liabilityAfter.toString(),
+            liabilityBalanceBase: liabilityBaseAfter.toString(),
+          })
           .where(eq(leases.id, id));
       await tx.insert(leaseEvents).values({
         companyId,
@@ -664,6 +738,8 @@ export class LeasesService {
         eventDate: input.paymentDate,
         liabilityChange: finance ? payment.negate().toString() : '0',
         rouChange: '0',
+        liabilityChangeBase: finance ? relievedBase.negate().toString() : '0',
+        rouChangeBase: '0',
         liabilityAfter: liabilityAfter.toString(),
         rouCarryingAfter: this.carrying(lease).toString(),
         journalEntryId: entry.id,
@@ -681,6 +757,8 @@ export class LeasesService {
             event: 'PAYMENT',
             lineId: line.id,
             amount: payment.toString(),
+            baseAmount: cashBase.toString(),
+            realizedFx: gain.toString(),
             bankAccountId: bank.id,
             journalEntryId: entry.id,
           },
@@ -774,6 +852,30 @@ export class LeasesService {
         currency,
         { firstSequence: from.sequence, exempt: !finance, rouCarrying: carryingAfter.toString() },
       );
+      // The change in the liability is measured at the rate of the effective date and adjusts
+      // the right-of-use asset at that same rate; the remaining carrying base then depreciates
+      // over the remaining term.
+      const baseCurrency = await this.accounts.companyCurrency(companyId, tx);
+      const { rate: fxRate } = await this.rates.documentRate(
+        companyId,
+        currency,
+        input.effectiveDate,
+        undefined,
+        tx,
+      );
+      const deltaBase = finance ? delta.convert(baseCurrency, fxRate) : Money.zero(baseCurrency);
+      const liabilityBaseAfter = Money.of(lease.liabilityBalanceBase, baseCurrency).add(deltaBase);
+      const rouCostBaseAfter = Money.of(lease.rouCostBase, baseCurrency).add(deltaBase);
+      const carryingBaseAfter = rouCostBaseAfter.subtract(
+        Money.of(lease.rouAccumulatedDepreciationBase, baseCurrency),
+      );
+      const depreciationBase = finance
+        ? allocateBaseDepreciation(
+            schedule.lines.map((l) => l.depreciation),
+            currency,
+            carryingBaseAfter,
+          )
+        : schedule.lines.map(() => '0');
       const [event] = await tx
         .insert(leaseEvents)
         .values({
@@ -783,6 +885,8 @@ export class LeasesService {
           eventDate: input.effectiveDate,
           liabilityChange: delta.toString(),
           rouChange: delta.toString(),
+          liabilityChangeBase: deltaBase.toString(),
+          rouChangeBase: deltaBase.toString(),
           liabilityAfter: finance ? newLiability.toString() : '0',
           rouCarryingAfter: carryingAfter.toString(),
           notes:
@@ -810,15 +914,15 @@ export class LeasesService {
             lines: [
               {
                 accountId: accts.rouAsset,
-                debit: delta.isPositive() ? delta.toString() : '0',
-                credit: delta.isNegative() ? delta.abs().toString() : '0',
+                debit: deltaBase.isPositive() ? deltaBase.toString() : '0',
+                credit: deltaBase.isNegative() ? deltaBase.abs().toString() : '0',
                 description: `${lease.leaseNumber} right-of-use asset remeasured`,
                 ...this.dims(lease),
               },
               {
                 accountId: accts.liability,
-                debit: delta.isNegative() ? delta.abs().toString() : '0',
-                credit: delta.isPositive() ? delta.toString() : '0',
+                debit: deltaBase.isNegative() ? deltaBase.abs().toString() : '0',
+                credit: deltaBase.isPositive() ? deltaBase.toString() : '0',
                 description: `${lease.leaseNumber} lease liability remeasured`,
                 ...this.dims(lease),
               },
@@ -839,7 +943,7 @@ export class LeasesService {
           ),
         );
       await tx.insert(leaseScheduleLines).values(
-        schedule.lines.map((l) => ({
+        schedule.lines.map((l, i) => ({
           companyId,
           leaseId: id,
           sequence: l.sequence,
@@ -848,6 +952,7 @@ export class LeasesService {
           openingLiability: l.openingLiability,
           interest: l.interest,
           depreciation: l.depreciation,
+          depreciationBase: depreciationBase[i]!,
           payment: l.payment,
           paymentDate: l.paymentDate,
           closingLiability: l.closingLiability,
@@ -863,6 +968,8 @@ export class LeasesService {
           rouCost: finance
             ? Money.of(lease.rouCost, currency).add(delta).toString()
             : lease.rouCost,
+          liabilityBalanceBase: finance ? liabilityBaseAfter.toString() : '0',
+          rouCostBase: finance ? rouCostBaseAfter.toString() : lease.rouCostBase,
         })
         .where(eq(leases.id, id));
       await this.audit.record(
@@ -924,9 +1031,14 @@ export class LeasesService {
       const currency = lease.currency;
       const lines = await this.lines(tx, id, { lock: true });
       const finance = lease.classification === 'FINANCE';
-      const liability = Money.of(lease.liabilityBalance, currency);
-      const cost = Money.of(lease.rouCost, currency);
-      const accumulated = Money.of(lease.rouAccumulatedDepreciation, currency);
+      const liabilityFc = Money.of(lease.liabilityBalance, currency);
+      const carryingFc = this.carrying(lease);
+      // Everything leaves the books at its base carrying amount: the liability at the base the
+      // register carries (settlements and revaluations kept it current), the asset at cost.
+      const baseCurrency = await this.accounts.companyCurrency(companyId, tx);
+      const liability = Money.of(lease.liabilityBalanceBase, baseCurrency);
+      const cost = Money.of(lease.rouCostBase, baseCurrency);
+      const accumulated = Money.of(lease.rouAccumulatedDepreciationBase, baseCurrency);
       const carrying = cost.subtract(accumulated);
       // Positive = gain (liability released exceeds the asset given up).
       const gainLoss = liability.subtract(carrying);
@@ -1013,6 +1125,9 @@ export class LeasesService {
           liabilityBalance: '0',
           rouCost: '0',
           rouAccumulatedDepreciation: '0',
+          liabilityBalanceBase: '0',
+          rouCostBase: '0',
+          rouAccumulatedDepreciationBase: '0',
         })
         .where(eq(leases.id, id));
       await tx.insert(leaseEvents).values({
@@ -1020,8 +1135,10 @@ export class LeasesService {
         leaseId: id,
         eventType: 'TERMINATION',
         eventDate: input.terminationDate,
-        liabilityChange: liability.negate().toString(),
-        rouChange: carrying.negate().toString(),
+        liabilityChange: liabilityFc.negate().toString(),
+        rouChange: carryingFc.negate().toString(),
+        liabilityChangeBase: finance ? liability.negate().toString() : '0',
+        rouChangeBase: finance ? carrying.negate().toString() : '0',
         liabilityAfter: '0',
         rouCarryingAfter: '0',
         journalEntryId,
@@ -1036,7 +1153,11 @@ export class LeasesService {
           module: MODULE,
           entityType: 'Lease',
           entityId: id,
-          previousValue: { status: 'ACTIVE', liabilityBalance: lease.liabilityBalance },
+          previousValue: {
+            status: 'ACTIVE',
+            liabilityBalance: lease.liabilityBalance,
+            liabilityBalanceBase: lease.liabilityBalanceBase,
+          },
           newValue: {
             status: 'TERMINATED',
             terminationDate: input.terminationDate,
@@ -1257,6 +1378,38 @@ function pick(row: Record<string, unknown>, keys: string[]): Record<string, unkn
   return out;
 }
 
+/** Base depreciation of a (re)built tail: the remaining carrying base spread like the contract-currency schedule. */
+function allocateBaseDepreciation(
+  depreciation: readonly string[],
+  currency: string,
+  carryingBase: Money,
+): string[] {
+  const total = depreciation.reduce(
+    (acc, d) => acc.add(Money.of(d, currency)),
+    Money.zero(currency),
+  );
+  if (total.isZero()) return depreciation.map(() => '0');
+  // Convert at the implied carrying rate, plugging rounding into the last line.
+  const rate = Money.of(carryingBase.toString(), carryingBase.currency, 20)
+    .divide(total.toString())
+    .toString();
+  return convertSeriesAtRate(depreciation, currency, carryingBase.currency, rate).map(
+    (v, i, arr) =>
+      i === arr.length - 1
+        ? carryingBase
+            .subtract(
+              arr
+                .slice(0, -1)
+                .reduce(
+                  (acc, x) => acc.add(Money.of(x, carryingBase.currency)),
+                  Money.zero(carryingBase.currency),
+                ),
+            )
+            .toString()
+        : v,
+  );
+}
+
 function leaseColumns() {
   return {
     id: leases.id,
@@ -1283,6 +1436,10 @@ function leaseColumns() {
     liabilityBalance: leases.liabilityBalance,
     rouCost: leases.rouCost,
     rouAccumulatedDepreciation: leases.rouAccumulatedDepreciation,
+    exchangeRate: leases.exchangeRate,
+    liabilityBalanceBase: leases.liabilityBalanceBase,
+    rouCostBase: leases.rouCostBase,
+    rouAccumulatedDepreciationBase: leases.rouAccumulatedDepreciationBase,
     rouAssetAccountId: leases.rouAssetAccountId,
     rouAccumulatedAccountId: leases.rouAccumulatedAccountId,
     liabilityAccountId: leases.liabilityAccountId,
@@ -1319,6 +1476,8 @@ function leaseLineColumns() {
     openingLiability: leaseScheduleLines.openingLiability,
     interest: leaseScheduleLines.interest,
     depreciation: leaseScheduleLines.depreciation,
+    depreciationBase: leaseScheduleLines.depreciationBase,
+    interestBase: leaseScheduleLines.interestBase,
     payment: leaseScheduleLines.payment,
     paymentDate: leaseScheduleLines.paymentDate,
     closingLiability: leaseScheduleLines.closingLiability,
@@ -1344,6 +1503,8 @@ function leaseEventColumns() {
     eventDate: leaseEvents.eventDate,
     liabilityChange: leaseEvents.liabilityChange,
     rouChange: leaseEvents.rouChange,
+    liabilityChangeBase: leaseEvents.liabilityChangeBase,
+    rouChangeBase: leaseEvents.rouChangeBase,
     liabilityAfter: leaseEvents.liabilityAfter,
     rouCarryingAfter: leaseEvents.rouCarryingAfter,
     runId: leaseEvents.runId,

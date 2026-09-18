@@ -317,3 +317,46 @@ export function maturityBuckets(
   }
   return buckets.map((b) => ({ ...b, amount: b.amount.toString() }));
 }
+
+/**
+ * Base-currency amounts for a series of contract-currency amounts converted at
+ * one historical rate: each line is converted and rounded on its own, and the
+ * rounding drift is plugged into the last non-zero line so the series sums to
+ * exactly `total.convert(rate)` (the right-of-use base cost, for depreciation).
+ */
+export function convertSeriesAtRate(
+  amounts: readonly string[],
+  currency: string,
+  baseCurrency: string,
+  rate: string,
+): string[] {
+  const total = wide(
+    amounts.reduce((acc, a) => acc.add(wide(a, currency)), wide(0, currency)),
+    currency,
+  ).convert(baseCurrency, rate);
+  const target = narrow(total, baseCurrency);
+  const converted = amounts.map((a) => Money.of(a, currency).convert(baseCurrency, rate));
+  const sum = converted.reduce((acc, m) => acc.add(m), Money.zero(baseCurrency));
+  const drift = target.subtract(sum);
+  if (!drift.isZero()) {
+    let last = converted.length - 1;
+    while (last > 0 && converted[last]!.isZero()) last -= 1;
+    converted[last] = converted[last]!.add(drift);
+  }
+  return converted.map((m) => m.toString());
+}
+
+/**
+ * Base carrying amount relieved when `payment` (contract currency) settles part
+ * of a liability carried at `liabilityBase` for `liability` units: the payment's
+ * share of the carrying base, and the whole of it when the payment clears the
+ * liability so no rounding residue is left behind.
+ */
+export function baseRelieved(liability: Money, liabilityBase: Money, payment: Money): Money {
+  if (liability.isZero() || payment.greaterThan(liability) || payment.equals(liability))
+    return liabilityBase;
+  const share = wide(liabilityBase, liabilityBase.currency)
+    .multiply(payment.toString())
+    .divide(liability.toString());
+  return narrow(share, liabilityBase.currency);
+}

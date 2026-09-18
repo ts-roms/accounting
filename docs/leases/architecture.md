@@ -100,6 +100,15 @@ Accounts resolve lease override -> mapping: `RIGHT_OF_USE_ASSET`,
   already posted but unpaid is released with the liability - settle it first
   if it is still owed.
 - **Completion** is derived: every month posted and every instalment paid.
+- **Foreign-currency leases**: the contract currency is data (`currency`,
+  fixed once commenced); the schedule stays in it and the ledger holds base
+  figures measured as `docs/accounting/multi-currency.md` describes -
+  commencement rate for the asset, run-date rate for interest, carrying rate
+  for the liability relieved by an instalment (realized FX on the difference
+  to the cash), closing rate through the FX revaluation for the open
+  liability. `lease_events` carry both the contract and the base effects;
+  the integrity checks compare the base effects with the ledger net of the
+  revaluation in force.
 - Journal lines carry the lease's branch and dimensions; validated by the
   gateway like any other posting.
 

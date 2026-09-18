@@ -362,7 +362,7 @@ Stock-moving lines on invoices, bills, orders, receipts and returns accept
 
 | Method                      | Path                                                                                                                                                   | Permission                                      |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------- |
-| GET / POST / PATCH          | `/bank-accounts`, `/bank-accounts/:id` (ledger balance, open statements)                                                                               | `bank-account.view` / `bank-account.manage`     |
+| GET / POST / PATCH          | `/bank-accounts`, `/bank-accounts/:id` (base ledger balance, foreign balance for currency-bound accounts, open statements)                             | `bank-account.view` / `bank-account.manage`     |
 | GET / PUT                   | `/bank-accounts/settings` `{ matchDateToleranceDays }`                                                                                                 | `bank-account.view` / `bank-account.manage`     |
 | GET / POST / PATCH / DELETE | `/bank-transactions` (paginated; `bankAccountId`, `status`, `from`, `to`), `/bank-transactions/:id`                                                    | `bank-account.view` / `bank-transaction.create` |
 | POST                        | `/bank-transactions/:id/post`, `/bank-transactions/:id/void { reason }`                                                                                | `bank-transaction.post`                         |

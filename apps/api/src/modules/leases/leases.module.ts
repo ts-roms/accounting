@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AccountingModule } from '@/modules/accounting/accounting.module';
+import { FxModule } from '@/modules/fx/fx.module';
 import { BankingModule } from '@/modules/banking/banking.module';
 import { JobsModule } from '@/modules/jobs/jobs.module';
 import { RbacModule } from '@/modules/rbac/rbac.module';
@@ -16,7 +17,7 @@ import { LeasesService } from './leases.service';
  * termination, register / maturity reports, integrity and the scheduled run.
  */
 @Module({
-  imports: [AccountingModule, BankingModule, RbacModule, JobsModule],
+  imports: [AccountingModule, BankingModule, FxModule, RbacModule, JobsModule],
   controllers: [LeasesController],
   providers: [
     LeasesConfigService,

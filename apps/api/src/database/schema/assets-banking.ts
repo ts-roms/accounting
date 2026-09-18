@@ -6,6 +6,7 @@ import {
   date,
   index,
   integer,
+  numeric,
   pgEnum,
   pgTable,
   text,
@@ -272,8 +273,13 @@ export const bankTransactions = pgTable(
     transactionType: bankTransactionTypeEnum('transaction_type').notNull(),
     status: bankTransactionStatusEnum('status').notNull().default('DRAFT'),
     transactionDate: date('transaction_date').notNull(),
+    /** Amount in the bank account's currency. */
     amount: money('amount').notNull(),
     currency: char('currency', { length: 3 }).notNull(),
+    /** 1 unit of `currency` = `exchangeRate` base units (1 for base-currency accounts). */
+    exchangeRate: numeric('exchange_rate', { precision: 19, scale: 8 }).notNull().default('1'),
+    /** `amount` in the company base currency - what the journal carries. */
+    baseAmount: money('base_amount').notNull().default('0'),
     counterpartyAccountId: uuid('counterparty_account_id').references(() => accounts.id, {
       onDelete: 'restrict',
     }),

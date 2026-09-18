@@ -117,15 +117,23 @@ export const fxRevaluations = pgTable(
     asOfDate: date('as_of_date').notNull(),
     reversalDate: date('reversal_date').notNull(),
     currency: char('currency', { length: 3 }).notNull(),
-    /** Per open item: what was revalued and by how much. */
+    /**
+     * Per monetary item: what was revalued and by how much. AR / AP items are
+     * open documents; BANK items are foreign-currency bank GL accounts; LEASE
+     * items are foreign-currency lease liabilities (the register's base carrying
+     * amount is the "document rate" side).
+     */
     lines: jsonb('lines')
       .$type<
         Array<{
-          side: 'AR' | 'AP';
+          side: 'AR' | 'AP' | 'BANK' | 'LEASE';
           documentId: string;
           documentNumber: string;
+          /** GL account the adjustment is posted to (BANK / LEASE items). */
+          accountId?: string;
           currency: string;
           openAmount: string;
+          /** Effective historical rate (base carrying / foreign amount) for BANK / LEASE items. */
           documentRate: string;
           closingRate: string;
           adjustment: string;

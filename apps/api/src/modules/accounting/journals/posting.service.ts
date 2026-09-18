@@ -61,9 +61,14 @@ export interface PostingLine {
   departmentId?: string | null;
   costCenterId?: string | null;
   projectId?: string | null;
-  /** Foreign-currency journals: the amount as entered, kept beside the base amount. */
+  /**
+   * Foreign amount beside the base amount, in `foreignCurrency`. Required on a
+   * line that hits an account bound to a currency (the account's foreign balance
+   * is the sum of these); manual foreign journals carry it on every line.
+   */
   foreignDebit?: string | null;
   foreignCredit?: string | null;
+  foreignCurrency?: string | null;
   exchangeRate?: string | null;
 }
 
@@ -273,12 +278,31 @@ export class AccountingPostingService {
           { line: index + 1 },
         );
       }
-      if (account.currency && account.currency !== currency) {
+      const hasForeign = line.foreignDebit != null || line.foreignCredit != null;
+      if (hasForeign && !line.foreignCurrency) {
         throw new BusinessRuleError(
-          ErrorCodes.CURRENCY_MISMATCH,
-          `Line ${index + 1}: ${account.code} is a ${account.currency} account; this journal is in ${currency}.`,
+          ErrorCodes.VALIDATION_FAILED,
+          `Line ${index + 1}: a foreign amount needs its currency.`,
           { line: index + 1 },
         );
+      }
+      if (line.foreignCurrency && line.foreignCurrency === currency) {
+        throw new BusinessRuleError(
+          ErrorCodes.VALIDATION_FAILED,
+          `Line ${index + 1}: the foreign currency cannot be the base currency ${currency}.`,
+          { line: index + 1 },
+        );
+      }
+      // An account bound to a currency only takes lines that carry their amount in that
+      // currency, so its foreign balance stays derivable from the ledger.
+      if (account.currency && account.currency !== currency) {
+        if (line.foreignCurrency !== account.currency) {
+          throw new BusinessRuleError(
+            ErrorCodes.CURRENCY_MISMATCH,
+            `Line ${index + 1}: ${account.code} is a ${account.currency} account; the line must carry its ${account.currency} amount${line.foreignCurrency ? ` (got ${line.foreignCurrency})` : ''}.`,
+            { line: index + 1 },
+          );
+        }
       }
       const debit = Money.parse(line.debit, currency);
       const credit = Money.parse(line.credit, currency);
@@ -582,6 +606,7 @@ export class AccountingPostingService {
         projectId: line.projectId ?? null,
         foreignDebit: line.foreignDebit ?? null,
         foreignCredit: line.foreignCredit ?? null,
+        foreignCurrency: line.foreignCurrency ?? null,
         exchangeRate: line.exchangeRate ?? null,
       })),
     );
@@ -768,6 +793,7 @@ export class AccountingPostingService {
           projectId: l.projectId,
           foreignDebit: l.foreignCredit,
           foreignCredit: l.foreignDebit,
+          foreignCurrency: l.foreignCurrency,
           exchangeRate: l.exchangeRate,
         })),
         sourceType: 'JOURNAL_REVERSAL',

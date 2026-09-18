@@ -3,6 +3,8 @@ import {
   addMonths,
   buildLeaseSchedule,
   classify,
+  baseRelieved,
+  convertSeriesAtRate,
   maturityBuckets,
   paymentMonths,
   presentValue,
@@ -183,5 +185,32 @@ describe('lease.logic', () => {
     );
     expect(buckets.map((b) => b.amount)).toEqual(['200.0000', '100.0000', '100.0000']);
     expect(buckets[0]!.to).toBe('2027-09-29');
+  });
+
+  it('converts a series at one rate with the rounding plug on the last non-zero line', () => {
+    // USD 10 per line at 57.123457 -> 571.2346 each (rounded); the total 300 x rate = 17137.0371.
+    const out = convertSeriesAtRate(Array(30).fill('10'), 'USD', PHP, '57.123457');
+    const sum = out.reduce((acc, v) => acc.add(Money.of(v, PHP)), Money.zero(PHP));
+    expect(sum.toString()).toBe(Money.of('300', 'USD').convert(PHP, '57.123457').toString());
+    expect(new Set(out.slice(0, -1)).size).toBe(1);
+    expect(out[out.length - 1]).not.toBe(out[0]);
+    // Trailing zero lines never carry the plug.
+    const tail = convertSeriesAtRate(['10', '10', '0'], 'USD', PHP, '57.123457');
+    expect(tail[2]).toBe('0.0000');
+    expect(Money.of(tail[0]!, PHP).add(Money.of(tail[1]!, PHP)).toString()).toBe(
+      Money.of('20', 'USD').convert(PHP, '57.123457').toString(),
+    );
+  });
+
+  it('relieves the carrying base in proportion to the payment and in full on the last one', () => {
+    const liability = Money.of('1000', 'USD');
+    const carrying = Money.of('56123.4567', PHP);
+    expect(baseRelieved(liability, carrying, Money.of('250', 'USD')).toString()).toBe('14030.8642');
+    expect(baseRelieved(liability, carrying, Money.of('1000', 'USD')).toString()).toBe(
+      '56123.4567',
+    );
+    expect(baseRelieved(Money.zero('USD'), Money.zero(PHP), Money.zero('USD')).toString()).toBe(
+      '0.0000',
+    );
   });
 });
