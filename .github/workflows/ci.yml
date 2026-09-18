@@ -40,20 +40,6 @@ jobs:
       - run: pnpm format:check
       - name: Unit tests
         run: pnpm test
-      - name: Upload API build for the e2e jobs
-        uses: actions/upload-artifact@v4
-        with:
-          name: api-dist
-          path: apps/api/dist
-          retention-days: 1
-      - name: Upload web build for the e2e jobs
-        uses: actions/upload-artifact@v4
-        with:
-          name: web-standalone
-          path: |
-            apps/web/.next/standalone
-            apps/web/.next/static
-          retention-days: 1
 
   api-e2e:
     name: API e2e
@@ -81,6 +67,7 @@ jobs:
       DATABASE_URL: postgres://accounting:accounting@127.0.0.1:5433/accounting_test
       TEST_DATABASE_URL: postgres://accounting:accounting@127.0.0.1:5433/accounting_test
       QUEUE_PREFIX: ci-api-e2e
+      WEB_BASE_URL: http://localhost:3006
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -139,15 +126,10 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build:packages
-      - uses: actions/download-artifact@v4
-        with:
-          name: api-dist
-          path: apps/api/dist
-      - uses: actions/download-artifact@v4
-        with:
-          name: web-standalone
-          path: apps/web/.next
+      - name: Build (packages, API, web)
+        # Built here rather than shipped as an artifact: uploads flatten pnpm's node_modules
+        # symlinks, which the traced standalone server depends on.
+        run: pnpm build
       - name: Migrate and seed the demo database
         run: pnpm db:migrate && pnpm db:seed
       - name: Start the API (production build)
@@ -159,14 +141,10 @@ jobs:
             sleep 2
           done
           echo "API did not become ready"; cat ../../api.log; exit 1
-      - name: Start the web app (standalone build)
+      - name: Start the web app (production build)
         working-directory: apps/web
         run: |
-          # The standalone server expects the static assets and public files beside it.
-          mkdir -p .next/standalone/apps/web/.next
-          cp -r .next/static .next/standalone/apps/web/.next/static
-          [ -d public ] && cp -r public .next/standalone/apps/web/public || true
-          HOSTNAME=127.0.0.1 PORT=3000 nohup node .next/standalone/apps/web/server.js > ../../web.log 2>&1 &
+          nohup pnpm exec next start -H 127.0.0.1 -p 3000 > ../../web.log 2>&1 &
           for i in $(seq 1 60); do
             curl -sf http://127.0.0.1:3000/login > /dev/null && exit 0
             sleep 2
