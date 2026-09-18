@@ -1,6 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import type { StatementsQuery } from '@accounting/validation';
+import { BusinessRuleError } from '@/common/errors/app-error';
+import { ErrorCodes } from '@/common/errors/error-codes';
 import { DRIZZLE, type Database } from '@/database/database.types';
 
 export interface StatementRow {
@@ -47,20 +49,29 @@ const ORDER: Record<StatementsQuery['orderBy'], string> = {
 export class StatementsService {
   constructor(@Inject(DRIZZLE) private readonly db: Database) {}
 
-  async top(query: StatementsQuery): Promise<StatementsView> {
+  /**
+   * Null when the extension can be queried; otherwise why not. Both halves are
+   * needed: CREATE EXTENSION succeeds on a server that does not preload the
+   * library, and the view then raises on every read.
+   */
+  async unavailableReason(): Promise<string | null> {
     const installed = await this.db.execute(
       sql`select 1 from pg_extension where extname = 'pg_stat_statements'`,
     );
-    if (installed.rows.length === 0) {
-      return {
-        available: false,
-        reason:
-          'pg_stat_statements is not installed. Add it to shared_preload_libraries, restart PostgreSQL and run CREATE EXTENSION pg_stat_statements in this database.',
-        resetAt: null,
-        orderBy: query.orderBy,
-        rows: [],
-      };
-    }
+    if (installed.rows.length === 0)
+      return 'pg_stat_statements is not installed. Add it to shared_preload_libraries, restart PostgreSQL and run CREATE EXTENSION pg_stat_statements in this database.';
+    const preload = await this.db.execute<{ setting: string }>(
+      sql`select current_setting('shared_preload_libraries', true) as setting`,
+    );
+    if (!/\bpg_stat_statements\b/.test(preload.rows[0]?.setting ?? ''))
+      return 'pg_stat_statements is installed but not preloaded: add it to shared_preload_libraries and restart PostgreSQL.';
+    return null;
+  }
+
+  async top(query: StatementsQuery): Promise<StatementsView> {
+    const reason = await this.unavailableReason();
+    if (reason)
+      return { available: false, reason, resetAt: null, orderBy: query.orderBy, rows: [] };
     let resetAt: string | null = null;
     try {
       const info = await this.db.execute<{ stats_reset: string | null }>(
@@ -117,6 +128,8 @@ export class StatementsService {
 
   /** Zeroes the counters so a fresh window (after a deploy, during a load test) can be read. */
   async reset(): Promise<void> {
+    const reason = await this.unavailableReason();
+    if (reason) throw new BusinessRuleError(ErrorCodes.VALIDATION_FAILED, reason);
     await this.db.execute(sql`select pg_stat_statements_reset()`);
   }
 }
