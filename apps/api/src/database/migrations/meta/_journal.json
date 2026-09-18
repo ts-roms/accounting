@@ -267,6 +267,13 @@
       "when": 1789738155536,
       "tag": "0037_account_period_balances",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1789751024853,
+      "tag": "0038_pg_stat_statements",
+      "breakpoints": true
     }
   ]
 }

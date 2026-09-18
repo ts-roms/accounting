@@ -306,6 +306,32 @@ describe('Operations (e2e)', () => {
 
   // ------------------------------------------------------------- permissions
 
+  it('lists the top database statements from pg_stat_statements and resets the counters (audited)', async () => {
+    // Migration 0038 created the extension in this database (the test role is the owner).
+    const stats = await as(
+      http().get('/api/v1/operations/statements?orderBy=calls&limit=5'),
+    ).expect(200);
+    expect(stats.body.available).toBe(true);
+    expect(stats.body.orderBy).toBe('calls');
+    expect(stats.body.rows.length).toBeGreaterThan(0);
+    expect(stats.body.rows.length).toBeLessThanOrEqual(5);
+    const top = stats.body.rows[0];
+    expect(top.calls).toBeGreaterThanOrEqual(stats.body.rows[stats.body.rows.length - 1].calls);
+    expect(typeof top.meanMs).toBe('number');
+    // Normalised text: parameters are placeholders, never literal values.
+    expect(top.query).not.toMatch(/admin@acme.local/);
+    await as(http().get('/api/v1/operations/statements?orderBy=slowest')).expect(400);
+    await as(http().get('/api/v1/operations/statements'), auditor).expect(200);
+    await as(http().post('/api/v1/operations/statements/reset'), auditor).expect(403);
+    await as(http().post('/api/v1/operations/statements/reset')).expect(204);
+    const after = await as(http().get('/api/v1/operations/statements?orderBy=total')).expect(200);
+    expect(after.body.resetAt).not.toBeNull();
+    const { rows } = await pool.query(
+      "select 1 from audit_logs where action = 'DELETE' and entity_type = 'StatementStats'",
+    );
+    expect(rows).toHaveLength(1);
+  });
+
   it('auditors read the console; viewers get nothing; only operations.manage runs jobs', async () => {
     await as(http().get('/api/v1/operations/status'), auditor).expect(200);
     await as(http().get('/api/v1/operations/jobs'), auditor).expect(200);

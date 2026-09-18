@@ -18,7 +18,8 @@
     "db:migrate": "tsx src/database/migrate.ts",
     "db:seed": "tsx src/database/seed/index.ts",
     "db:reset": "tsx src/database/reset.ts",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "db:migrate:dist": "node dist/database/migrate.js"
   },
   "dependencies": {
     "@accounting/config": "workspace:*",
