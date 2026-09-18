@@ -222,7 +222,7 @@ test.describe('financial close', () => {
     await page.getByTestId('close-start-confirm').click();
     await expect(page).toHaveURL(/\/accounting\/financial-close\/[0-9a-f-]+$/);
     await expect(page.getByTestId('close-status')).toHaveText('IN PROGRESS');
-    await expect(page.getByTestId('close-task')).toHaveCount(18);
+    await expect(page.getByTestId('close-task')).toHaveCount(21);
 
     // Work every required manual task.
     for (const key of [

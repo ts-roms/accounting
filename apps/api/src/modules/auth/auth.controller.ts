@@ -14,6 +14,19 @@ import { AppConfigService } from '@/config/app-config.service';
 import { clearAuthCookies, setAuthCookies } from './auth-cookies';
 import { AuthService } from './auth.service';
 
+/**
+ * Per-route sign-in limits are resolved at request time from the validated
+ * environment (decorators cannot inject the config service). Defaults guard
+ * against brute force; e2e runs that sign in dozens of times raise them.
+ */
+const loginRateLimit = (
+  key: 'AUTH_LOGIN_RATE_LIMIT' | 'AUTH_REFRESH_RATE_LIMIT',
+  fallback: number,
+) => {
+  const raw = Number(process.env[key]);
+  return Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : fallback;
+};
+
 class LoginDto extends createZodDto(loginSchema) {}
 class ChangePasswordDto extends createZodDto(changePasswordSchema) {}
 
@@ -28,7 +41,7 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(200)
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Throttle({ default: { limit: () => loginRateLimit('AUTH_LOGIN_RATE_LIMIT', 10), ttl: 60_000 } })
   @ApiOperation({ summary: 'Authenticate with email and password; sets httpOnly cookies' })
   async login(@Body() body: LoginDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.auth.login(body);
@@ -43,7 +56,9 @@ export class AuthController {
   @Public()
   @Post('refresh')
   @HttpCode(200)
-  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @Throttle({
+    default: { limit: () => loginRateLimit('AUTH_REFRESH_RATE_LIMIT', 30), ttl: 60_000 },
+  })
   @ApiOperation({ summary: 'Rotate the refresh token and issue a new access token' })
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const token =

@@ -87,7 +87,14 @@ export type SyncEntity = (typeof SYNC_ENTITIES)[number];
 export const SYNC_MODES = ['INCREMENTAL', 'FULL'] as const;
 export type SyncMode = (typeof SYNC_MODES)[number];
 
-export const SYNC_TRIGGERS = ['MANUAL', 'SCHEDULED', 'RETRY', 'RESUME', 'WEBHOOK', 'EVENT'] as const;
+export const SYNC_TRIGGERS = [
+  'MANUAL',
+  'SCHEDULED',
+  'RETRY',
+  'RESUME',
+  'WEBHOOK',
+  'EVENT',
+] as const;
 export type SyncTrigger = (typeof SYNC_TRIGGERS)[number];
 
 export const SYNC_JOB_STATUSES = [

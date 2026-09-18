@@ -1,4 +1,13 @@
-import { boolean, index, jsonb, pgEnum, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  index,
+  jsonb,
+  pgEnum,
+  pgTable,
+  text,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { REPORT_BASES, REPORT_CATEGORIES } from '@accounting/types';
 import type { ReportLayoutInput } from '@accounting/validation';
 import { entityStatusEnum, primaryId, timestamps } from './_shared';

@@ -211,9 +211,7 @@ export const integrationSyncCursors = pgTable(
     checkpoint: jsonb('checkpoint').$type<Record<string, unknown>>().notNull().default({}),
     ...timestamps,
   },
-  (t) => [
-    uniqueIndex('integration_sync_cursors_uq').on(t.integrationId, t.entity, t.direction),
-  ],
+  (t) => [uniqueIndex('integration_sync_cursors_uq').on(t.integrationId, t.entity, t.direction)],
 );
 
 // ------------------------------------------------------------------ mapping

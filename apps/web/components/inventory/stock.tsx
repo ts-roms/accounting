@@ -256,9 +256,7 @@ export function InventoryValuationPage() {
                 <dd>
                   <Amount value={r.totalLedger} currency={r.currency} />
                 </dd>
-                <dt
-                  className={cn('font-medium', r.reconciled ? 'text-success' : 'text-critical')}
-                >
+                <dt className={cn('font-medium', r.reconciled ? 'text-success' : 'text-critical')}>
                   {r.reconciled ? 'Reconciled' : 'Difference'}
                 </dt>
                 <dd>

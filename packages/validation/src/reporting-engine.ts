@@ -13,7 +13,13 @@ import {
 } from '@accounting/types';
 import { isoDateSchema } from './accounting';
 import { dimensionRefsSchema } from './dimensions';
-import { codeSchema, nameSchema, optionalText, paginationQuerySchema, uuidSchema } from './primitives';
+import {
+  codeSchema,
+  nameSchema,
+  optionalText,
+  paginationQuerySchema,
+  uuidSchema,
+} from './primitives';
 
 // ------------------------------------------------------------ definitions
 
@@ -40,11 +46,11 @@ export const accountSelectorSchema = z
     (s) =>
       Boolean(
         s.accountIds?.length ||
-          s.codes?.length ||
-          (s.codeFrom && s.codeTo) ||
-          s.types?.length ||
-          s.subtypes?.length ||
-          s.mappingKeys?.length,
+        s.codes?.length ||
+        (s.codeFrom && s.codeTo) ||
+        s.types?.length ||
+        s.subtypes?.length ||
+        s.mappingKeys?.length,
       ),
     'An account selector needs at least one criterion',
   );
@@ -76,11 +82,19 @@ export const reportRowSchema = z
   })
   .superRefine((r, ctx) => {
     if ((r.kind === 'ACCOUNTS' || r.kind === 'DIMENSION_GROUP') && !r.accounts)
-      ctx.addIssue({ code: 'custom', message: `${r.kind} rows need an account selector`, path: ['accounts'] });
+      ctx.addIssue({
+        code: 'custom',
+        message: `${r.kind} rows need an account selector`,
+        path: ['accounts'],
+      });
     if (r.kind === 'FORMULA' && !r.formula)
       ctx.addIssue({ code: 'custom', message: 'FORMULA rows need a formula', path: ['formula'] });
     if (r.kind === 'DIMENSION_GROUP' && !r.dimensionType)
-      ctx.addIssue({ code: 'custom', message: 'DIMENSION_GROUP rows need a dimension type', path: ['dimensionType'] });
+      ctx.addIssue({
+        code: 'custom',
+        message: 'DIMENSION_GROUP rows need a dimension type',
+        path: ['dimensionType'],
+      });
   });
 export type ReportRowInput = z.infer<typeof reportRowSchema>;
 
@@ -98,9 +112,17 @@ export const reportColumnSchema = z
   })
   .superRefine((c, ctx) => {
     if (c.kind === 'CUSTOM_RANGE' && !(c.from && c.to))
-      ctx.addIssue({ code: 'custom', message: 'CUSTOM_RANGE columns need from and to', path: ['from'] });
+      ctx.addIssue({
+        code: 'custom',
+        message: 'CUSTOM_RANGE columns need from and to',
+        path: ['from'],
+      });
     if ((c.kind === 'VARIANCE' || c.kind === 'VARIANCE_PCT') && !(c.base && c.against))
-      ctx.addIssue({ code: 'custom', message: 'Variance columns need base and against', path: ['base'] });
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Variance columns need base and against',
+        path: ['base'],
+      });
   });
 export type ReportColumnInput = z.infer<typeof reportColumnSchema>;
 
@@ -125,13 +147,25 @@ export const reportLayoutSchema = z
       if (r.formula)
         for (const ref of r.formula.split(/\s*[-+]\s*/))
           if (!rowKeys.has(ref))
-            ctx.addIssue({ code: 'custom', message: `Formula of ${r.key} references unknown row ${ref}`, path: ['rows'] });
+            ctx.addIssue({
+              code: 'custom',
+              message: `Formula of ${r.key} references unknown row ${ref}`,
+              path: ['rows'],
+            });
     }
     for (const c of l.columns) {
       if (c.base && !colKeys.has(c.base))
-        ctx.addIssue({ code: 'custom', message: `Column ${c.key} bases on unknown column ${c.base}`, path: ['columns'] });
+        ctx.addIssue({
+          code: 'custom',
+          message: `Column ${c.key} bases on unknown column ${c.base}`,
+          path: ['columns'],
+        });
       if (c.against && !colKeys.has(c.against))
-        ctx.addIssue({ code: 'custom', message: `Column ${c.key} compares against unknown column ${c.against}`, path: ['columns'] });
+        ctx.addIssue({
+          code: 'custom',
+          message: `Column ${c.key} compares against unknown column ${c.against}`,
+          path: ['columns'],
+        });
     }
   });
 export type ReportLayoutInput = z.infer<typeof reportLayoutSchema>;

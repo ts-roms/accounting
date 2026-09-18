@@ -217,7 +217,8 @@ function GenerateFileDialog({
           <DialogTitle>Generate a payment file</DialogTitle>
           <DialogDescription>
             Only posted vendor payments paid from the chosen bank account and not already in a live
-            file are eligible. Beneficiary details come from each vendor&apos;s primary bank account.
+            file are eligible. Beneficiary details come from each vendor&apos;s primary bank
+            account.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-3 sm:grid-cols-2">

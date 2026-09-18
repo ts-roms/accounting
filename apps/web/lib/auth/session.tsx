@@ -3,7 +3,14 @@ import * as React from 'react';
 import { useAppRouter } from '@/lib/navigation/progress';
 import { useQueryClient } from '@tanstack/react-query';
 import type { DelegatedGrant, PermissionKey } from '@accounting/types';
-import { api, getActiveCompanyId, setActiveCompanyId } from '../api/client';
+import { ErrorState } from '@accounting/ui';
+import {
+  ApiError,
+  api,
+  describeError,
+  getActiveCompanyId,
+  setActiveCompanyId,
+} from '../api/client';
 import { useMe } from '../api/hooks';
 import type { CompanySummary, MeResponse } from '../api/types';
 
@@ -37,11 +44,14 @@ export function SessionProvider({
   const router = useAppRouter();
   const queryClient = useQueryClient();
   const [companyId, setCompanyId] = React.useState<string | null>(() => getActiveCompanyId());
-  const { data: me, isLoading, isError } = useMe();
+  const { data: me, isLoading, isError, error, refetch } = useMe();
 
+  // Only a rejected session sends the user to sign in; a throttled / unreachable API
+  // (429, 5xx, network) keeps the shell and offers a retry instead of logging out.
+  const unauthenticated = isError && error instanceof ApiError && error.status === 401;
   React.useEffect(() => {
-    if (isError) router.replace('/login');
-  }, [isError, router]);
+    if (unauthenticated) router.replace('/login');
+  }, [unauthenticated, router]);
 
   // Auto-select the first accessible company if none (or a stale one) is stored.
   React.useEffect(() => {
@@ -94,6 +104,16 @@ export function SessionProvider({
     };
   }, [me, companyId, setActiveCompany, logout]);
 
+  if (isError && !unauthenticated)
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6">
+        <ErrorState
+          title="Cannot reach the accounting service"
+          description={describeError(error)}
+          onRetry={() => void refetch()}
+        />
+      </div>
+    );
   if (isLoading || !value) return <>{fallback}</>;
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

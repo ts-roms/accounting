@@ -1,0 +1,191 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: 22
+  TURBO_TELEMETRY_DISABLED: 1
+  NEXT_TELEMETRY_DISABLED: 1
+  # Test-only secrets: never reused outside CI.
+  JWT_ACCESS_SECRET: ci-jwt-access-secret-not-for-production-0123456789
+  INTEGRATION_ENCRYPTION_KEY: ci-integration-encryption-key-0123456789
+  REDIS_URL: redis://127.0.0.1:6379
+  AI_PROVIDER: HEURISTIC
+  COOKIE_SECURE: 'false'
+
+jobs:
+  quality:
+    name: Build, lint, typecheck, unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build (packages, API, web)
+        run: pnpm build
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm format:check
+      - name: Unit tests
+        run: pnpm test
+      - name: Upload API build for the e2e jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-dist
+          path: apps/api/dist
+          retention-days: 1
+      - name: Upload web build for the e2e jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-standalone
+          path: |
+            apps/web/.next/standalone
+            apps/web/.next/static
+          retention-days: 1
+
+  api-e2e:
+    name: API e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: quality
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: accounting
+          POSTGRES_PASSWORD: accounting
+          POSTGRES_DB: accounting_test
+        ports: ['5433:5432']
+        options: >-
+          --health-cmd "pg_isready -U accounting"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgres://accounting:accounting@127.0.0.1:5433/accounting_test
+      TEST_DATABASE_URL: postgres://accounting:accounting@127.0.0.1:5433/accounting_test
+      QUEUE_PREFIX: ci-api-e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:packages
+      - name: API e2e suites (each suite drops and reseeds the schema)
+        run: pnpm --filter @accounting/api test:e2e
+
+  web-e2e:
+    name: Web e2e (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: quality
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: accounting
+          POSTGRES_PASSWORD: accounting
+          POSTGRES_DB: accounting_ci
+        ports: ['5433:5432']
+        options: >-
+          --health-cmd "pg_isready -U accounting"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgres://accounting:accounting@127.0.0.1:5433/accounting_ci
+      QUEUE_PREFIX: ci-web-e2e
+      API_PORT: 3001
+      API_CORS_ORIGINS: http://127.0.0.1:3000
+      WEB_BASE_URL: http://127.0.0.1:3000
+      API_INTERNAL_URL: http://127.0.0.1:3001
+      STORAGE_DIR: ./storage-ci
+      ACCOUNTING_SCHEDULES_CRON: ''
+      SEED_ADMIN_PASSWORD: P@ssw0rd123
+      SEED_DEMO_PASSWORD: P@ssw0rd123
+      PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
+      # The suite signs in far more than a person would; keep the brute-force guard out of the way.
+      AUTH_LOGIN_RATE_LIMIT: 1000
+      AUTH_REFRESH_RATE_LIMIT: 1000
+      RATE_LIMIT_MAX: 5000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:packages
+      - uses: actions/download-artifact@v4
+        with:
+          name: api-dist
+          path: apps/api/dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-standalone
+          path: apps/web/.next
+      - name: Migrate and seed the demo database
+        run: pnpm db:migrate && pnpm db:seed
+      - name: Start the API (production build)
+        working-directory: apps/api
+        run: |
+          nohup node dist/main.js > ../../api.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:3001/api/v1/health/ready > /dev/null && exit 0
+            sleep 2
+          done
+          echo "API did not become ready"; cat ../../api.log; exit 1
+      - name: Start the web app (standalone build)
+        working-directory: apps/web
+        run: |
+          # The standalone server expects the static assets and public files beside it.
+          mkdir -p .next/standalone/apps/web/.next
+          cp -r .next/static .next/standalone/apps/web/.next/static
+          [ -d public ] && cp -r public .next/standalone/apps/web/public || true
+          HOSTNAME=127.0.0.1 PORT=3000 nohup node .next/standalone/apps/web/server.js > ../../web.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:3000/login > /dev/null && exit 0
+            sleep 2
+          done
+          echo "Web did not become ready"; cat ../../web.log; exit 1
+      - name: Install Playwright browsers
+        working-directory: apps/web
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Playwright
+        working-directory: apps/web
+        run: pnpm exec playwright test --reporter=line,html
+      - name: Upload Playwright report and server logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+            api.log
+            web.log
+          retention-days: 7
