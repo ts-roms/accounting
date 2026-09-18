@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, RefreshCw } from 'lucide-react';
 import { P } from '@accounting/types';
 import {
   AnimatedProgress,
@@ -18,17 +18,21 @@ import {
   cn,
 } from '@accounting/ui';
 import { useSession } from '@/lib/auth/session';
-import { useIntegrityReport } from '@/lib/api/accounting-hooks';
+import { useLatestIntegrityRun, useRunIntegrityNow } from '@/lib/api/accounting-hooks';
 import { useReconciliationSummary } from '@/lib/api/reconciliation-hooks';
 import { useCloses } from '@/lib/api/close-hooks';
 import { today } from '@/components/accounting/primitives';
+import { formatDateTime } from '@/lib/format';
 import { PercentageDisplay } from './display';
 
 /**
- * Financial Health: derived only from live control data - the integrity
- * checker, the reconciliation center and the current financial close. There
- * is no invented "score": each row shows the real measure behind it, and the
- * headline is the worst tone among them.
+ * Financial Health: derived only from control data - the latest stored
+ * integrity run (the nightly job, or "Run now"), the live reconciliation
+ * center and the current financial close. There is no invented "score": each
+ * row shows the real measure behind it, and the headline is the worst tone
+ * among them. The integrity row reads the stored outcome rather than
+ * re-running every check on each visit: the full audit over the whole ledger
+ * is the most expensive read in the system and belongs to a schedule.
  */
 export function FinancialHealth({ className }: { className?: string }) {
   const { hasPermission, activeCompany } = useSession();
@@ -37,7 +41,8 @@ export function FinancialHealth({ className }: { className?: string }) {
   const canRecon = hasPermission(P['reconciliation.view']) && Boolean(activeCompany);
   const canClose = hasPermission(P['close.view']) && Boolean(activeCompany);
 
-  const integrity = useIntegrityReport(asOf, canIntegrity);
+  const integrity = useLatestIntegrityRun(canIntegrity);
+  const runNow = useRunIntegrityNow();
   const recon = useReconciliationSummary(asOf, canRecon);
   const closes = useCloses(
     { page: 1, pageSize: 1, sortBy: 'createdAt', sortDir: 'desc' },
@@ -46,16 +51,19 @@ export function FinancialHealth({ className }: { className?: string }) {
 
   if (!canIntegrity && !canRecon && !canClose) return null;
 
-  // --- integrity
-  const findings = integrity.data?.findings ?? [];
+  // --- integrity (stored findings only carry the checks that found something)
+  const run = integrity.data ?? null;
+  const findings = run?.findings ?? [];
   const criticalFindings = findings.filter((f) => f.severity === 'CRITICAL');
   const warningFindings = findings.filter((f) => f.severity === 'WARNING');
-  const integrityTone: Tone | undefined = integrity.data
-    ? integrity.data.status === 'OK'
-      ? 'positive'
-      : integrity.data.status === 'WARNING'
-        ? 'warning'
-        : 'critical'
+  const integrityTone: Tone | undefined = integrity.isSuccess
+    ? !run
+      ? 'neutral'
+      : run.status === 'OK'
+        ? 'positive'
+        : run.status === 'WARNING'
+          ? 'warning'
+          : 'critical'
     : undefined;
 
   // --- reconciliation
@@ -126,16 +134,39 @@ export function FinancialHealth({ className }: { className?: string }) {
             label="Accounting integrity"
             href="/accounting/integrity"
             tone={integrityTone}
-            loading={integrity.isLoading}
+            loading={integrity.isLoading || runNow.isPending}
             error={integrity.isError}
             value={
-              integrity.data ? (
-                <StatusBadge tone={integrityTone ?? 'neutral'} size="sm">
-                  {integrity.data.status === 'OK'
-                    ? 'All checks passed'
-                    : `${criticalFindings.length} critical · ${warningFindings.length} warning`}
-                </StatusBadge>
+              integrity.isSuccess ? (
+                run ? (
+                  <span className="flex flex-col items-end gap-0.5">
+                    <StatusBadge tone={integrityTone ?? 'neutral'} size="sm">
+                      {run.status === 'OK'
+                        ? 'All checks passed'
+                        : run.status === 'FAILED'
+                          ? 'Check failed'
+                          : `${criticalFindings.length} critical · ${warningFindings.length} warning`}
+                    </StatusBadge>
+                    <span className="text-xs text-muted-foreground">
+                      checked {formatDateTime(run.ranAt)}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Not run yet</span>
+                )
               ) : null
+            }
+            action={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Run integrity checks now"
+                title="Run integrity checks now"
+                disabled={runNow.isPending}
+                onClick={() => runNow.mutate()}
+              >
+                <RefreshCw className={cn(runNow.isPending && 'animate-spin')} />
+              </Button>
             }
           />
         ) : null}
@@ -239,6 +270,7 @@ function HealthRow({
   progress,
   loading,
   error,
+  action,
 }: {
   label: string;
   href: string;
@@ -247,33 +279,38 @@ function HealthRow({
   progress?: number;
   loading?: boolean;
   error?: boolean;
+  /** Optional control rendered beside the row (a sibling of the link, never nested in it). */
+  action?: React.ReactNode;
 }) {
   return (
-    <Link
-      href={href}
-      className="block rounded-sm px-1 py-1 transition-colors duration-fast hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-    >
-      <div className="flex items-center justify-between gap-3">
-        <span className="shrink-0 text-sm text-muted-foreground">{label}</span>
-        {loading ? (
-          <Skeleton className="h-4 w-28" />
-        ) : error ? (
-          <StatusBadge tone="warning" size="sm">
-            Unavailable
-          </StatusBadge>
-        ) : (
-          <span className="min-w-0 text-right">{value}</span>
-        )}
-      </div>
-      {progress !== undefined && !loading && !error ? (
-        <AnimatedProgress
-          value={progress}
-          size="sm"
-          tone={tone ? TONE_BAR[tone] : 'primary'}
-          label={`${label} progress`}
-          className="mt-1.5"
-        />
-      ) : null}
-    </Link>
+    <div className="flex items-start gap-1">
+      <Link
+        href={href}
+        className="block min-w-0 flex-1 rounded-sm px-1 py-1 transition-colors duration-fast hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <span className="shrink-0 text-sm text-muted-foreground">{label}</span>
+          {loading ? (
+            <Skeleton className="h-4 w-28" />
+          ) : error ? (
+            <StatusBadge tone="warning" size="sm">
+              Unavailable
+            </StatusBadge>
+          ) : (
+            <span className="min-w-0 text-right">{value}</span>
+          )}
+        </div>
+        {progress !== undefined && !loading && !error ? (
+          <AnimatedProgress
+            value={progress}
+            size="sm"
+            tone={tone ? TONE_BAR[tone] : 'primary'}
+            label={`${label} progress`}
+            className="mt-1.5"
+          />
+        ) : null}
+      </Link>
+      {action}
+    </div>
   );
 }

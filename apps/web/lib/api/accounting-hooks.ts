@@ -30,6 +30,7 @@ import type {
   IncomeStatementReport,
   IncomeStatementTrend,
   IntegrityReport,
+  IntegrityRunView,
   JournalCorrectionResult,
   JournalEntryDetail,
   JournalEntryView,
@@ -287,6 +288,28 @@ export const useBalanceSheet = (query: BalanceSheetQuery, enabled = true) =>
   });
 
 // ---------------------------------------------------------------- integrity
+
+const integrityRunKey = () => ['integrity-run', company()] as const;
+
+/** Latest stored integrity run (the scheduled job or "Run now"); null before the first run. */
+export const useLatestIntegrityRun = (enabled = true) =>
+  useQuery({
+    queryKey: integrityRunKey(),
+    queryFn: () => api.get<IntegrityRunView | null>('/integrity/runs/latest'),
+    staleTime: 60_000,
+    enabled,
+  });
+
+export const useRunIntegrityNow = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<IntegrityRunView>('/integrity/runs', {}),
+    onSuccess: (run) => {
+      qc.setQueryData(integrityRunKey(), run);
+      void qc.invalidateQueries({ queryKey: ['integrity'] });
+    },
+  });
+};
 
 export const useIntegrityReport = (asOf: string, enabled = true) =>
   useQuery({

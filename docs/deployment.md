@@ -24,7 +24,11 @@ PostgreSQL on 5432; change `POSTGRES_HOST_PORT` / `DATABASE_URL` if needed.
 
 `infrastructure/docker/docker-compose.yml` defines:
 
-- `postgres`, `redis` - always started (`pnpm infra:up`).
+- `postgres`, `redis` - always started (`pnpm infra:up`). Postgres gets
+  `shm_size: 256m`: parallel workers and hash aggregates allocate dynamic
+  shared memory, and Docker's 64 MB default fails under ~20 concurrent report
+  queries (`could not resize shared memory segment` -> HTTP 500). Recreate the
+  container (`docker compose up -d postgres`) after pulling this change.
 - `api`, `web` - profile `app`, multi-stage Dockerfiles
   (`api.Dockerfile`, `web.Dockerfile`), non-root runtime users.
 

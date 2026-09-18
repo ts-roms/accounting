@@ -447,9 +447,10 @@ and is what the tests run; `ANTHROPIC` adds image reading and phrasing.
 
 ### Integrity (all require `X-Company-Id`)
 
-| Method | Path                                                                                                                         | Permission        |
-| ------ | ---------------------------------------------------------------------------------------------------------------------------- | ----------------- |
-| GET    | `/integrity?asOf` - runs every accounting invariant read-only -> `{ status, findings[{ check, severity, count, samples }] }` | `integrity.check` |
+| Method     | Path                                                                                                                                                                                  | Permission        |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| GET        | `/integrity?asOf` - runs every accounting invariant read-only -> `{ status, findings[{ check, severity, count, samples }] }`                                                          | `integrity.check` |
+| GET / POST | `/integrity/runs/latest` (latest stored run of the active company, `null` before the first), `/integrity/runs` (run now and store the outcome - what the dashboard health card shows) | `integrity.check` |
 
 New error codes: `ACCOUNTING_PERIOD_SOFT_CLOSED`, `ACCOUNTING_PERIOD_LOCKED`, `SOURCE_DOCUMENT_INVALID` (all 422).
 
