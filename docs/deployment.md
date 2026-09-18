@@ -8,7 +8,7 @@ pnpm install
 pnpm infra:up                   # PostgreSQL (host port 5433) + Redis (6379) in Docker
 pnpm build:packages             # compile shared packages (also done by `pnpm build`)
 pnpm db:migrate && pnpm db:seed
-pnpm dev                        # turbo: packages in watch mode + API (3001) + web (3000)
+pnpm dev                        # turbo: packages in watch mode + API (3001) + web (3006)
 ```
 
 Or: `bash infrastructure/scripts/dev-setup.sh`.

@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * E2E tests assume the full stack is running locally (API on 3001, web on 3000)
+ * E2E tests assume the full stack is running locally (API on 3001, web on 3006)
  * with the development seed applied: `pnpm infra:up && pnpm db:migrate && pnpm db:seed && pnpm dev`.
  */
 export default defineConfig({
@@ -15,7 +15,7 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? 'github' : 'list',
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3006',
     trace: 'on-first-retry',
   },
   projects: [

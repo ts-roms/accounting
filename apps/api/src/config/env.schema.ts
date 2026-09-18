@@ -11,7 +11,7 @@ export const envSchema = z.object({
   API_GLOBAL_PREFIX: z.string().default('api'),
   API_CORS_ORIGINS: z
     .string()
-    .default('http://localhost:3000')
+    .default('http://localhost:3006')
     .transform((v) =>
       v
         .split(',')
@@ -94,7 +94,7 @@ export const envSchema = z.object({
   /** Public base URL of the API for OAuth redirect URIs (e.g. https://api.example.com). */
   OAUTH_REDIRECT_BASE_URL: z.string().trim().url().optional(),
   /** Where OAuth callbacks send the browser back to (the web app). */
-  WEB_BASE_URL: z.string().trim().url().default('http://localhost:3000'),
+  WEB_BASE_URL: z.string().trim().url().default('http://localhost:3006'),
 
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });
