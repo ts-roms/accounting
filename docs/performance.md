@@ -31,7 +31,7 @@ ledger grows. Every report still derives from posted journal lines (see
 - **The dashboard reads the stored integrity run.** The health card shows the
   latest `integrity_runs` row (nightly job or "Run now" ->
   `POST /integrity/runs`) with its timestamp; `GET /integrity` remains the
-  live audit for the integrity page. Running all 22 checks on every dashboard
+  live audit for the integrity page. Running all 23 checks on every dashboard
   visit was the single largest share of database CPU under load.
 - **Fan out independent reads inside a request.** The reconciliation summary
   evaluates its five areas and every bank account with `Promise.all`; under
