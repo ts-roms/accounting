@@ -9,10 +9,12 @@
     "pnpm": ">=9.0.0"
   },
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "pnpm build:packages && turbo run dev --parallel",
+    "dev:apps": "pnpm build:packages && pnpm -r --parallel --stream --filter @accounting/api --filter @accounting/web dev",
     "dev:api": "pnpm --filter @accounting/api dev",
     "dev:web": "pnpm --filter @accounting/web dev",
     "build": "turbo run build",
+    "start": "pnpm -r --parallel --stream --filter @accounting/api --filter @accounting/web start",
     "build:packages": "pnpm -r --filter \"./packages/*\" build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",

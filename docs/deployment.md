@@ -8,10 +8,14 @@ pnpm install
 pnpm infra:up                   # PostgreSQL (host port 5433) + Redis (6379) in Docker
 pnpm build:packages             # compile shared packages (also done by `pnpm build`)
 pnpm db:migrate && pnpm db:seed
-pnpm dev                        # turbo: packages in watch mode + API (3001) + web (3006)
+pnpm dev                        # builds the packages, then runs everything in parallel:
+                                #   package watchers + API (3001) + web (3006), output prefixed per app
+pnpm dev:apps                   # only the two apps, in parallel (packages built once, no watchers)
 ```
 
-Or: `bash infrastructure/scripts/dev-setup.sh`.
+Or: `bash infrastructure/scripts/dev-setup.sh`. `pnpm start` runs the built API and
+web (`pnpm build` first) in parallel the same way; `pnpm dev:api` / `pnpm dev:web`
+start one app.
 
 Seeded accounts (development only): `admin@acme.local / P@ssw0rd123`
 (SUPER_ADMIN), `accountant@`, `finance@`, `auditor@`, `viewer@acme.local` with

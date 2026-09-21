@@ -57,7 +57,7 @@ docs                Architecture, accounting engine, database, API, security, pe
 
 | Command                                                    | Description                                                                                                                                        |
 | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm dev` / `pnpm build`                                  | Run / build everything through Turborepo                                                                                                           |
+| `pnpm dev` / `pnpm dev:apps` / `pnpm build` / `pnpm start` | Dev: packages built, then watchers + API + web in parallel (`dev:apps` = the two apps only); build everything; run the built apps in parallel      |
 | `pnpm lint` / `pnpm typecheck` / `pnpm test`               | Quality gates across the workspace                                                                                                                 |
 | `pnpm --filter @accounting/api test:e2e`                   | API integration tests against `accounting_test` (needs `pnpm infra:up`); worktrees use `accounting_test_<worktree>`, or set `TEST_DATABASE_SUFFIX` |
 | `pnpm --filter @accounting/web test:e2e`                   | Playwright against a running stack                                                                                                                 |
