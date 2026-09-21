@@ -87,6 +87,15 @@ becomes "the truth".
 | `/health`       | Dependencies reachable (database, Redis) - Terminus.                                                                                |
 | `/health/ready` | **Readiness**: 200 only when the database answers, the bundled migration journal is fully applied and the instance is not draining. |
 
+A database that is behind the build (pending bundled migrations) is reported
+once at boot (`Database schema is N migration(s) behind this build (...); run
+`pnpm db:migrate``), keeps readiness at 503, and makes every **scheduled** or
+startup job stand down with that one warning (`SCHEMA_BEHIND`, no run row)
+instead of failing each tick with a "relation does not exist" stack trace.
+Manual runs from the console still execute - an operator asked. The check
+(`database/schema-status.ts`) is shared by readiness, the operations status
+and the job registry, and cached for a minute in the registry.
+
 On `SIGTERM` (or `app.close()`), `RuntimeStatusService.beforeApplicationShutdown`
 flips `draining` first - readiness returns 503 so load balancers stop routing
 here - then waits for inline jobs; workers close and the pool ends in the

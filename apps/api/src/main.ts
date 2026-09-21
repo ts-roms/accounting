@@ -8,6 +8,8 @@ import { cleanupOpenApiDoc } from 'nestjs-zod';
 import { API_VERSION } from '@accounting/config';
 import { AppModule } from './app.module';
 import { configureApp } from './app.setup';
+import { DRIZZLE, type Database } from './database/database.types';
+import { schemaBehindMessage, schemaStatus } from './database/schema-status';
 
 async function bootstrap(): Promise<void> {
   // rawBody: inbound webhook signatures are verified over the exact bytes received.
@@ -34,6 +36,15 @@ async function bootstrap(): Promise<void> {
     SwaggerModule.setup(`${config.env.API_GLOBAL_PREFIX}/docs`, app, document, {
       jsonDocumentUrl: `${config.env.API_GLOBAL_PREFIX}/docs-json`,
     });
+  }
+
+  // Say it once at boot: a database behind the build would otherwise surface as
+  // "relation does not exist" in every job and request that touches the new tables.
+  try {
+    const status = await schemaStatus(app.get<Database>(DRIZZLE));
+    if (status.pending.length) logger.warn(schemaBehindMessage(status), 'Bootstrap');
+  } catch (err) {
+    logger.warn(`Could not read the migration state: ${(err as Error).message}`, 'Bootstrap');
   }
 
   await app.listen(config.env.API_PORT, config.env.API_HOST);

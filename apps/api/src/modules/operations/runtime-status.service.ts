@@ -1,11 +1,11 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Inject, Injectable, type BeforeApplicationShutdown } from '@nestjs/common';
-import { sql } from 'drizzle-orm';
 import { PinoLogger } from 'nestjs-pino';
 import type { Pool } from 'pg';
 import { AppConfigService } from '@/config/app-config.service';
 import { DRIZZLE, PG_POOL, type Database } from '@/database/database.types';
+import { schemaStatus } from '@/database/schema-status';
 import { JobRegistryService } from '@/modules/jobs/job-registry.service';
 import { JobRunnerService } from '@/modules/jobs/job-runner.service';
 import { QueueService, type QueueStats } from '@/modules/jobs/queue.service';
@@ -42,12 +42,6 @@ export interface RuntimeStatus {
   inlineJobs: boolean;
 }
 
-interface JournalEntry {
-  idx: number;
-  when: number;
-  tag: string;
-}
-
 /**
  * Runtime health for operators and probes (hardening H8): dependency
  * checks, schema currency (pending migrations block readiness), storage,
@@ -58,7 +52,6 @@ interface JournalEntry {
 export class RuntimeStatusService implements BeforeApplicationShutdown {
   readonly startedAt = new Date();
   private draining = false;
-  private journalCache: JournalEntry[] | null = null;
 
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
@@ -112,35 +105,10 @@ export class RuntimeStatusService implements BeforeApplicationShutdown {
   /** Compares the bundled migration journal with drizzle's migrations table. */
   async migrations(): Promise<MigrationStatus | { error: string }> {
     try {
-      const journal = await this.journal();
-      const result = await this.db.execute(
-        sql`SELECT created_at FROM drizzle.__drizzle_migrations ORDER BY created_at DESC`,
-      );
-      const applied = (result.rows as unknown as Array<{ created_at: string | number }>).map((r) =>
-        Number(r.created_at),
-      );
-      const last = applied[0] ?? 0;
-      const pending = journal.filter((e) => e.when > last).map((e) => e.tag);
-      return { known: journal.length, applied: applied.length, pending };
+      return await schemaStatus(this.db);
     } catch (err) {
       return { error: err instanceof Error ? err.message : String(err) };
     }
-  }
-
-  private async journal(): Promise<JournalEntry[]> {
-    if (this.journalCache) return this.journalCache;
-    const file = path.join(
-      __dirname,
-      '..',
-      '..',
-      'database',
-      'migrations',
-      'meta',
-      '_journal.json',
-    );
-    const parsed = JSON.parse(await fs.readFile(file, 'utf8')) as { entries: JournalEntry[] };
-    this.journalCache = parsed.entries;
-    return parsed.entries;
   }
 
   async redis(): Promise<RuntimeStatus['redis']> {

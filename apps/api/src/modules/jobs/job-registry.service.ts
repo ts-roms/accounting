@@ -9,6 +9,7 @@ import { ErrorCodes } from '@/common/errors/error-codes';
 import { countWhere, offsetFor, toPaginatedResult } from '@/common/pagination/pagination';
 import { DRIZZLE, type Database } from '@/database/database.types';
 import { jobRuns, type JobRun } from '@/database/schema';
+import { schemaBehindMessage, schemaStatus } from '@/database/schema-status';
 import { AppConfigService } from '@/config/app-config.service';
 import { QueueService, type QueueName } from './queue.service';
 
@@ -102,6 +103,28 @@ export class JobRegistryService {
     }
   }
 
+  private schemaCheck: { at: number; message: string | null } | null = null;
+
+  /** Pending-migration message, cached for a minute; null when the schema is current. */
+  private async schemaBehind(): Promise<string | null> {
+    if (this.schemaCheck && Date.now() - this.schemaCheck.at < 60_000)
+      return this.schemaCheck.message;
+    let message: string | null = null;
+    try {
+      const status = await schemaStatus(this.db);
+      if (status.pending.length) {
+        message = schemaBehindMessage(status);
+        // Once per minute at most, not once per job per tick.
+        if (this.schemaCheck?.message !== message)
+          this.logger.warn({ pending: status.pending }, message);
+      }
+    } catch (err) {
+      this.logger.warn({ err }, 'Could not read the migration state; jobs continue');
+    }
+    this.schemaCheck = { at: Date.now(), message };
+    return message;
+  }
+
   private ensureWorker(queue: QueueName): void {
     if (this.workers.has(queue)) return;
     this.workers.add(queue);
@@ -110,7 +133,14 @@ export class JobRegistryService {
         this.logger.warn({ queue, name: job.name }, 'No registered job for scheduled occurrence');
         return;
       }
-      await this.execute(job.name, 'SCHEDULED');
+      try {
+        await this.execute(job.name, 'SCHEDULED');
+      } catch (err) {
+        // Already warned once by schemaBehind(); a failed BullMQ job would only
+        // add a stack trace and a dead letter per tick.
+        if (err instanceof BusinessRuleError && err.code === ErrorCodes.SCHEMA_BEHIND) return;
+        throw err;
+      }
     });
   }
 
@@ -150,6 +180,14 @@ export class JobRegistryService {
     actor: AuthenticatedUser | null = null,
   ): Promise<JobRun> {
     const def = this.definition(name);
+    // A database that is behind the build fails every job with a stack trace
+    // per tick. Scheduled and startup runs stand down with one warning until
+    // the migrations are applied; a manual run is an operator's explicit ask.
+    if (trigger !== 'MANUAL') {
+      const behind = await this.schemaBehind();
+      if (behind)
+        throw new BusinessRuleError(ErrorCodes.SCHEMA_BEHIND, `Job ${name} skipped: ${behind}`);
+    }
     const [started] = await this.db
       .insert(jobRuns)
       .values({
