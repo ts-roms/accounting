@@ -171,6 +171,44 @@ describe('Operations (e2e)', () => {
     expect(jobFailed).toHaveLength(1);
   });
 
+  it('scheduled jobs stand down while the database is behind the build; readiness says why', async () => {
+    // Pretend the newest migration was never applied (the tables exist; only the bookkeeping row goes).
+    const { rows: last } = await pool.query<{ id: number; hash: string; created_at: string }>(
+      'select id, hash, created_at from drizzle.__drizzle_migrations order by created_at desc limit 1',
+    );
+    await pool.query('delete from drizzle.__drizzle_migrations where id = $1', [last[0]!.id]);
+    const registry = app.get(JobRegistryService) as unknown as { schemaCheck: unknown };
+    registry.schemaCheck = null;
+    try {
+      const ready = await http().get('/api/v1/health/ready').expect(503);
+      expect(ready.body.reasons.join(' ')).toMatch(/migration/i);
+      await expect(
+        app.get(JobRegistryService).execute('session-cleanup', 'SCHEDULED'),
+      ).rejects.toMatchObject({
+        code: 'SCHEMA_BEHIND',
+      });
+      // No run row was written for the skipped tick...
+      const runs = await as(
+        http().get('/api/v1/operations/job-runs?jobName=session-cleanup'),
+      ).expect(200);
+      expect(runs.body.items.every((r: { trigger: string }) => r.trigger === 'MANUAL')).toBe(true);
+      // ...while an operator's manual run still goes through.
+      const manual = await as(
+        http().post('/api/v1/operations/jobs/delegation-expiration/run'),
+      ).expect(201);
+      expect(manual.body.status).toBe('SUCCEEDED');
+    } finally {
+      await pool.query(
+        'insert into drizzle.__drizzle_migrations (hash, created_at) values ($1, $2)',
+        [last[0]!.hash, last[0]!.created_at],
+      );
+      registry.schemaCheck = null;
+    }
+    // Still draining from the readiness test above, but no longer behind.
+    const after = await http().get('/api/v1/health/ready').expect(503);
+    expect(after.body.reasons.join(' ')).not.toMatch(/migration/i);
+  });
+
   it('a second execution while the lock is held is SKIPPED_LOCKED; the manual trigger refuses it', async () => {
     let release: () => void = () => undefined;
     const gate = new Promise<void>((r) => (release = r));
