@@ -22,6 +22,7 @@ import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { CompanyScoped } from '@/common/decorators/company-scoped.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
+import { businessToday } from '@/common/time/clock';
 import { DimensionRulesService } from './dimensions/dimension-rules.service';
 import { PostingRulesService } from './posting-rules/posting-rules.service';
 import { PrepaymentsService } from './prepayments/prepayments.service';
@@ -237,9 +238,6 @@ export class SuspenseController {
   @RequirePermissions(P['journal.view'])
   @ApiOperation({ summary: 'Suspense balances, unresolved postings, age and owner' })
   report(@CurrentUser() user: AuthenticatedUser, @Query() query: SuspenseQueryDto) {
-    return this.service.monitor(
-      user.companyId!,
-      query.asOf ?? new Date().toISOString().slice(0, 10),
-    );
+    return this.service.monitor(user.companyId!, query.asOf ?? businessToday());
   }
 }

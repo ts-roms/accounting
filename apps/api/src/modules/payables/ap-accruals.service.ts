@@ -26,6 +26,7 @@ import { AccountingPostingService } from '@/modules/accounting/journals/posting.
 import { DocumentNumberingService } from '@/modules/accounting/numbering/document-numbering.service';
 import { AuditService } from '@/modules/audit/audit.service';
 import { OutboxService } from '@/modules/integrations/events/outbox.service';
+import { businessToday } from '@/common/time/clock';
 import { ApConfigService } from './ap-config.service';
 import { grniValue } from './payables.logic';
 
@@ -105,7 +106,7 @@ export class ApAccrualsService {
     query: GrniQuery,
     executor: DbExecutor = this.db,
   ): Promise<GrniReport> {
-    const asOf = query.asOf ?? new Date().toISOString().slice(0, 10);
+    const asOf = query.asOf ?? businessToday();
     const currency = await this.accounts.companyCurrency(companyId, executor);
     const settings = await this.config.settings(companyId, executor);
     const where: SQL[] = [

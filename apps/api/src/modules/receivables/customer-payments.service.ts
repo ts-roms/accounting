@@ -54,6 +54,7 @@ import { CustomersService } from './customers.service';
 import { ExchangeRatesService } from '@/modules/fx/exchange-rates.service';
 import { FxService } from '@/modules/fx/fx.service';
 import { OutboxService } from '@/modules/integrations/events/outbox.service';
+import { businessToday } from '@/common/time/clock';
 import { InvoicesService, type AllocationView } from './invoices.service';
 
 const MODULE = 'RECEIVABLES';
@@ -679,7 +680,7 @@ export class CustomerPaymentsService {
     actor: AuthenticatedUser,
     id: string,
     input: AllocateInput,
-    allocationDate = new Date().toISOString().slice(0, 10),
+    allocationDate = businessToday(),
   ): Promise<CustomerPaymentDetail> {
     await this.db.transaction(async (tx) => {
       const existing = await this.lock(tx, companyId, id);

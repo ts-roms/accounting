@@ -40,6 +40,7 @@ import { OutboxService } from '@/modules/integrations/events/outbox.service';
 import { NotificationsService } from '@/modules/integrations/notifications/notifications.service';
 import { SodService } from '@/modules/rbac/sod.service';
 import { ApprovalsService } from '@/modules/workflows/approvals.service';
+import { businessToday } from '@/common/time/clock';
 import { TreasuryConfigService } from './treasury-config.service';
 import { pettyCashOnHand, replenishmentDue } from './treasury.logic';
 
@@ -710,7 +711,7 @@ export class PettyCashService {
           tx,
           {
             companyId,
-            entryDate: voidDate ?? new Date().toISOString().slice(0, 10),
+            entryDate: voidDate ?? businessToday(),
             description: `Void ${v.documentNumber}: ${reason}`,
             reference: v.documentNumber,
             journalType: 'REVERSAL',

@@ -6,6 +6,7 @@ import { companies, payRuns } from '@/database/schema';
 import { NotificationsService } from '@/modules/integrations/notifications/notifications.service';
 import { JobRunnerService } from '@/modules/jobs/job-runner.service';
 import { QUEUES } from '@/modules/jobs/queue.service';
+import { businessToday } from '@/common/time/clock';
 import { PayrollConfigService } from './payroll-config.service';
 
 const JOB_NAME = 'payroll-reminders';
@@ -44,9 +45,7 @@ export class PayrollRemindersJob implements OnModuleInit {
     );
   }
 
-  async run(
-    asOf = new Date().toISOString().slice(0, 10),
-  ): Promise<{ companies: number; reminders: number }> {
+  async run(asOf = businessToday()): Promise<{ companies: number; reminders: number }> {
     const rows = await this.db
       .select({ id: companies.id, organizationId: companies.organizationId })
       .from(companies)

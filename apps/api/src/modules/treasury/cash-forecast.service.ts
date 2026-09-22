@@ -37,6 +37,7 @@ import { nextOccurrence } from '@/modules/accounting/recurring/recurring.logic';
 import { AuditService } from '@/modules/audit/audit.service';
 import { ArConfigService } from '@/modules/receivables/ar-config.service';
 import { addDays } from '@/modules/subledger/subledger.logic';
+import { businessToday } from '@/common/time/clock';
 import { CashPositionService } from './cash-position.service';
 import { TreasuryConfigService } from './treasury-config.service';
 import {
@@ -102,7 +103,7 @@ export class CashForecastService {
     query: CashForecastQuery,
     actor?: AuthenticatedUser,
   ): Promise<CashForecast> {
-    const asOf = query.asOf ?? new Date().toISOString().slice(0, 10);
+    const asOf = query.asOf ?? businessToday();
     const settings = await this.config.settings(companyId);
     const horizonDays = query.horizonDays ?? settings.forecastHorizonDays;
     const granularity = query.granularity ?? settings.forecastGranularity;

@@ -28,6 +28,7 @@ import { AuthorityService } from '@/modules/delegations/authority.service';
 import { OutboxService } from '@/modules/integrations/events/outbox.service';
 import { NotificationsService } from '@/modules/integrations/notifications/notifications.service';
 import { ApprovalsService } from '@/modules/workflows/approvals.service';
+import { businessToday } from '@/common/time/clock';
 import { CustomerPaymentsService } from './customer-payments.service';
 import { CustomersService } from './customers.service';
 
@@ -160,7 +161,7 @@ export class RefundsService {
       const documentNumber = await this.numbering.allocate(
         companyId,
         'RFD',
-        new Date().getFullYear(),
+        Number(businessToday().slice(0, 4)),
         tx,
       );
       const [created] = await tx

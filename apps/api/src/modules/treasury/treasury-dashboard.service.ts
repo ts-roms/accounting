@@ -11,6 +11,7 @@ import {
   paymentFiles,
 } from '@/database/schema';
 import { AccountsService } from '@/modules/accounting/accounts/accounts.service';
+import { businessToday } from '@/common/time/clock';
 import { BankTransfersService, type BankTransferView } from './bank-transfers.service';
 import { CashForecastService, type CashForecast } from './cash-forecast.service';
 import { CashPositionService, type CashPosition } from './cash-position.service';
@@ -65,10 +66,7 @@ export class TreasuryDashboardService {
     private readonly pettyCash: PettyCashService,
   ) {}
 
-  async dashboard(
-    companyId: string,
-    asOf = new Date().toISOString().slice(0, 10),
-  ): Promise<TreasuryDashboard> {
+  async dashboard(companyId: string, asOf = businessToday()): Promise<TreasuryDashboard> {
     const currency = await this.accounts.companyCurrency(companyId);
     const settings = await this.config.settings(companyId);
     const query: CashForecastQuery = {

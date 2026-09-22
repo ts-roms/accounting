@@ -13,6 +13,7 @@ import { VendorsService } from '@/modules/payables/vendors.service';
 import { ArReportsService } from '@/modules/receivables/ar-reports.service';
 import { CustomersService } from '@/modules/receivables/customers.service';
 import { ReportingService } from '@/modules/reporting/reporting.service';
+import { businessToday } from '@/common/time/clock';
 import { toCsv, type CsvColumn } from './csv';
 
 export interface ExportFile {
@@ -35,7 +36,7 @@ export const DATASET_PERMISSION: Record<ExportDataset, PermissionKey> = {
   AUDIT_LOGS: P['audit.view'],
 };
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = businessToday;
 const PAGE = 200;
 
 /**

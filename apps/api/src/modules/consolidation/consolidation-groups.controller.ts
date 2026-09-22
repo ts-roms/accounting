@@ -35,6 +35,7 @@ import {
 import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
+import { businessToday } from '@/common/time/clock';
 import { ConsolidationGroupsService } from './consolidation-groups.service';
 import { ConsolidationIntegrityService } from './consolidation-integrity.service';
 import { ConsolidationRunsService } from './consolidation-runs.service';
@@ -320,10 +321,7 @@ export class ConsolidationPlatformController {
   @Get('integrity')
   @RequirePermissions(P['consolidation.view'])
   runIntegrity(@CurrentUser() user: AuthenticatedUser, @Query() query: AsOfQueryDto) {
-    return this.integrity.run(
-      user.organizationId,
-      query.asOf ?? new Date().toISOString().slice(0, 10),
-    );
+    return this.integrity.run(user.organizationId, query.asOf ?? businessToday());
   }
 }
 

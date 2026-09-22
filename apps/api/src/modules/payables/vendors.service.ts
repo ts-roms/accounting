@@ -45,6 +45,7 @@ import { AuthorityService } from '@/modules/delegations/authority.service';
 import { ApprovalsService } from '@/modules/workflows/approvals.service';
 import { OutboxService } from '@/modules/integrations/events/outbox.service';
 import { NotificationsService } from '@/modules/integrations/notifications/notifications.service';
+import { businessToday } from '@/common/time/clock';
 import { ApConfigService } from './ap-config.service';
 import { maskAccountNumber } from './payables.logic';
 
@@ -942,7 +943,7 @@ export class VendorsService {
     const result = new Map<string, VendorBalance>();
     if (vendorIds.length === 0) return result;
     const currency = await this.accounts.companyCurrency(companyId, executor);
-    const today = new Date().toISOString().slice(0, 10);
+    const today = businessToday();
     for (const id of vendorIds)
       result.set(id, {
         outstanding: '0.0000',

@@ -32,6 +32,7 @@ import {
   type CustomerContact,
   type CustomerCreditProfile,
 } from '@/database/schema';
+import { businessToday } from '@/common/time/clock';
 import { ArConfigService } from './ar-config.service';
 
 const MODULE = 'RECEIVABLES';
@@ -84,7 +85,7 @@ export class CustomersService {
     if (query.salespersonId) filters.push(eq(customers.salespersonId, query.salespersonId));
     if (query.creditHold) filters.push(eq(customerCreditProfiles.creditHold, true));
     if (query.overdueOnly) {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = businessToday();
       filters.push(
         sql`exists (select 1 from invoices i where i.customer_id = ${customers.id} and i.accounting_status = 'POSTED' and i.status in ('APPROVED', 'PARTIALLY_PAID') and i.document_type in ('INVOICE', 'DEBIT_NOTE') and i.due_date < ${today})`,
       );
@@ -527,7 +528,7 @@ export class CustomersService {
     const result = new Map<string, CustomerBalance>();
     if (customerIds.length === 0) return result;
     const currency = await this.accounts.companyCurrency(companyId, executor);
-    const today = new Date().toISOString().slice(0, 10);
+    const today = businessToday();
     for (const id of customerIds)
       result.set(id, {
         outstanding: '0.0000',

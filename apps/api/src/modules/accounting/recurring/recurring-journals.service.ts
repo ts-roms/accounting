@@ -31,6 +31,7 @@ import {
   type RecurringJournalRun,
 } from '@/database/schema';
 import { AuditService } from '@/modules/audit/audit.service';
+import { businessToday } from '@/common/time/clock';
 import { DimensionsService } from '../dimensions/dimensions.service';
 import { DocumentNumberingService } from '../numbering/document-numbering.service';
 import { AccountingPostingService, type PostingActor } from '../journals/posting.service';
@@ -286,7 +287,7 @@ export class RecurringJournalsService {
     actor: AuthenticatedUser | null,
     input: RunRecurringJournalsInput,
   ): Promise<RecurringRunResult> {
-    const asOf = input.asOf ?? new Date().toISOString().slice(0, 10);
+    const asOf = input.asOf ?? businessToday();
     const conditions: SQL[] = [
       eq(recurringJournals.companyId, companyId),
       eq(recurringJournals.status, 'ACTIVE'),

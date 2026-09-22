@@ -25,6 +25,7 @@ import { DocumentNumberingService } from '@/modules/accounting/numbering/documen
 import { AuditService } from '@/modules/audit/audit.service';
 import { OutboxService } from '@/modules/integrations/events/outbox.service';
 import { NotificationsService } from '@/modules/integrations/notifications/notifications.service';
+import { businessToday } from '@/common/time/clock';
 
 const MODULE = 'RECEIVABLES';
 const OPEN: DisputeStatus[] = ['OPEN', 'INVESTIGATING'];
@@ -151,7 +152,7 @@ export class DisputesService {
       const documentNumber = await this.numbering.allocate(
         companyId,
         'DSP',
-        new Date().getFullYear(),
+        Number(businessToday().slice(0, 4)),
         tx,
       );
       const [openCase] = await tx

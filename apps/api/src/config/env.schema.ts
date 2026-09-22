@@ -6,6 +6,19 @@ import { z } from 'zod';
  */
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  /**
+   * Pins the business calendar date (`businessToday()`): default as-of dates, due
+   * dates, scheduled jobs. Unset in production; CI and demo stacks pin it to the
+   * seed's date so seeded documents never age into dunning steps or new aging
+   * buckets. Wall-clock timestamps are unaffected.
+   */
+  APP_CLOCK_FIXED_DATE: z.preprocess(
+    (v) => (typeof v === 'string' && v.trim() === '' ? undefined : v),
+    z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD')
+      .optional(),
+  ),
   API_PORT: z.coerce.number().int().min(1).max(65535).default(3001),
   API_HOST: z.string().default('0.0.0.0'),
   API_GLOBAL_PREFIX: z.string().default('api'),

@@ -39,6 +39,7 @@ import { OutboxService } from '@/modules/integrations/events/outbox.service';
 import { NotificationsService } from '@/modules/integrations/notifications/notifications.service';
 import { VendorPaymentsService } from '@/modules/payables/vendor-payments.service';
 import { CustomerPaymentsService } from '@/modules/receivables/customer-payments.service';
+import { businessToday } from '@/common/time/clock';
 import { BankFeedRulesService } from './bank-feed-rules.service';
 import {
   defaultTransactionType,
@@ -481,7 +482,7 @@ export class BankFeedService {
     const suggestions = rows.length
       ? await this.suggestionsFor(rows.map((r) => r.line.id))
       : new Map<string, SuggestionView[]>();
-    const today = new Date().toISOString().slice(0, 10);
+    const today = businessToday();
     return toPaginatedResult(
       rows.map((r) => ({
         id: r.line.id,

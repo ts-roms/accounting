@@ -73,6 +73,7 @@ import { FxService } from '@/modules/fx/fx.service';
 import { AuthorityService } from '@/modules/delegations/authority.service';
 import { OutboxService } from '@/modules/integrations/events/outbox.service';
 import { NotificationsService } from '@/modules/integrations/notifications/notifications.service';
+import { businessToday } from '@/common/time/clock';
 import { ApConfigService } from './ap-config.service';
 import { discountAvailable, discountWindowFor } from './payables.logic';
 
@@ -154,7 +155,7 @@ export class BillsService {
   // ----------------------------------------------------------------- queries
 
   async list(companyId: string, query: ListDocumentsQuery): Promise<PaginatedResult<BillView>> {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = businessToday();
     const filters: SQL[] = [eq(vendorBills.companyId, companyId)];
     if (query.partyId) filters.push(eq(vendorBills.vendorId, query.partyId));
     if (query.documentType) filters.push(eq(vendorBills.documentType, query.documentType));
@@ -234,7 +235,7 @@ export class BillsService {
       this.lines(id),
       this.allocations(companyId, row.id, row.documentType),
     ]);
-    return { ...this.decorate(row, new Date().toISOString().slice(0, 10)), lines, allocations };
+    return { ...this.decorate(row, businessToday()), lines, allocations };
   }
 
   // ---------------------------------------------------------------- commands
@@ -1074,7 +1075,7 @@ export class BillsService {
     actor: AuthenticatedUser,
     creditNoteId: string,
     input: AllocateInput,
-    allocationDate = new Date().toISOString().slice(0, 10),
+    allocationDate = businessToday(),
   ): Promise<BillDetail> {
     await this.db.transaction(async (tx) => {
       const note = await this.lock(tx, companyId, creditNoteId);

@@ -30,6 +30,7 @@ import { AuditService } from '@/modules/audit/audit.service';
 import { OutboxService } from '@/modules/integrations/events/outbox.service';
 import { NotificationsService } from '@/modules/integrations/notifications/notifications.service';
 import { ApprovalsService } from '@/modules/workflows/approvals.service';
+import { businessToday } from '@/common/time/clock';
 import { TreasuryConfigService } from './treasury-config.service';
 import {
   fileTotals,
@@ -251,7 +252,7 @@ export class PaymentFilesService {
         });
       }
       const totals = fileTotals(entries, bank.currency);
-      const valueDate = input.valueDate ?? new Date().toISOString().slice(0, 10);
+      const valueDate = input.valueDate ?? businessToday();
       const documentNumber = await this.numbering.allocate(
         companyId,
         'PMF',

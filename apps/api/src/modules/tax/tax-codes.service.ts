@@ -15,6 +15,7 @@ import { DRIZZLE, type Database, type DbExecutor } from '@/database/database.typ
 import { taxCodes, taxRates, type TaxCode, type TaxRate } from '@/database/schema';
 import { AccountsService } from '@/modules/accounting/accounts/accounts.service';
 import { AuditService } from '@/modules/audit/audit.service';
+import { businessToday } from '@/common/time/clock';
 import { resolveRate } from './tax.logic';
 
 const MODULE = 'TAX';
@@ -67,7 +68,7 @@ export class TaxCodesService {
         ),
       )
       .orderBy(asc(taxRates.effectiveFrom));
-    const today = new Date().toISOString().slice(0, 10);
+    const today = businessToday();
     return rows.map((r) => {
       const own = rates.filter((x) => x.taxCodeId === r.id);
       return { ...r, rates: own, currentRate: resolveRate(own, today)?.ratePercent ?? null };

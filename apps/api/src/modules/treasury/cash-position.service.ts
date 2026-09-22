@@ -16,6 +16,7 @@ import {
 import { AccountsService } from '@/modules/accounting/accounts/accounts.service';
 import { BankingService } from '@/modules/banking/banking.service';
 import { ExchangeRatesService } from '@/modules/fx/exchange-rates.service';
+import { businessToday } from '@/common/time/clock';
 import { TreasuryConfigService } from './treasury-config.service';
 
 export interface CashPositionAccount {
@@ -91,7 +92,7 @@ export class CashPositionService {
     query: CashPositionQuery,
     executor: DbExecutor = this.db,
   ): Promise<CashPosition> {
-    const asOf = query.asOf ?? new Date().toISOString().slice(0, 10);
+    const asOf = query.asOf ?? businessToday();
     const baseCurrency = await this.accounts.companyCurrency(companyId, executor);
     const profiles = await this.config.profiles(companyId, executor);
     const rows = await executor

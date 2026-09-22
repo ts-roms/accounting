@@ -64,6 +64,7 @@ import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { CompanyScoped } from '@/common/decorators/company-scoped.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
+import { businessToday } from '@/common/time/clock';
 import { ArConfigService } from './ar-config.service';
 import { ArDashboardService } from './ar-dashboard.service';
 import { ArIntegrityService } from './ar-integrity.service';
@@ -128,7 +129,7 @@ class StatementsQueryDto extends createZodDto(customerStatementsQuerySchema) {}
 class ListStatementsQueryDto extends createZodDto(listCustomerStatementsQuerySchema) {}
 class SweepDto extends createZodDto(z.object({ asOf: isoDateSchema.optional() })) {}
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = businessToday;
 
 // ---------------------------------------------------------------- settings
 

@@ -28,6 +28,7 @@ import { AttachmentsService, type UploadedFile } from '@/modules/attachments/att
 import { AuditService } from '@/modules/audit/audit.service';
 import { ExpenseClaimsService } from '@/modules/budgeting/expense-claims.service';
 import { BillsService } from '@/modules/payables/bills.service';
+import { businessToday } from '@/common/time/clock';
 import { AiClassifierService } from './ai-classifier.service';
 import { AiProviderService } from './ai-provider.service';
 import { OcrService } from './ocr.service';
@@ -311,7 +312,7 @@ export class AiIntakeService {
         'This document was dismissed.',
       );
     const x = doc.extracted;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = businessToday();
     const lines = x.lines.length
       ? x.lines
       : x.total

@@ -61,6 +61,7 @@ import { OutboxService } from '@/modules/integrations/events/outbox.service';
 import { InvoicesService } from '@/modules/receivables/invoices.service';
 import { DocumentStockService } from '@/modules/inventory/document-stock.service';
 import { ApprovalsService } from '@/modules/workflows/approvals.service';
+import { businessToday } from '@/common/time/clock';
 import { MatchingService } from './matching.service';
 import { OrderFulfillmentService } from './order-fulfillment.service';
 import {
@@ -666,7 +667,7 @@ export class OrdersService {
         .from(orderLines)
         .where(eq(orderLines.orderId, id))
         .orderBy(asc(orderLines.lineNumber));
-      const orderDate = input.orderDate ?? new Date().toISOString().slice(0, 10);
+      const orderDate = input.orderDate ?? businessToday();
       const documentNumber = await this.numbering.allocate(
         companyId,
         NUMBER_TYPE[target],

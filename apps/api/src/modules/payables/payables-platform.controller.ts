@@ -49,6 +49,7 @@ import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { CompanyScoped } from '@/common/decorators/company-scoped.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
+import { businessToday } from '@/common/time/clock';
 import { ApAccrualsService } from './ap-accruals.service';
 import { ApConfigService } from './ap-config.service';
 import { ApDashboardService } from './ap-dashboard.service';
@@ -581,7 +582,7 @@ export class ApReportsPlatformController {
     summary: 'AP integrity checks (subledger vs GL, holds, discounts, runs, accruals)',
   })
   integrityChecks(@CurrentUser() user: AuthenticatedUser, @Query() query: AsOfQueryDto) {
-    return this.integrity.run(user.companyId!, query.asOf ?? new Date().toISOString().slice(0, 10));
+    return this.integrity.run(user.companyId!, query.asOf ?? businessToday());
   }
 
   @Post('payables/sweep')

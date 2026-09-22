@@ -14,6 +14,7 @@ import {
 } from '@/database/schema';
 import { GeneralLedgerService } from '@/modules/accounting/ledger/general-ledger.service';
 import { ExchangeRatesService } from '@/modules/fx/exchange-rates.service';
+import { businessToday } from '@/common/time/clock';
 import { naturalBalance } from './consolidation.logic';
 
 export interface IntercompanyPair {
@@ -78,7 +79,7 @@ export class IntercompanyReconciliationService {
     query: IntercompanyReconciliationQuery,
     executor: DbExecutor = this.db,
   ): Promise<IntercompanyReconciliation> {
-    const asOf = query.asOf ?? new Date().toISOString().slice(0, 10);
+    const asOf = query.asOf ?? businessToday();
     const [org] = await executor
       .select({ baseCurrency: organizations.baseCurrency })
       .from(organizations)

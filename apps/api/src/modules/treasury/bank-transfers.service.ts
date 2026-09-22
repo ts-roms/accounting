@@ -26,6 +26,7 @@ import { OutboxService } from '@/modules/integrations/events/outbox.service';
 import { NotificationsService } from '@/modules/integrations/notifications/notifications.service';
 import { SodService } from '@/modules/rbac/sod.service';
 import { ApprovalsService } from '@/modules/workflows/approvals.service';
+import { businessToday } from '@/common/time/clock';
 import { TreasuryConfigService } from './treasury-config.service';
 
 const MODULE = 'TREASURY';
@@ -416,7 +417,7 @@ export class BankTransfersService {
       const to = await this.bankAccount(companyId, t.toBankAccountId, tx);
       const transit = await this.accounts.resolveMapped(companyId, 'CASH_IN_TRANSIT', tx);
       const base = await this.accounts.companyCurrency(companyId, tx);
-      const settlementDate = input.settlementDate ?? new Date().toISOString().slice(0, 10);
+      const settlementDate = input.settlementDate ?? businessToday();
       if (settlementDate < t.transferDate)
         throw new BusinessRuleError(
           ErrorCodes.VALIDATION_FAILED,

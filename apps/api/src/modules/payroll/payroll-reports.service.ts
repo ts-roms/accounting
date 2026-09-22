@@ -17,6 +17,7 @@ import type {
   IntegrityReport,
 } from '@/modules/accounting/integrity/integrity.service';
 import { GeneralLedgerService } from '@/modules/accounting/ledger/general-ledger.service';
+import { businessToday } from '@/common/time/clock';
 
 export interface PayrollSummary {
   from: string;
@@ -282,7 +283,7 @@ export class PayrollReportsService {
     query: EmployeeYtdQuery,
   ): Promise<EmployeeYtd> {
     const currency = await this.accounts.companyCurrency(companyId);
-    const year = query.year ?? new Date().getUTCFullYear();
+    const year = query.year ?? Number(businessToday().slice(0, 4));
     const rows = await this.db
       .select({ s: payslips })
       .from(payslips)

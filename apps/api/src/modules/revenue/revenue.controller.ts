@@ -33,6 +33,7 @@ import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { CompanyScoped } from '@/common/decorators/company-scoped.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
+import { businessToday } from '@/common/time/clock';
 import { RevenueConfigService } from './revenue-config.service';
 import { RevenueReportsService } from './revenue-reports.service';
 import { RevenueRunsService } from './revenue-runs.service';
@@ -225,9 +226,6 @@ export class RevenueController {
     summary: 'Deferred revenue integrity checks (ledger vs schedules, totals, overdue lines)',
   })
   integrity(@CurrentUser() user: AuthenticatedUser, @Query() query: IntegrityQueryDto) {
-    return this.reports.integrity(
-      user.companyId!,
-      query.asOf ?? new Date().toISOString().slice(0, 10),
-    );
+    return this.reports.integrity(user.companyId!, query.asOf ?? businessToday());
   }
 }

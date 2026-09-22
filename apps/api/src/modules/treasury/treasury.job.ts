@@ -8,6 +8,7 @@ import { OutboxService } from '@/modules/integrations/events/outbox.service';
 import { NotificationsService } from '@/modules/integrations/notifications/notifications.service';
 import { JobRunnerService } from '@/modules/jobs/job-runner.service';
 import { QUEUES } from '@/modules/jobs/queue.service';
+import { businessToday } from '@/common/time/clock';
 import { BankTransfersService } from './bank-transfers.service';
 import { CashForecastService } from './cash-forecast.service';
 import { CashPositionService } from './cash-position.service';
@@ -71,10 +72,7 @@ export class TreasurySweepJob implements OnModuleInit {
   }
 
   /** On-demand sweep for one company (also what the API endpoint runs). */
-  async sweep(
-    companyId: string,
-    asOf = new Date().toISOString().slice(0, 10),
-  ): Promise<TreasurySweepResult> {
+  async sweep(companyId: string, asOf = businessToday()): Promise<TreasurySweepResult> {
     const settings = await this.config.settings(companyId);
     const currency = await this.accounts.companyCurrency(companyId);
     const [company] = await this.db
