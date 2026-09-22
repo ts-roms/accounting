@@ -1,14 +1,5 @@
-import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { login } from './helpers';
-
-async function pickFromCombobox(page: Page, testId: string, search: string) {
-  await page.getByTestId(testId).first().click();
-  const input = page.getByPlaceholder('Search by code or name...');
-  await input.fill(search);
-  await expect(page.locator('[cmdk-item]').first()).toBeVisible();
-  await input.press('Enter');
-}
+import { login, pickFromCombobox } from './helpers';
 
 /** Hardening H5: control center, suspense monitor, field history, SoD conflicts, workflow deadlines. */
 test.describe('enterprise controls', () => {

@@ -1,4 +1,4 @@
-import { expect, type BrowserContext, type Page } from '@playwright/test';
+import { expect, type BrowserContext, type Locator, type Page } from '@playwright/test';
 
 export const ADMIN = { email: 'admin@acme.local', password: 'P@ssw0rd123' };
 export const FINANCE = { email: 'finance@acme.local', password: 'P@ssw0rd123' };
@@ -78,4 +78,57 @@ export async function apiLogin(page: Page, creds: { email: string; password: str
     headers: { 'x-requested-with': 'XMLHttpRequest' },
   });
   expect(res.status(), `login as ${creds.email}`).toBe(200);
+}
+
+/** Calls the API through the page's cookie jar with the active company header; fails loudly. */
+export async function api(
+  page: Page,
+  method: 'get' | 'post' | 'patch' | 'delete',
+  path: string,
+  data?: unknown,
+) {
+  const me = await page.request.get('/api/v1/auth/me');
+  const companyId = (await me.json()).companies[0].id as string;
+  const headers = { 'x-requested-with': 'XMLHttpRequest', 'x-company-id': companyId };
+  const res = await page.request[method](`/api/v1${path}`, { data, headers });
+  expect(res.ok(), `${method.toUpperCase()} ${path}: ${await res.text()}`).toBeTruthy();
+  return res;
+}
+
+/**
+ * The seed's invoices age in real time: once one passes the dunning policy's
+ * 120-day step, the collections sweep (which runs at API start) puts its
+ * customer on credit hold and every invoice approval for that customer is
+ * refused. Specs that approve invoices release the hold on the customer they
+ * use first, so they own their precondition instead of depending on the date.
+ */
+export async function releaseCreditHold(page: Page, customerCode: string): Promise<string> {
+  const list = await (
+    await api(page, 'get', `/customers?search=${customerCode}&pageSize=10`)
+  ).json();
+  const customer = list.items.find((c: { code: string }) => c.code === customerCode);
+  expect(customer, `customer ${customerCode} exists`).toBeTruthy();
+  const credit = await (await api(page, 'get', `/customers/${customer.id}/credit`)).json();
+  if (credit.creditHold)
+    await api(page, 'post', `/customers/${customer.id}/credit-hold`, {
+      hold: false,
+      reason: 'e2e: seeded invoice aged into the dunning credit-hold step',
+    });
+  return customer.id as string;
+}
+
+/**
+ * Picks an option in a cmdk combobox. Scoped to the popover that opened
+ * last: a previous combobox still closing must not make the placeholder
+ * ambiguous (strict-mode violation seen in CI), and the pick is done only
+ * once the popover is gone.
+ */
+export async function pickFromCombobox(page: Page, trigger: string | Locator, search: string) {
+  const button = typeof trigger === 'string' ? page.getByTestId(trigger).first() : trigger;
+  await button.click();
+  const input = page.getByPlaceholder('Search by code or name...').last();
+  await input.fill(search);
+  await expect(page.locator('[cmdk-root]').last().locator('[cmdk-item]').first()).toBeVisible();
+  await input.press('Enter');
+  await expect(input).toBeHidden();
 }
