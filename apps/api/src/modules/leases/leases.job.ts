@@ -7,6 +7,7 @@ import { companies } from '@/database/schema';
 import { NotificationsService } from '@/modules/integrations/notifications/notifications.service';
 import { JobRegistryService } from '@/modules/jobs/job-registry.service';
 import { QUEUES } from '@/modules/jobs/queue.service';
+import { businessToday } from '@/common/time/clock';
 import { LeaseRunsService } from './lease-runs.service';
 import { LeasesService } from './leases.service';
 
@@ -44,7 +45,7 @@ export class LeaseRunsJob implements OnModuleInit {
     });
   }
 
-  async run(asOf = new Date().toISOString().slice(0, 10)): Promise<Record<string, number>> {
+  async run(asOf = businessToday()): Promise<Record<string, number>> {
     const results = await this.runs.runAllCompanies(asOf);
     const reminders = await this.remindPayments(asOf);
     const summary = {

@@ -25,6 +25,7 @@ import { AuditService } from '@/modules/audit/audit.service';
 import { OutboxService } from '@/modules/integrations/events/outbox.service';
 import { NotificationsService } from '@/modules/integrations/notifications/notifications.service';
 import { daysBetween } from '@/modules/subledger/subledger.logic';
+import { businessToday } from '@/common/time/clock';
 import { ArConfigService } from './ar-config.service';
 import { CustomersService } from './customers.service';
 import {
@@ -118,7 +119,7 @@ export class CreditService {
           options.excludeOrderId ? sql`${orders.id} <> ${options.excludeOrderId}` : sql`true`,
         ),
       );
-    const today = new Date().toISOString().slice(0, 10);
+    const today = businessToday();
     const [oldest] = await executor
       .select({ dueDate: sql<string | null>`min(${invoices.dueDate})` })
       .from(invoices)
@@ -366,7 +367,7 @@ export class CreditService {
     await this.outbox.enqueue(tx, {
       eventType: 'customer.over_credit_limit',
       companyId,
-      dedupeKey: `customer.over_credit_limit:${customer.id}:${new Date().toISOString().slice(0, 10)}`,
+      dedupeKey: `customer.over_credit_limit:${customer.id}:${businessToday()}`,
       payload: { customerId: customer.id, code: customer.code, ...summary },
     });
     await this.notifications.notify(

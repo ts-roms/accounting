@@ -308,6 +308,37 @@ describe('Operations (e2e)', () => {
 
   // ------------------------------------------------------------------ queues
 
+  it('the business clock pins scheduled jobs to a calendar date: the seed only ages when the pin moves', async () => {
+    const saved = process.env.APP_CLOCK_FIXED_DATE;
+    const hold = async () => {
+      const { rows } = await pool.query<{ credit_hold: boolean }>(
+        `select p.credit_hold from customer_credit_profiles p
+           join customers c on c.id = p.customer_id
+          where c.company_id = $1 and c.code = 'CUST-003'`,
+        [companyId],
+      );
+      return rows[0]!.credit_hold;
+    };
+    try {
+      // Pinned to the seed's date: INV-2026-000003 is 118 days overdue, under the 120-day hold step.
+      process.env.APP_CLOCK_FIXED_DATE = '2026-09-18';
+      const first = await as(
+        http().post('/api/v1/operations/jobs/receivables-collections-sweep/run'),
+      ).expect(201);
+      expect(first.body.status).toBe('SUCCEEDED');
+      expect(await hold()).toBe(false);
+      // Move the calendar past the step and the same sweep places the hold.
+      process.env.APP_CLOCK_FIXED_DATE = '2026-09-22';
+      await as(http().post('/api/v1/operations/jobs/receivables-collections-sweep/run')).expect(
+        201,
+      );
+      expect(await hold()).toBe(true);
+    } finally {
+      if (saved === undefined) delete process.env.APP_CLOCK_FIXED_DATE;
+      else process.env.APP_CLOCK_FIXED_DATE = saved;
+    }
+  });
+
   it('reports queue statistics per queue (or null without Redis) and the key prefix', async () => {
     const res = await as(http().get('/api/v1/operations/queues')).expect(200);
     expect(typeof res.body.keyPrefix).toBe('string');

@@ -24,6 +24,7 @@ import {
   type PrepaymentSchedule,
 } from '@/database/schema';
 import { AuditService } from '@/modules/audit/audit.service';
+import { businessToday } from '@/common/time/clock';
 import { DimensionsService } from '../dimensions/dimensions.service';
 import { AccountingPostingService, type PostingActor } from '../journals/posting.service';
 import { buildPrepaymentSchedule } from './prepayments.logic';
@@ -280,7 +281,7 @@ export class PrepaymentsService {
     actor: AuthenticatedUser | null,
     input: RecognizePrepaymentsInput,
   ): Promise<RecognitionResult> {
-    const asOf = input.asOf ?? new Date().toISOString().slice(0, 10);
+    const asOf = input.asOf ?? businessToday();
     const conditions: SQL[] = [
       eq(prepayments.companyId, companyId),
       eq(prepayments.status, 'ACTIVE'),
@@ -342,7 +343,7 @@ export class PrepaymentsService {
           .for('update');
         if (initial && (initial.status === 'POSTED' || initial.status === 'LOCKED')) {
           const reversal = await this.posting.reverseEntry(tx, initial, {
-            reversalDate: laterOf(initial.entryDate, new Date().toISOString().slice(0, 10)),
+            reversalDate: laterOf(initial.entryDate, businessToday()),
             description: `Cancelled prepayment ${row.name}: ${reason}`,
             actor: this.actor(actor),
             permission: P['prepayment.post'],

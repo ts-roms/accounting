@@ -56,6 +56,7 @@ import { VendorsService } from './vendors.service';
 import { ExchangeRatesService } from '@/modules/fx/exchange-rates.service';
 import { FxService } from '@/modules/fx/fx.service';
 import { ApprovalsService } from '@/modules/workflows/approvals.service';
+import { businessToday } from '@/common/time/clock';
 import { BillsService, type AllocationView } from './bills.service';
 
 const MODULE = 'PAYABLES';
@@ -950,7 +951,7 @@ export class VendorPaymentsService {
     actor: AuthenticatedUser,
     id: string,
     input: AllocateInput,
-    allocationDate = new Date().toISOString().slice(0, 10),
+    allocationDate = businessToday(),
   ): Promise<VendorPaymentDetail> {
     await this.db.transaction(async (tx) => {
       const existing = await this.lock(tx, companyId, id);

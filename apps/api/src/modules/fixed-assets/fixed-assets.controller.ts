@@ -38,6 +38,7 @@ import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { CompanyScoped } from '@/common/decorators/company-scoped.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
+import { businessToday } from '@/common/time/clock';
 import { AssetReportsService } from './asset-reports.service';
 import { DepreciationRunsService } from './depreciation-runs.service';
 import { FixedAssetsService } from './fixed-assets.service';
@@ -281,6 +282,6 @@ export class DepreciationRunsController {
   @RequirePermissions(P['depreciation.run'])
   @ApiOperation({ summary: 'Run the monthly depreciation job now (what the scheduler does)' })
   scheduled(@CurrentUser() user: AuthenticatedUser, @Body() body: ScheduledDto) {
-    return this.runs.runScheduled(body.asOf ?? new Date().toISOString().slice(0, 10), user);
+    return this.runs.runScheduled(body.asOf ?? businessToday(), user);
   }
 }

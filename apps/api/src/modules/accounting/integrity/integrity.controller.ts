@@ -8,6 +8,7 @@ import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { CompanyScoped } from '@/common/decorators/company-scoped.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
+import { businessToday } from '@/common/time/clock';
 import { IntegrityService } from './integrity.service';
 
 class IntegrityQueryDto extends createZodDto(z.object({ asOf: isoDateSchema.optional() })) {}
@@ -22,6 +23,6 @@ export class IntegrityController {
   @RequirePermissions(P['integrity.check'])
   @ApiOperation({ summary: 'Run the financial integrity checks (read-only) as of a date' })
   run(@CurrentUser() user: AuthenticatedUser, @Query() query: IntegrityQueryDto) {
-    return this.integrity.run(user.companyId!, query.asOf ?? new Date().toISOString().slice(0, 10));
+    return this.integrity.run(user.companyId!, query.asOf ?? businessToday());
   }
 }

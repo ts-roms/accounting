@@ -2,6 +2,7 @@ import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { JobRunnerService } from '@/modules/jobs/job-runner.service';
 import { QUEUES } from '@/modules/jobs/queue.service';
+import { businessToday } from '@/common/time/clock';
 import { BankFeedService } from './bank-feed.service';
 
 const JOB_NAME = 'bank-feed-suggestions';
@@ -32,7 +33,7 @@ export class BankFeedSweepJob implements OnModuleInit {
     );
   }
 
-  async run(asOf = new Date().toISOString().slice(0, 10)): Promise<Record<string, number>> {
+  async run(asOf = businessToday()): Promise<Record<string, number>> {
     const summary = await this.feed.sweepAll(asOf);
     this.logger.info(summary, 'Bank feed sweep finished');
     return summary;

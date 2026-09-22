@@ -6,6 +6,7 @@ import { DRIZZLE, type Database } from '@/database/database.types';
 import { companies } from '@/database/schema';
 import { JobRegistryService } from '@/modules/jobs/job-registry.service';
 import { QUEUES } from '@/modules/jobs/queue.service';
+import { businessToday } from '@/common/time/clock';
 import { AiAnomalyService } from './ai-anomaly.service';
 
 const JOB_NAME = 'ai-anomaly-scan';
@@ -39,7 +40,7 @@ export class AiAnomalyJob implements OnModuleInit {
 
   async run(): Promise<void> {
     const days = this.config.env.AI_ANOMALY_SCAN_DAYS;
-    const to = new Date();
+    const to = new Date(businessToday() + 'T00:00:00Z');
     const from = new Date(to.getTime() - days * 86_400_000);
     const rows = await this.db
       .select({ id: companies.id, code: companies.code })

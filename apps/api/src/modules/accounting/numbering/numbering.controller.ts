@@ -17,12 +17,13 @@ import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { CompanyScoped } from '@/common/decorators/company-scoped.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
+import { businessToday } from '@/common/time/clock';
 import { DocumentNumberingService } from './document-numbering.service';
 
 class NumberingRuleDto extends createZodDto(numberingRuleSchema) {}
 class PreviewDto extends createZodDto(numberingPreviewQuerySchema) {}
 
-const currentYear = () => new Date().getUTCFullYear();
+const currentYear = () => Number(businessToday().slice(0, 4));
 
 @ApiTags('Numbering')
 @Controller('numbering-rules')

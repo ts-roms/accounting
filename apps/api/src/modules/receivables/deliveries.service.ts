@@ -34,6 +34,7 @@ import { OutboxService } from '@/modules/integrations/events/outbox.service';
 import { DocumentStockService } from '@/modules/inventory/document-stock.service';
 import { InventoryService } from '@/modules/inventory/inventory.service';
 import { OrderFulfillmentService } from '@/modules/orders/order-fulfillment.service';
+import { businessToday } from '@/common/time/clock';
 import { CustomersService } from './customers.service';
 import { InvoicesService, type InvoiceDetail } from './invoices.service';
 
@@ -448,7 +449,7 @@ export class DeliveriesService {
           );
         if (existing.status === 'DELIVERED') {
           const baseCurrency = await this.accounts.companyCurrency(companyId, tx);
-          const reversalDate = input.deliveryDate ?? new Date().toISOString().slice(0, 10);
+          const reversalDate = input.deliveryDate ?? businessToday();
           const stockReversal = await this.inventory.reverseDocument(
             tx,
             companyId,

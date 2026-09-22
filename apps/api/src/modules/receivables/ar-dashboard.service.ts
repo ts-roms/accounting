@@ -23,6 +23,7 @@ import { AccountsService } from '@/modules/accounting/accounts/accounts.service'
 import { DocumentNumberingService } from '@/modules/accounting/numbering/document-numbering.service';
 import { AuditService } from '@/modules/audit/audit.service';
 import { addDays } from '@/modules/subledger/subledger.logic';
+import { businessToday } from '@/common/time/clock';
 import { ArConfigService } from './ar-config.service';
 import { ArReportsService, type StatementReport } from './ar-reports.service';
 import { CustomersService } from './customers.service';
@@ -86,10 +87,7 @@ export class ArDashboardService {
     private readonly audit: AuditService,
   ) {}
 
-  async dashboard(
-    companyId: string,
-    asOf = new Date().toISOString().slice(0, 10),
-  ): Promise<ArDashboard> {
+  async dashboard(companyId: string, asOf = businessToday()): Promise<ArDashboard> {
     const currency = await this.accounts.companyCurrency(companyId);
     const settings = await this.config.settings(companyId);
     const aging = await this.reports.aging(companyId, { asOf });
@@ -350,7 +348,7 @@ export class ArDashboardService {
   }
 
   /** Unapplied receipts with their age (the unapplied-cash monitor). */
-  async unappliedCash(companyId: string, asOf = new Date().toISOString().slice(0, 10)) {
+  async unappliedCash(companyId: string, asOf = businessToday()) {
     const settings = await this.config.settings(companyId);
     const rows = await this.db
       .select({

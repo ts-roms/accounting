@@ -76,6 +76,7 @@ import { ApprovalsService } from '@/modules/workflows/approvals.service';
 import { ArConfigService } from './ar-config.service';
 import { CreditService } from './credit.service';
 import { RevenueSchedulesService } from '@/modules/revenue/revenue-schedules.service';
+import { businessToday } from '@/common/time/clock';
 import { dueDateFor, type CreditFinding } from './receivables.logic';
 
 const MODULE = 'RECEIVABLES';
@@ -157,7 +158,7 @@ export class InvoicesService {
   // ----------------------------------------------------------------- queries
 
   async list(companyId: string, query: ListDocumentsQuery): Promise<PaginatedResult<InvoiceView>> {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = businessToday();
     const filters: SQL[] = [eq(invoices.companyId, companyId)];
     if (query.partyId) filters.push(eq(invoices.customerId, query.partyId));
     if (query.documentType) filters.push(eq(invoices.documentType, query.documentType));
@@ -231,7 +232,7 @@ export class InvoicesService {
       this.lines(id),
       this.allocations(companyId, row.id, row.documentType),
     ]);
-    return { ...this.decorate(row, new Date().toISOString().slice(0, 10)), lines, allocations };
+    return { ...this.decorate(row, businessToday()), lines, allocations };
   }
 
   // ---------------------------------------------------------------- commands
@@ -1068,7 +1069,7 @@ export class InvoicesService {
     actor: AuthenticatedUser,
     creditNoteId: string,
     input: AllocateInput,
-    allocationDate = new Date().toISOString().slice(0, 10),
+    allocationDate = businessToday(),
   ): Promise<InvoiceDetail> {
     await this.db.transaction(async (tx) => {
       const note = await this.lock(tx, companyId, creditNoteId);

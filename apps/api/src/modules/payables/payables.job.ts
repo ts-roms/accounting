@@ -11,6 +11,7 @@ import { NotificationsService } from '@/modules/integrations/notifications/notif
 import { JobRunnerService } from '@/modules/jobs/job-runner.service';
 import { QUEUES } from '@/modules/jobs/queue.service';
 import { addDays } from '@/modules/subledger/subledger.logic';
+import { businessToday } from '@/common/time/clock';
 import { ApAccrualsService } from './ap-accruals.service';
 import { ApConfigService } from './ap-config.service';
 import { discountAvailable } from './payables.logic';
@@ -74,10 +75,7 @@ export class PayablesSweepJob implements OnModuleInit {
   }
 
   /** On-demand sweep for one company (also what the API endpoint runs). */
-  async sweep(
-    companyId: string,
-    asOf = new Date().toISOString().slice(0, 10),
-  ): Promise<PayablesSweepResult> {
+  async sweep(companyId: string, asOf = businessToday()): Promise<PayablesSweepResult> {
     const settings = await this.config.settings(companyId);
     const currency = await this.accounts.companyCurrency(companyId);
     const [company] = await this.db

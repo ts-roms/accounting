@@ -38,6 +38,7 @@ import { OutboxService } from '@/modules/integrations/events/outbox.service';
 import { NotificationsService } from '@/modules/integrations/notifications/notifications.service';
 import { deriveDocumentStatus } from '@/modules/subledger/subledger.logic';
 import { ApprovalsService } from '@/modules/workflows/approvals.service';
+import { businessToday } from '@/common/time/clock';
 import { ArConfigService } from './ar-config.service';
 import { ArReportsService } from './ar-reports.service';
 import { DisputesService } from './disputes.service';
@@ -201,7 +202,7 @@ export class WriteOffsService {
       const documentNumber = await this.numbering.allocate(
         companyId,
         'WO',
-        new Date().getFullYear(),
+        Number(businessToday().slice(0, 4)),
         tx,
       );
       const [created] = await tx
@@ -411,7 +412,7 @@ export class WriteOffsService {
           ErrorCodes.WRITE_OFF_INVALID,
           `Only ${balance.toString()} remains open on ${invoice.documentNumber}.`,
         );
-      const date = writeOffDate ?? existing.writeOffDate ?? new Date().toISOString().slice(0, 10);
+      const date = writeOffDate ?? existing.writeOffDate ?? businessToday();
       const settings = await this.config.settings(companyId, tx);
       const debitKey: AccountMappingKey =
         existing.reason === 'BAD_DEBT' || existing.reason === 'UNCOLLECTIBLE'

@@ -3,6 +3,7 @@ import { PinoLogger } from 'nestjs-pino';
 import { AppConfigService } from '@/config/app-config.service';
 import { JobRegistryService } from '@/modules/jobs/job-registry.service';
 import { QUEUES } from '@/modules/jobs/queue.service';
+import { businessToday } from '@/common/time/clock';
 import { RevenueRunsService } from './revenue-runs.service';
 
 const JOB_NAME = 'revenue-recognition';
@@ -34,7 +35,7 @@ export class RevenueRecognitionJob implements OnModuleInit {
     });
   }
 
-  async run(asOf = new Date().toISOString().slice(0, 10)): Promise<Record<string, number>> {
+  async run(asOf = businessToday()): Promise<Record<string, number>> {
     const results = await this.runs.recognizeAllCompanies(asOf);
     const summary = {
       companies: results.length,

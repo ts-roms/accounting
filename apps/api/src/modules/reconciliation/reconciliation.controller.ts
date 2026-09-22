@@ -18,6 +18,7 @@ import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { CompanyScoped } from '@/common/decorators/company-scoped.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
+import { businessToday } from '@/common/time/clock';
 import { ReconciliationsService } from './reconciliations.service';
 
 class RunDto extends createZodDto(runReconciliationSchema) {}
@@ -30,7 +31,7 @@ class ApproveDto extends createZodDto(z.object({ notes: optionalText(1000) })) {
 class SummaryDto extends createZodDto(z.object({ asOf: isoDateSchema.optional() })) {}
 class PolicyDto extends createZodDto(updateAccountingPolicySchema) {}
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = businessToday;
 
 /** Recorded subledger reconciliations with review and approval. */
 @ApiTags('Reconciliation')

@@ -111,6 +111,9 @@ jobs:
       API_INTERNAL_URL: http://127.0.0.1:3001
       STORAGE_DIR: ./storage-ci
       ACCOUNTING_SCHEDULES_CRON: ''
+      # The seed is written for this date; without the pin its invoices age into
+      # dunning credit holds and the approval flows fail on a calendar day.
+      APP_CLOCK_FIXED_DATE: '2026-09-18'
       SEED_ADMIN_PASSWORD: P@ssw0rd123
       SEED_DEMO_PASSWORD: P@ssw0rd123
       PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000

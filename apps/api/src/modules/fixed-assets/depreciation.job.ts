@@ -8,6 +8,7 @@ import { users } from '@/database/schema';
 import { SYSTEM_USER_EMAIL } from '@/database/seed/seed';
 import { JobRegistryService } from '@/modules/jobs/job-registry.service';
 import { QUEUES } from '@/modules/jobs/queue.service';
+import { businessToday } from '@/common/time/clock';
 import { DepreciationRunsService } from './depreciation-runs.service';
 
 const JOB_NAME = 'depreciation-monthly';
@@ -45,7 +46,7 @@ export class DepreciationJob implements OnModuleInit {
       this.logger.warn('No system scheduler user; skipping depreciation job');
       return { skipped: 'no system scheduler user' };
     }
-    const results = await this.runs.runScheduled(new Date().toISOString().slice(0, 10), actor);
+    const results = await this.runs.runScheduled(businessToday(), actor);
     this.logger.info({ results }, 'Depreciation job finished');
     return results;
   }

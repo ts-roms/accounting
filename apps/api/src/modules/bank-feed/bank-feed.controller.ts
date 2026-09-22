@@ -31,6 +31,7 @@ import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { CompanyScoped } from '@/common/decorators/company-scoped.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
+import { businessToday } from '@/common/time/clock';
 import { BankFeedIntegrityService } from './bank-feed-integrity.service';
 import { BankFeedRulesService } from './bank-feed-rules.service';
 import { BankFeedService } from './bank-feed.service';
@@ -186,17 +187,13 @@ export class BankFeedController {
     summary: 'Reconciliation KPIs: automation rate, pending lines, ageing, rule hits',
   })
   dashboard(@CurrentUser() user: AuthenticatedUser, @Query() query: DashboardQueryDto) {
-    return this.feed.dashboard(
-      user.companyId!,
-      query.asOf ?? new Date().toISOString().slice(0, 10),
-      query.days,
-    );
+    return this.feed.dashboard(user.companyId!, query.asOf ?? businessToday(), query.days);
   }
 
   @Get('integrity')
   @RequirePermissions(P['bank-account.view'])
   runIntegrity(@CurrentUser() user: AuthenticatedUser, @Query() query: AsOfDto) {
-    return this.integrity.run(user.companyId!, query.asOf ?? new Date().toISOString().slice(0, 10));
+    return this.integrity.run(user.companyId!, query.asOf ?? businessToday());
   }
 
   @Post('sweep')

@@ -28,6 +28,7 @@ import { AuditService } from '@/modules/audit/audit.service';
 import { ApReportsService } from '@/modules/payables/ap-reports.service';
 import { ArReportsService } from '@/modules/receivables/ar-reports.service';
 import { ReportingService } from '@/modules/reporting/reporting.service';
+import { businessToday } from '@/common/time/clock';
 import { AiAnomalyService } from './ai-anomaly.service';
 import { AiProviderService } from './ai-provider.service';
 import {
@@ -138,7 +139,7 @@ export class AiAssistantService {
     companyId: string,
     actor: AuthenticatedUser,
     input: AiAskInput,
-    today = new Date().toISOString().slice(0, 10),
+    today = businessToday(),
   ): Promise<AskResult> {
     const parsed = parseQuestion(input.question, today);
     const currency = await this.ledger.currency(companyId);
@@ -218,7 +219,7 @@ export class AiAssistantService {
   async forecast(
     companyId: string,
     query: AiForecastQuery,
-    today = new Date().toISOString().slice(0, 10),
+    today = businessToday(),
   ): Promise<ForecastReport> {
     const currency = await this.ledger.currency(companyId);
     const lastMonth = addMonths(today.slice(0, 7), -1);

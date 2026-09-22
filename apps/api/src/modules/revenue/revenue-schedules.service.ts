@@ -23,6 +23,7 @@ import {
 } from '@/database/schema';
 import { AccountsService } from '@/modules/accounting/accounts/accounts.service';
 import { AuditService } from '@/modules/audit/audit.service';
+import { businessToday } from '@/common/time/clock';
 import { RevenueConfigService } from './revenue-config.service';
 import { buildSchedule } from './revenue.logic';
 
@@ -384,7 +385,7 @@ export class RevenueSchedulesService {
           ErrorCodes.REVENUE_SCHEDULE_INVALID,
           `Milestone "${line.milestoneName}" is already ${line.completedAt ? 'completed' : line.status.toLowerCase()}.`,
         );
-      const completedOn = input.completedOn ?? new Date().toISOString().slice(0, 10);
+      const completedOn = input.completedOn ?? businessToday();
       await tx
         .update(revenueScheduleLines)
         .set({

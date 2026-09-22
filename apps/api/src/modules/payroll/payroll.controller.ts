@@ -37,6 +37,7 @@ import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { CompanyScoped } from '@/common/decorators/company-scoped.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
+import { businessToday } from '@/common/time/clock';
 import { EmployeesService } from './employees.service';
 import { PayRunsService } from './pay-runs.service';
 import { PayrollConfigService } from './payroll-config.service';
@@ -327,10 +328,7 @@ export class PayrollController {
   @Get('integrity')
   @RequirePermissions(P['payroll.view'])
   integrity(@CurrentUser() user: AuthenticatedUser, @Query() query: IntegrityQueryDto) {
-    return this.reports.integrity(
-      user.companyId!,
-      query.asOf ?? new Date().toISOString().slice(0, 10),
-    );
+    return this.reports.integrity(user.companyId!, query.asOf ?? businessToday());
   }
 
   @Post('reminders/run')

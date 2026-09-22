@@ -36,6 +36,7 @@ import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { CompanyScoped } from '@/common/decorators/company-scoped.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
+import { businessToday } from '@/common/time/clock';
 import { LeaseReportsService } from './lease-reports.service';
 import { LeaseRunsService } from './lease-runs.service';
 import { LeasesConfigService } from './leases-config.service';
@@ -58,7 +59,7 @@ class PeriodEndQueryDto extends createZodDto(z.object({ periodEnd: isoDateSchema
 class AsOfDto extends createZodDto(leaseAsOfQuerySchema) {}
 class MaturityQueryDto extends createZodDto(leaseMaturityQuerySchema) {}
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = businessToday;
 
 /**
  * Lease accounting (Prompt #13). Contracts and settings are data; every

@@ -7,11 +7,12 @@ import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { CompanyScoped } from '@/common/decorators/company-scoped.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
+import { businessToday } from '@/common/time/clock';
 import { ControlsService } from './controls.service';
 
 class ControlsQueryDto extends createZodDto(controlsQuerySchema) {}
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = businessToday;
 
 @ApiTags('Controls')
 @Controller('controls')

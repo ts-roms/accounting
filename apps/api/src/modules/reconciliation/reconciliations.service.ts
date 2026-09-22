@@ -36,6 +36,7 @@ import {
 import { AuditService } from '@/modules/audit/audit.service';
 import { BankingService } from '@/modules/banking/banking.service';
 import { StatementsService } from '@/modules/banking/statements.service';
+import { businessToday } from '@/common/time/clock';
 import { SubledgerBalancesService, type BalanceLine } from './subledger-balances.service';
 
 const MODULE = 'RECONCILIATION';
@@ -607,7 +608,7 @@ export class ReconciliationsService {
           },
         );
       const stamp = input.notes
-        ? `[approved ${new Date().toISOString().slice(0, 10)} ${actor.firstName} ${actor.lastName}] ${input.notes}`
+        ? `[approved ${businessToday()} ${actor.firstName} ${actor.lastName}] ${input.notes}`
         : null;
       await tx
         .update(reconciliations)

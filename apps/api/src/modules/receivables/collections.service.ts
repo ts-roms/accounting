@@ -42,6 +42,7 @@ import { AuditService } from '@/modules/audit/audit.service';
 import { OutboxService } from '@/modules/integrations/events/outbox.service';
 import { NotificationsService } from '@/modules/integrations/notifications/notifications.service';
 import { daysBetween } from '@/modules/subledger/subledger.logic';
+import { businessToday } from '@/common/time/clock';
 import { ArConfigService } from './ar-config.service';
 import { CreditService } from './credit.service';
 import { CustomersService } from './customers.service';
@@ -157,7 +158,7 @@ export class CollectionsService {
     );
     if (!row) throw new NotFoundError('Collection case', id);
     const [view] = await this.decorateCases(companyId, [row]);
-    const today = new Date().toISOString().slice(0, 10);
+    const today = businessToday();
     const [activities, promises, docs] = await Promise.all([
       this.db
         .select({
@@ -265,7 +266,7 @@ export class CollectionsService {
     const documentNumber = await this.numbering.allocate(
       companyId,
       'COL',
-      new Date().getFullYear(),
+      Number(businessToday().slice(0, 4)),
       tx,
     );
     const [created] = await tx
@@ -607,7 +608,7 @@ export class CollectionsService {
    */
   async runSweep(
     companyId: string,
-    asOf = new Date().toISOString().slice(0, 10),
+    asOf = businessToday(),
   ): Promise<{
     overdue: number;
     casesOpened: number;
@@ -972,7 +973,7 @@ export class CollectionsService {
     }>,
   ): Promise<CollectionCaseView[]> {
     if (!rows.length) return [];
-    const today = new Date().toISOString().slice(0, 10);
+    const today = businessToday();
     const customerIds = [...new Set(rows.map((r) => r.c.customerId))];
     const balances = await this.customersService.balances(companyId, customerIds);
     const oldest = await this.db

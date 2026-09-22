@@ -76,6 +76,12 @@ See `.env.example`. Production requirements:
   images and verified report facts to the Anthropic API - review your data
   policy before enabling it. `AI_ANOMALY_SCAN_DAYS=0` disables the nightly scan.
 - Log shipping of the JSON logs (correlation ids link web, API and DB events).
+- `APP_CLOCK_FIXED_DATE` stays **unset** in production. It pins the business
+  calendar date (`businessToday()`: default as-of dates, scheduled jobs, document
+  numbering years) for demo and test stacks - CI sets `2026-09-18`, the seed's
+  date, so seeded invoices never age into dunning credit holds or new aging
+  buckets and the Playwright suite stays deterministic. Wall-clock timestamps
+  (audit, sessions) are never pinned.
 
 ## Health & observability
 

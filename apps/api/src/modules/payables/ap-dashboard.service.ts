@@ -7,6 +7,7 @@ import { DRIZZLE, type Database } from '@/database/database.types';
 import { paymentRuns, vendorBills, vendorPayments, vendors } from '@/database/schema';
 import { AccountsService } from '@/modules/accounting/accounts/accounts.service';
 import { addDays } from '@/modules/subledger/subledger.logic';
+import { businessToday } from '@/common/time/clock';
 import { ApAccrualsService } from './ap-accruals.service';
 import { ApConfigService } from './ap-config.service';
 import { ApReportsService } from './ap-reports.service';
@@ -93,10 +94,7 @@ export class ApDashboardService {
     private readonly accruals: ApAccrualsService,
   ) {}
 
-  async dashboard(
-    companyId: string,
-    asOf = new Date().toISOString().slice(0, 10),
-  ): Promise<ApDashboard> {
+  async dashboard(companyId: string, asOf = businessToday()): Promise<ApDashboard> {
     const currency = await this.accounts.companyCurrency(companyId);
     const settings = await this.config.settings(companyId);
     const aging = await this.reports.aging(companyId, { asOf });
@@ -283,7 +281,7 @@ export class ApDashboardService {
     companyId: string,
     query: CashRequirementsQuery,
   ): Promise<CashRequirementsReport> {
-    const asOf = query.asOf ?? new Date().toISOString().slice(0, 10);
+    const asOf = query.asOf ?? businessToday();
     const currency = await this.accounts.companyCurrency(companyId);
     const settings = await this.config.settings(companyId);
     const horizons = query.days ? [query.days] : settings.cashRequirementHorizons;

@@ -22,6 +22,7 @@ import type {
   IntegrityReport,
 } from '@/modules/accounting/integrity/integrity.service';
 import { GeneralLedgerService } from '@/modules/accounting/ledger/general-ledger.service';
+import { businessToday } from '@/common/time/clock';
 import { RevenueConfigService } from './revenue-config.service';
 import { addDays, waterfall, type OpenLine } from './revenue.logic';
 
@@ -207,7 +208,7 @@ export class RevenueReportsService {
 
   async waterfall(companyId: string, query: RevenueWaterfallQuery): Promise<RevenueWaterfall> {
     const currency = await this.accounts.companyCurrency(companyId);
-    const from = query.from ?? new Date().toISOString().slice(0, 10);
+    const from = query.from ?? businessToday();
     const rows = await this.openLines(companyId);
     const overall = waterfall(rows, currency, from, query.months);
     const byCustomer = new Map<string, typeof rows>();
@@ -244,7 +245,7 @@ export class RevenueReportsService {
 
   async backlog(companyId: string, query: RevenueBacklogQuery): Promise<RevenueBacklog> {
     const currency = await this.accounts.companyCurrency(companyId);
-    const asOf = query.asOf ?? new Date().toISOString().slice(0, 10);
+    const asOf = query.asOf ?? businessToday();
     const horizon = addDays(asOf, 30);
     const rows = await this.openLines(companyId);
     const byCustomer = new Map<string, RevenueBacklogRow & { scheduleIds: Set<string> }>();

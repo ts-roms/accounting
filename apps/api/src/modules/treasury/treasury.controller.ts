@@ -45,6 +45,7 @@ import type { AuthenticatedUser } from '@/common/auth/authenticated-user';
 import { CompanyScoped } from '@/common/decorators/company-scoped.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
+import { businessToday } from '@/common/time/clock';
 import { BankTransfersService } from './bank-transfers.service';
 import { CashForecastService } from './cash-forecast.service';
 import { CashPositionService } from './cash-position.service';
@@ -200,7 +201,7 @@ export class TreasuryController {
       'Treasury integrity checks (in-transit vs ledger, petty cash vs imprest, payment file totals, statement drift)',
   })
   runIntegrity(@CurrentUser() user: AuthenticatedUser, @Query() query: AsOfQueryDto) {
-    return this.integrity.run(user.companyId!, query.asOf ?? new Date().toISOString().slice(0, 10));
+    return this.integrity.run(user.companyId!, query.asOf ?? businessToday());
   }
 
   @Post('sweep')

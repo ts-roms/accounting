@@ -12,6 +12,7 @@ import { IntegrityService } from '@/modules/accounting/integrity/integrity.servi
 import { NotificationsService } from '@/modules/integrations/notifications/notifications.service';
 import { JobRegistryService } from '@/modules/jobs/job-registry.service';
 import { QUEUES } from '@/modules/jobs/queue.service';
+import { businessToday } from '@/common/time/clock';
 
 export const INTEGRITY_JOB = 'integrity-check';
 
@@ -75,7 +76,7 @@ export class IntegrityScheduleService implements OnModuleInit {
       .from(companies)
       .where(eq(companies.id, companyId));
     if (!company) throw new NotFoundError('Company', companyId);
-    const asOf = new Date().toISOString().slice(0, 10);
+    const asOf = businessToday();
     let values: typeof integrityRuns.$inferInsert;
     try {
       const report = await this.integrity.run(companyId, asOf);
