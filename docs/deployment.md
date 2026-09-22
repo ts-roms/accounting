@@ -59,6 +59,39 @@ reads it. Recreate a Postgres container created before this change
 Backups: `docs/operations/backup-restore.md` (`infrastructure/scripts/backup.sh`
 / `restore.sh`, what holds state, the restore drill).
 
+## Railway
+
+The reference hosted setup is one Railway project (`accounting`) with four
+services. The app services' settings live in
+`infrastructure/railway/api.railway.json` and `web.railway.json` (config as
+code: Dockerfile builder, pre-deploy migration, health check, watch paths) and
+were applied with `railway environment edit`.
+
+| Service    | Source                                                                 | Notes                                                                                                                                                                                    |
+| ---------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Postgres` | Railway managed Postgres (`ghcr.io/railwayapp-templates/postgres-ssl`) | The application database (Drizzle migrations - there is no Prisma). `pg_stat_statements` is not preloaded there, so the Statements tab reports it unavailable until a DBA enables it.    |
+| `Redis`    | Railway managed Redis                                                  | Queues and schedulers.                                                                                                                                                                   |
+| `api`      | GitHub `ts-roms/accounting`, `infrastructure/docker/api.Dockerfile`    | Pre-deploy `node dist/database/migrate.js` (migrate-on-deploy), health `/api/v1/health/ready`, volume at `/data` with `STORAGE_DIR=/data/storage`, private network only (`API_HOST=::`). |
+| `web`      | Same repo, `infrastructure/docker/web.Dockerfile`                      | Public domain; `API_INTERNAL_URL=http://${{api.RAILWAY_PRIVATE_DOMAIN}}:3001`; the browser only ever talks to Next.js.                                                                   |
+
+Variables on `api`: `DATABASE_URL=${{Postgres.DATABASE_URL}}`,
+`REDIS_URL=${{Redis.REDIS_URL}}`, `NODE_ENV=production`, `API_HOST=::`
+(Railway's private network is IPv6), `API_PORT=3001` and `PORT=3001` (health
+checks), `COOKIE_SECURE=true`, `API_CORS_ORIGINS` / `WEB_BASE_URL` = the web
+domain, `STORAGE_DIR=/data/storage`, `RAILWAY_RUN_UID=0` (the volume mounts
+root-owned; the image otherwise runs as `app`), `QUEUE_PREFIX`, generated
+`JWT_ACCESS_SECRET` / `INTEGRATION_ENCRYPTION_KEY` / `METRICS_TOKEN`,
+`OCR_PROVIDER=TESSERACT` (language data caches on the volume). On `web`:
+`PORT=3000`, `NODE_ENV=production`, `API_INTERNAL_URL`.
+
+First deploy: the pre-deploy step creates the schema. Seed it once with the
+service's own variables - `railway run --service api node dist/database/seed/index.js`
+from a machine that has the built API (or `pnpm db:seed` against the public
+`DATABASE_PUBLIC_URL`) - and change the seeded passwords afterwards. Later
+deploys are automatic on push to `main`; watch paths keep the web from
+rebuilding on API-only changes and vice versa, and a failed migration fails the
+deploy before the new API starts. `APP_CLOCK_FIXED_DATE` stays unset.
+
 ## Environment
 
 See `.env.example`. Production requirements:

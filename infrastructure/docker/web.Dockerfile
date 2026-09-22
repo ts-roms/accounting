@@ -17,8 +17,11 @@ RUN pnpm install --frozen-lockfile --filter @accounting/web...
 FROM deps AS build
 COPY packages ./packages
 COPY apps/web ./apps/web
-ENV NEXT_TELEMETRY_DISABLED=1
-RUN pnpm --filter @accounting/web... build
+# Next.js bakes the /api rewrite target into the build: the API address must be
+# known here, not only at runtime (Railway and compose pass it as a build arg).
+ARG API_INTERNAL_URL=http://127.0.0.1:3001
+ENV NEXT_TELEMETRY_DISABLED=1 API_INTERNAL_URL=$API_INTERNAL_URL
+RUN pnpm --filter @accounting/web... build && mkdir -p apps/web/public
 
 FROM node:22-alpine AS runtime
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1

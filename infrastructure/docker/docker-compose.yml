@@ -100,6 +100,8 @@ services:
     build:
       context: ../..
       dockerfile: infrastructure/docker/web.Dockerfile
+      args:
+        API_INTERNAL_URL: http://api:3001
     container_name: accounting-web
     environment:
       NODE_ENV: production
