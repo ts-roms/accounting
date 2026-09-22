@@ -1,16 +1,11 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { FINANCE, login } from './helpers';
+import { FINANCE, login, pickFromCombobox } from './helpers';
 
 const stamp = Date.now().toString().slice(-6);
 
-async function pickAccount(page: Page, rowIndex: number, search: string) {
-  await page.getByTestId('account-combobox').nth(rowIndex).click();
-  const input = page.getByPlaceholder('Search by code or name...');
-  await input.fill(search);
-  await expect(page.locator('[cmdk-item]').first()).toBeVisible();
-  await input.press('Enter');
-}
+const pickAccount = (page: Page, rowIndex: number, search: string) =>
+  pickFromCombobox(page, page.getByTestId('account-combobox').nth(rowIndex), search);
 
 test.describe('enterprise: FX, intercompany, workflows, attachments', () => {
   test.slow();

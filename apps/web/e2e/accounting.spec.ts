@@ -1,14 +1,9 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { login } from './helpers';
+import { login, pickFromCombobox } from './helpers';
 
-async function pickAccount(page: Page, rowIndex: number, search: string) {
-  await page.getByTestId('account-combobox').nth(rowIndex).click();
-  const input = page.getByPlaceholder('Search by code or name...');
-  await input.fill(search);
-  await expect(page.locator('[cmdk-item]').first()).toBeVisible();
-  await input.press('Enter');
-}
+const pickAccount = (page: Page, rowIndex: number, search: string) =>
+  pickFromCombobox(page, page.getByTestId('account-combobox').nth(rowIndex), search);
 
 test.describe('accounting core', () => {
   test('creates, approves, posts and drills into a journal entry', async ({ page }) => {

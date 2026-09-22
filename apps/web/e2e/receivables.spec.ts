@@ -1,14 +1,5 @@
-import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { login } from './helpers';
-
-async function pickFromCombobox(page: Page, testId: string, search: string) {
-  await page.getByTestId(testId).first().click();
-  const input = page.getByPlaceholder('Search by code or name...');
-  await input.fill(search);
-  await expect(page.locator('[cmdk-item]').first()).toBeVisible();
-  await input.press('Enter');
-}
+import { login, pickFromCombobox, releaseCreditHold } from './helpers';
 
 test.describe('receivables', () => {
   // Each flow walks five or six screens; on a cold dev server that exceeds the default budget.
@@ -21,6 +12,7 @@ test.describe('receivables', () => {
     const reference = `E2E-${Date.now()}`;
 
     // ---- Invoice
+    await releaseCreditHold(page, 'CUST-003');
     await page.goto('/sales/invoices/new');
     await pickFromCombobox(page, 'party-combobox', 'Cebu');
     await expect(page.getByTestId('party-combobox')).toContainText('Cebu Hardware Supply');

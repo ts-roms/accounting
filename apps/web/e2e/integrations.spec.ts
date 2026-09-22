@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { login } from './helpers';
+import { login, releaseCreditHold } from './helpers';
 
 const ACCOUNTANT = { email: 'accountant@acme.local', password: 'P@ssw0rd123' };
 
@@ -139,12 +139,14 @@ test.describe('integration platform', () => {
         config: { taxpayerId: '000-999-888-777', pushOnEvents: false },
       })
     ).json();
-    const customers = await (await apiCall(page, 'get', '/customers?pageSize=1')).json();
+    // The first customer by name is CUST-003; make sure a dunning hold (its seeded
+    // invoice ages past 120 days in real time) cannot refuse the approval below.
+    const customerId = await releaseCreditHold(page, 'CUST-003');
     const accounts = await (await apiCall(page, 'get', '/accounts')).json();
     const revenue = accounts.find((a: { code: string }) => a.code === '4100');
     const invoice = await (
       await apiCall(page, 'post', '/invoices', {
-        customerId: customers.items[0].id,
+        customerId,
         documentDate: '2026-09-14',
         reference: `PW-LINKS-${stamp}`,
         lines: [{ description: 'Integration trail demo', unitPrice: '500', accountId: revenue.id }],
