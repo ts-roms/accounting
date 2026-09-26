@@ -281,6 +281,13 @@
       "when": 1789752249948,
       "tag": "0039_consolidation_account_mappings",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1790420970587,
+      "tag": "0040_period_balance_lock_order",
+      "breakpoints": true
     }
   ]
 }

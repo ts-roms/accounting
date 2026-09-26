@@ -127,6 +127,11 @@ export interface PostOptions {
    * manual journals use the default `journal.post`.
    */
   permission?: PermissionKey;
+  /**
+   * A JE number this transaction already allocated for the journal (see the
+   * auto-reversal in `postEntry`). Internal: callers never choose numbers.
+   */
+  preallocatedNumber?: string;
 }
 
 export const JOURNAL_POSTED_EVENT = 'accounting.journal.posted';
@@ -554,12 +559,14 @@ export class AccountingPostingService {
       options,
       event.actor,
     );
-    const documentNumber = await this.numbering.allocate(
-      event.companyId,
-      'JE',
-      Number(event.entryDate.slice(0, 4)),
-      tx,
-    );
+    const documentNumber =
+      options.preallocatedNumber ??
+      (await this.numbering.allocate(
+        event.companyId,
+        'JE',
+        Number(event.entryDate.slice(0, 4)),
+        tx,
+      ));
 
     const [entry] = await tx
       .insert(journalEntries)
@@ -656,6 +663,19 @@ export class AccountingPostingService {
     );
     const period = await this.resolvePeriod(tx, entry.companyId, entry.entryDate, options, actor);
 
+    // Lock order: every posting takes the JE counter row before the period-balance rows the
+    // status flip below updates. An accrual's mirror REVERSAL needs a number too, so it is
+    // allocated now - taking it after the flip would invert the order against concurrent
+    // postEvent calls and deadlock them.
+    const reversalNumber = entry.autoReverseDate
+      ? await this.numbering.allocate(
+          entry.companyId,
+          'JE',
+          Number(entry.autoReverseDate.slice(0, 4)),
+          tx,
+        )
+      : undefined;
+
     const [posted] = await tx
       .update(journalEntries)
       .set({
@@ -726,6 +746,7 @@ export class AccountingPostingService {
     // same authority - it is part of the accrual, not a separate decision.
     if (posted.autoReverseDate) {
       const reversal = await this.reverseEntry(tx, posted, {
+        documentNumber: reversalNumber,
         reversalDate: posted.autoReverseDate,
         description: `Auto-reversal of ${posted.documentNumber}: ${posted.description}`,
         actor,
@@ -750,6 +771,8 @@ export class AccountingPostingService {
       description?: string | null;
       actor: PostingActor;
       permission?: PermissionKey;
+      /** Number allocated earlier in this transaction (auto-reversal lock order). */
+      documentNumber?: string;
     },
   ): Promise<JournalEntry> {
     if (!(entry.status === 'POSTED' || entry.status === 'LOCKED')) {
@@ -801,7 +824,10 @@ export class AccountingPostingService {
         reversalOfId: entry.id,
         actor: input.actor,
       },
-      { permission: input.permission ?? P['journal.reverse'] },
+      {
+        permission: input.permission ?? P['journal.reverse'],
+        preallocatedNumber: input.documentNumber,
+      },
     );
     await tx
       .update(journalEntries)

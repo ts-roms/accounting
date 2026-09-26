@@ -16,6 +16,8 @@ export const ErrorCodes = {
   COMPANY_NOT_ACCESSIBLE: 'COMPANY_NOT_ACCESSIBLE',
   NOT_FOUND: 'NOT_FOUND',
   CONFLICT: 'CONFLICT',
+  /** A deadlock / serialization failure rolled the whole change back; safe to retry. */
+  TRANSACTION_CONFLICT: 'TRANSACTION_CONFLICT',
   DUPLICATE: 'DUPLICATE',
   SYSTEM_ROLE_IMMUTABLE: 'SYSTEM_ROLE_IMMUTABLE',
   SOD_VIOLATION: 'SOD_VIOLATION',
