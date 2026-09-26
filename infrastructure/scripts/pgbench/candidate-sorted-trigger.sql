@@ -1,7 +1,7 @@
--- CANDIDATE (not a migration): journal_entries_period_balance applying one upsert per distinct
--- key, in key order. Same arithmetic as 0037; deterministic lock order inside one entry, and a
--- 300-line journal that hits 40 keys does 40 upserts instead of 300. Apply to a perf database
--- only, measure with deadlock-pair.sql / post-event.sql, then prove with perf-verify.sql.
+-- The sorted, aggregated journal_entries_period_balance as first measured here; it shipped as
+-- migration 0040_period_balance_lock_order.sql. Kept so a perf database still on 0037 can be
+-- switched for a before / after comparison with deadlock-pair.sql / post-event.sql (prove the
+-- result with perf-verify.sql).
 CREATE OR REPLACE FUNCTION journal_entries_period_balance()
 RETURNS trigger
 LANGUAGE plpgsql

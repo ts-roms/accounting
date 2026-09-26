@@ -95,6 +95,14 @@ three reasons:
   line's debit, credit and count in the same transaction as the ledger write
   (migration `0037_account_period_balances.sql`). No service writes it; a
   posting cannot succeed without the matching balance change.
+- **One lock order.** An entry entering the ledger applies one upsert per
+  model key, in key order (migration `0040_period_balance_lock_order.sql`),
+  and every posting takes the JE number counter before the model rows - an
+  accrual allocates its mirror REVERSAL's number before its own status flip.
+  Opposite-order journals no longer deadlock each other; a deadlock or
+  serialization failure that still happens (a transaction posting several
+  entries) rolls everything back and returns 409 `TRANSACTION_CONFLICT`,
+  safe to retry.
 - **It is proven, every run.** `PERIOD_BALANCES_VS_LEDGER` (CRITICAL) joins
   the stored rows to the same aggregation computed from the lines and reports
   every key whose debit, credit or line count differs - in the nightly

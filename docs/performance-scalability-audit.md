@@ -297,6 +297,13 @@ Each: **Symptom → Evidence → Root cause → Change → Expected impact → V
 
 ### B2. Deadlocks in the period-balance trigger
 
+**Status: fixed** - migration `0040_period_balance_lock_order.sql` (sorted, aggregated
+upserts), `postEntry` allocates the auto-reversal's number before the status flip, and 40P01 /
+40001 return 409 `TRANSACTION_CONFLICT` instead of 500. After the fix the deadlock probe runs
+at 0 % failures, 303 tps on the 10M database [M]; two e2e tests in `period-balances.e2e-spec.ts`
+fail on the old code and pass on the new. An automatic server-side retry was not added: it would
+re-run in-process side effects (`JOURNAL_POSTED_EVENT`), so clients retry the 409 instead.
+
 - **Symptom**: 1-s stalls then HTTP 500 on posting; throughput collapse under concurrency.
 - **Evidence** [M]: `pgbench/deadlock-pair.sql` (2-line journals, opposite order, 4 clients):
   30 % deadlock failures, 1.9 tps; `accrual-inversion.sql` + `post-event.sql`: 12.7 % deadlocks,
