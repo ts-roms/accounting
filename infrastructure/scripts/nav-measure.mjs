@@ -1,9 +1,13 @@
 // In-page navigation timing: click a sidebar link, then measure from the
 // click (capture phase) to (a) the route skeleton / new page appearing in
 // <main>, (b) the last DOM mutation in <main> (settled), plus API calls.
-// usage (from apps/web, where playwright is installed):
+// usage (from apps/web, where @playwright/test is installed):
 //   node ../../infrastructure/scripts/nav-measure.mjs http://127.0.0.1:3016 [rounds]
-import { chromium } from 'playwright';
+// Resolved from the working directory: an ESM import would resolve next to this file, where
+// no node_modules exist.
+import { createRequire } from 'node:module';
+
+const { chromium } = createRequire(process.cwd() + '/')('@playwright/test');
 
 const base = process.argv[2] ?? 'http://127.0.0.1:3016';
 const rounds = Number(process.argv[3] ?? 2);
@@ -30,7 +34,10 @@ const routes = [
   '/admin/operations',
 ];
 
-const browser = await chromium.launch();
+// CHROMIUM_PATH: use a pre-installed Chromium when the bundled browser build is absent.
+const browser = await chromium.launch(
+  process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
+);
 const ctx = await browser.newContext({ viewport: { width: 1400, height: 900 } });
 await ctx.addInitScript(() => {
   const nav = { t0: null, first: null, last: null, skeleton: null, mutations: 0 };

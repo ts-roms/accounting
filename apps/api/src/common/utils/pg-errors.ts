@@ -14,6 +14,8 @@ export interface PgError extends Error {
 export const PG_UNIQUE_VIOLATION = '23505';
 export const PG_FOREIGN_KEY_VIOLATION = '23503';
 export const PG_CHECK_VIOLATION = '23514';
+export const PG_SERIALIZATION_FAILURE = '40001';
+export const PG_DEADLOCK_DETECTED = '40P01';
 
 export function isPgError(err: unknown): err is PgError {
   return (
@@ -42,4 +44,13 @@ export function isUniqueViolation(err: unknown, constraint?: string): boolean {
 
 export function isForeignKeyViolation(err: unknown): boolean {
   return unwrapPgError(err)?.code === PG_FOREIGN_KEY_VIOLATION;
+}
+
+/**
+ * Deadlock or serialization failure: Postgres rolled the whole transaction back
+ * because of a concurrent one. Nothing was written, so the request can be retried.
+ */
+export function isTransactionConflict(err: unknown): boolean {
+  const code = unwrapPgError(err)?.code;
+  return code === PG_DEADLOCK_DETECTED || code === PG_SERIALIZATION_FAILURE;
 }

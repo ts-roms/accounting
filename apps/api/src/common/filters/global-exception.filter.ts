@@ -13,6 +13,7 @@ import type { ApiErrorBody } from '@accounting/types';
 import { RequestContext } from '../context/request-context';
 import { AppError } from '../errors/app-error';
 import { ErrorCodes } from '../errors/error-codes';
+import { isTransactionConflict } from '../utils/pg-errors';
 
 /**
  * Translates every thrown error into the standard envelope:
@@ -89,6 +90,19 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         body: {
           code: this.codeForStatus(status),
           message: Array.isArray(message) ? message.join('; ') : message,
+        },
+      };
+    }
+
+    // A deadlock or serialization failure rolled everything back: a retryable conflict, not a
+    // server fault. (The Idempotency-Key interceptor saw the raw error and released the key.)
+    if (isTransactionConflict(exception)) {
+      return {
+        status: HttpStatus.CONFLICT,
+        body: {
+          code: ErrorCodes.TRANSACTION_CONFLICT,
+          message:
+            'The change clashed with another one saved at the same time and was not applied. Try again.',
         },
       };
     }

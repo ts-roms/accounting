@@ -43,7 +43,8 @@ ledger grows. Every report still derives from posted journal lines (see
 ## Navigation (web)
 
 "Navigation is slow" has two very different causes, so measure the right one.
-`infrastructure/scripts/nav-measure.mjs <base>` (run from `apps/web`; the recipe is: click a real
+`infrastructure/scripts/nav-measure.mjs <base>` (run from `apps/web`, which provides
+`@playwright/test`; `CHROMIUM_PATH` points it at a pre-installed Chromium; the recipe is: click a real
 sidebar link, then time from the click to the first DOM change inside
 `<main>` and to the last one, with a MutationObserver installed by
 `addInitScript`) against a **production build** (`next build` + `next start`)
@@ -94,6 +95,14 @@ three reasons:
   line's debit, credit and count in the same transaction as the ledger write
   (migration `0037_account_period_balances.sql`). No service writes it; a
   posting cannot succeed without the matching balance change.
+- **One lock order.** An entry entering the ledger applies one upsert per
+  model key, in key order (migration `0040_period_balance_lock_order.sql`),
+  and every posting takes the JE number counter before the model rows - an
+  accrual allocates its mirror REVERSAL's number before its own status flip.
+  Opposite-order journals no longer deadlock each other; a deadlock or
+  serialization failure that still happens (a transaction posting several
+  entries) rolls everything back and returns 409 `TRANSACTION_CONFLICT`,
+  safe to retry.
 - **It is proven, every run.** `PERIOD_BALANCES_VS_LEDGER` (CRITICAL) joins
   the stored rows to the same aggregation computed from the lines and reports
   every key whose debit, credit or line count differs - in the nightly
@@ -142,9 +151,32 @@ node infrastructure/scripts/load-test.mjs http://127.0.0.1:3001/api/v1 10 30 mix
 ```
 
 Raise `AUTH_LOGIN_RATE_LIMIT` / `RATE_LIMIT_MAX` on the API under test.
+`RAMP`, `THINK_MS` and an open-loop `RATE` shape the load; on one machine it
+also prints where the CPU went (machine / API / Postgres).
 `infrastructure/scripts/perf-volume.sql` loads the 40k-journal volume into a
 throwaway database (it credits the AR / AP control accounts directly, so
-reconciliations show variance afterwards).
+reconciliations show variance afterwards) - kept to reproduce the numbers
+below. For anything larger, or anything that must also prove correctness, use
+`perf-ledger.sql` + `perf-verify.sql` (next section).
+
+## Scalability audit (10M lines)
+
+`docs/performance-scalability-audit.md` measures a 10-million-line ledger
+(1.65M journals, four companies, 33 months, realistic account skew and
+dimensions): what still holds from this page, what does not (the read model
+compresses only 2.5-4x once lines carry dimensions; live integrity audits;
+posting serialization on the JE counter; trigger deadlocks; API crash on a
+server-side disconnect), and an ordered roadmap. Its tooling:
+
+| Script                                    | What it does                                                                                 |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `infrastructure/scripts/perf-ledger.sql`  | financially valid volume at any size (companies, years, skew, dimensions, reversals, drafts) |
+| `infrastructure/scripts/perf-verify.sql`  | the correctness gate: every run must PASS it, fast or not                                    |
+| `infrastructure/scripts/perf-explain.sql` | `EXPLAIN (ANALYZE, BUFFERS)` of the ledger / integrity statements                            |
+| `infrastructure/scripts/report-bench.mjs` | sequential latency + payload matrix (windows, partial months, heavy / cold GL, deep pages)   |
+| `infrastructure/scripts/posting-test.mjs` | API posting throughput, concurrent duplicates, mixed post / reverse / report, then the gate  |
+| `infrastructure/scripts/pgbench/`         | DB-level posting, lock-order probes, the candidate sorted period-balance trigger             |
+| `infrastructure/k6/accounting-journey.js` | open-model k6 journey for perf companies (`PERF01..`) only                                   |
 
 ### Findings (2026-09, 40k journals, 16-core workstation, Postgres in Docker)
 

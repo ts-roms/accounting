@@ -6,6 +6,8 @@ import { AppModule } from '@/app.module';
 import { configureApp } from '@/app.setup';
 import { runMigrations } from '@/database/migrate';
 import { runSeed } from '@/database/seed/seed';
+import { DRIZZLE, type Database } from '@/database/database.types';
+import { AccountingPostingService } from '@/modules/accounting/journals/posting.service';
 import {
   GeneralLedgerService,
   type BalanceFilter,
@@ -184,6 +186,83 @@ describe('Period balances (e2e)', () => {
     expect(Number(juneAfter.credit) - Number(june.credit)).toBeCloseTo(123.45, 4);
     expect((await integrityFinding()).count).toBe(0);
     await expectSameActivity({ companyId, from: '2026-05-01', to: '2026-06-30' });
+  });
+
+  it('concurrent postings touching the same rows in opposite line order all succeed (lock order)', async () => {
+    // Half the journals list cash first, half list the expense first: before 0040 the trigger
+    // locked model rows in line order and these deadlocked against each other.
+    const drafts: string[] = [];
+    for (let i = 0; i < 30; i += 1) {
+      const lines = [
+        { accountId: acc['6400'], debit: '10.00', credit: '0' },
+        { accountId: acc['1110'], debit: '0', credit: '10.00' },
+      ];
+      const res = await as(http().post('/api/v1/journal-entries'))
+        .send({
+          entryDate: '2026-07-15',
+          description: `Lock order probe ${i}`,
+          lines: i % 2 ? lines : [...lines].reverse(),
+        })
+        .expect(201);
+      await as(http().post(`/api/v1/journal-entries/${res.body.id}/submit`)).expect(201);
+      await as(http().post(`/api/v1/journal-entries/${res.body.id}/approve`), finance).expect(201);
+      drafts.push(res.body.id as string);
+    }
+    const posted = await Promise.all(
+      drafts.map((id) => as(http().post(`/api/v1/journal-entries/${id}/post`), finance)),
+    );
+    expect(posted.map((r) => r.status)).toEqual(drafts.map(() => 201));
+    expect((await integrityFinding()).count).toBe(0);
+    await expectSameActivity({ companyId, from: '2026-07-01', to: '2026-07-31' });
+  });
+
+  it('auto-reversing journals and ordinary postings on the same rows do not deadlock', async () => {
+    // postEntry of an accrual used to update the model rows first and take the JE counter for its
+    // mirror afterwards; every postEvent takes the counter first - opposite orders, deadlocks.
+    const accruals: string[] = [];
+    for (let i = 0; i < 15; i += 1) {
+      const res = await as(http().post('/api/v1/journal-entries'))
+        .send({
+          entryDate: '2026-07-20',
+          autoReverseDate: '2026-08-01',
+          description: `Accrual lock order probe ${i}`,
+          lines: [
+            { accountId: acc['6400'], debit: '5.00', credit: '0' },
+            { accountId: acc['1110'], debit: '0', credit: '5.00' },
+          ],
+        })
+        .expect(201);
+      await as(http().post(`/api/v1/journal-entries/${res.body.id}/submit`)).expect(201);
+      await as(http().post(`/api/v1/journal-entries/${res.body.id}/approve`), finance).expect(201);
+      accruals.push(res.body.id as string);
+    }
+    const db = app.get<Database>(DRIZZLE);
+    const posting = app.get(AccountingPostingService);
+    const results = await Promise.allSettled([
+      ...accruals.map((id) =>
+        as(http().post(`/api/v1/journal-entries/${id}/post`), finance).then((r) => r.status),
+      ),
+      ...Array.from({ length: 15 }, (_, i) =>
+        db.transaction((tx) =>
+          posting.postEvent(tx, {
+            companyId,
+            entryDate: '2026-07-20',
+            description: `Engine posting probe ${i}`,
+            lines: [
+              { accountId: acc['1110']!, debit: '7.00', credit: '0' },
+              { accountId: acc['6400']!, debit: '0', credit: '7.00' },
+            ],
+            actor: { id: null, system: true },
+          }),
+        ),
+      ),
+    ]);
+    expect(results.filter((r) => r.status === 'rejected')).toEqual([]);
+    expect(results.slice(0, 15).map((r) => (r as PromiseFulfilledResult<number>).value)).toEqual(
+      accruals.map(() => 201),
+    );
+    expect((await integrityFinding()).count).toBe(0);
+    await expectSameActivity({ companyId, from: '2026-07-01', to: '2026-08-31' });
   });
 
   it('the integrity check catches a drifted row and the operations rebuild repairs it', async () => {
